@@ -33,6 +33,7 @@
             <form method="post" action="{{ route('sg.couriers.action', $d) }}" style="display:flex;gap:6px;align-items:center">@csrf<input type="hidden" name="a" value="delivered"><input name="cash" class="inp numr" style="height:34px;width:90px" value="{{ $d->pay_type === 'bank' ? 0 : round($d->toCollect(), 2) }}" title="نقداً"><input name="bank" class="inp numr" style="height:34px;width:80px" value="{{ $d->pay_type === 'bank' ? round($d->amount, 2) : 0 }}" title="مصرف"><button class="btn green sm">✓ تم التسليم (بالنيابة)</button></form>
             <form method="post" action="{{ route('sg.couriers.action', $d) }}" data-confirm="الطلبية عادت للمحل؟ الإيصالات ترجع للرف">@csrf<input type="hidden" name="a" value="returned"><button class="btn ghost sm">↩ عادت للمحل</button></form>
             <form method="post" action="{{ route('sg.couriers.action', $d) }}" data-confirm="إلغاء التوصيل؟">@csrf<input type="hidden" name="a" value="cancelled"><button class="btn red sm">إلغاء</button></form>
+            @if (\Illuminate\Support\Facades\Route::has('sg.dispatch.act'))<form method="post" action="{{ route('sg.dispatch.act', $d) }}" data-confirm="نحذفوه نهائي؟ ما يرجعش (الإيصالات ترجع للرف)">@csrf<input type="hidden" name="a" value="delete"><button class="btn ghost sm" style="color:#c62828">🗑 حذف نهائي</button></form>@endif
         </div>
         @endif
         @endcan

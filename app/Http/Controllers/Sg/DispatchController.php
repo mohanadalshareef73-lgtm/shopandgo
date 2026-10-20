@@ -152,26 +152,29 @@ class DispatchController extends Controller
     {
         $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle,note,hide,problem,delete', 'text' => 'nullable|string|max:1000', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
         if ($d['a'] === 'delete') {
-            // 🗑 حذف من طلبيات دليفري: يتلغى التوصيل (ما يتمسحش من السجل) · الإيصالات ترجع للرف · الحجز يرجع لتأكيد الحجوزات
-            foreach ($delivery->orders as $o) {
-                if (!$o->delivered && (int) $o->delivery_id === (int) $delivery->id) {
-                    $o->delivery_id = null;
-                    $o->save();
+            if ($delivery->status === 'delivered') {
+                return back()->with('error', 'التوصيل هذا تسلّم وفلوسه تسجلت — ما ينحذفش (استعمل ✓ للإخفاء)');
+            }
+            // 🗑 حذف نهائي: التوصيل ينمسح · الإيصالات ترجع للرف · الحجز (لو سلة) يتخفى نهائي
+            $info = $delivery->code . ' · ' . ($delivery->recipient_name ?: optional($delivery->customer)->name) . ($delivery->cart_id ? ' · سلة #' . $delivery->cart_id : '') . ' · ' . $delivery->orders->pluck('code')->implode('، ');
+            DB::transaction(function () use ($delivery) {
+                Order::where('delivery_id', $delivery->id)->where('delivered', false)->update(['delivery_id' => null]);
+                if ($delivery->cart_id && ($cart = \App\Models\CartQuote::find($delivery->cart_id)) && $cart->portal_status === 'ordered') {
+                    $cart->portal_status = 'ignored';
+                    $cart->save();
                 }
-            }
-            if (in_array($delivery->status, self::ACTIVE, true)) {
-                $delivery->status = 'cancelled';
-            }
-            if (\Illuminate\Support\Facades\Schema::hasColumn('deliveries', 'kept')) {
-                $delivery->kept = false;
-            }
-            $delivery->save();
-            $delivery->log('cancelled', '🗑 انحذف من طلبيات دليفري');
+                DB::table('delivery_order')->where('delivery_id', $delivery->id)->delete();
+                if (\Illuminate\Support\Facades\Schema::hasTable('delivery_events')) {
+                    DB::table('delivery_events')->where('delivery_id', $delivery->id)->delete();
+                }
+                $delivery->delete();
+            });
+            Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' حذف توصيل نهائي', 'log' => ' ' . $info]);
             Cache::forget('sg.badge.ready');
             Cache::forget('sg.badge.courier');
             Cache::forget('sg.badge.pcart');
 
-            return back()->with('success', '🗑 انحذف' . ($delivery->cart_id ? ' · الحجز رجع لـ«تأكيد الحجوزات»' : ''));
+            return back()->with('success', '🗑 انحذف نهائي');
         }
         if ($d['a'] === 'hide') {
             $delivery->kept = false;
