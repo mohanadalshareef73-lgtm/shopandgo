@@ -65,8 +65,8 @@
             <form method="post" action="{{ route('sg.pcarts.decide', $ct) }}" style="margin-bottom:6px" onsubmit="return confirm({{ json_encode($ct->customer_id ? 'نأكدو الحجز؟ ينعمل الإيصال ويوصل العميل التأكيد' : 'نأكدو الحجز؟ ينفتحله حساب (لو ما عندهش) وينعمل الإيصال ويوصله على الواتساب') }})">@csrf
                 <input type="hidden" name="send_whatsapp" value="1">
                 <button name="do" value="confirm" class="btn green" style="font-size:15px;padding:9px 16px">✓ تأكيد الحجز</button>
-                <button name="do" value="reject" class="btn ghost sm" style="color:var(--down)" onclick="return confirm('نرفضو الحجز؟')">✕ رفض</button>
             </form>
+            <form method="post" action="{{ route('sg.pcarts.decide', $ct) }}" style="margin:0 0 6px" onsubmit="return confirm('نرفضو الحجز؟ (بدون رسالة للعميل)')">@csrf<input type="hidden" name="send_whatsapp" value="0"><button name="do" value="reject" class="btn ghost sm" style="color:var(--down)">✕ رفض</button></form>
             @endif
             @if (empty($ct->order_id) && $ct->customer_id && in_array($ct->portal_status, ['draft', 'ordered', null], true))
             <details style="margin-bottom:6px"><summary class="btn ghost sm" style="display:inline-flex;cursor:pointer">🏪 حجز في المكتب</summary>
