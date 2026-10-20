@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\Delivery;
 use App\Models\Log;
 use App\Models\Order;
+use App\Models\TreasuryHistory;
 use App\Models\User;
 use App\Services\AppSettings;
 use App\Services\MessageService;
@@ -716,29 +717,46 @@ class DispatchController extends Controller
      */
     protected function restore(Delivery $dl): string
     {
-        if ($dl->cart_id && $dl->status === 'delivered') {
-            throw new \RuntimeException('حجز سلة اتأكد وانعمله إيصال — تراجع عنه من صفحة الإيصال');
-        }
         $cashId = AppSettings::cashPaymentId();
         $back = 0;
         DB::transaction(function () use ($dl, $cashId, &$back) {
             $dl->loadMissing('orders');
             $since = ($dl->delivered_at ?: $dl->updated_at ?: now())->copy()->subMinutes(10);
-            if ($dl->status === 'delivered') {
+            if ($dl->cart_id && $dl->status === 'delivered') {
+                // 🛒 حجز سلة اتقبض بالغلط: الدفعة ترجع · الإيصال اللي انعمل منه يتلغى · الحجز يرجع «يستنى تأكيد»
+                $cart = \App\Models\CartQuote::find($dl->cart_id);
+                $o = $cart && !empty($cart->order_id) ? Order::find($cart->order_id) : null;
+                if ($o) {
+                    foreach (\App\Models\PaidHistory::where('order_id', $o->id)->where('created_at', '>=', $since)->get() as $p) {
+                        $back += (float) $p->paid_price;
+                        $this->reversePaid($p, $o);
+                    }
+                    $o->refresh();
+                    if (!$o->delivered && $o->created_at && $o->created_at->gte($since)) {
+                        $o->status = 'canceld'; // الإيصال انعمل بالغلط من القبض
+                        $o->note = trim(($o->note ? $o->note . ' · ' : '') . 'تلغى: تراجع عن قبض دليفري ' . $dl->code);
+                        $o->save();
+                    }
+                }
+                if ($cart) {
+                    $cart->paid_amount = max(0, round((float) $cart->paid_amount - max($back, (float) $dl->amount), 2));
+                    if ((float) $cart->paid_amount <= 0.009) {
+                        $cart->paid_at = null;
+                    }
+                    if ($o && (int) $cart->order_id === (int) $o->id && $o->status === 'canceld') {
+                        $cart->order_id = null;
+                    }
+                    if (in_array($cart->portal_status, ['confirmed'], true)) {
+                        $cart->portal_status = 'ordered';
+                    }
+                    $cart->save();
+                }
+            } elseif ($dl->status === 'delivered') {
                 $targets = $dl->deposit_order_id ? Order::whereKey($dl->deposit_order_id)->get() : $dl->orders;
                 foreach ($targets as $o) {
                     foreach (\App\Models\PaidHistory::where('order_id', $o->id)->where('created_at', '>=', $since)->get() as $p) {
                         $back += (float) $p->paid_price;
-                        if ($dl->courier_id && (int) $p->payment_id === (int) $cashId && !$dl->settlement_id) {
-                            // كاش مع مندوب بحساب: ما دخلش الخزينة — نشيلوه من الإيصال بس
-                            $o->refresh();
-                            $o->paid_price = max(0, round((float) $o->paid_price - (float) $p->paid_price, 2));
-                            $o->refreshPaymentStatus();
-                            $o->save();
-                            $p->delete();
-                        } else {
-                            \App\Services\OrderPaymentService::edit($p, 0, (int) $p->payment_id);
-                        }
+                        $this->reversePaid($p, $o);
                     }
                 }
                 foreach ($dl->orders as $o) {
@@ -779,6 +797,24 @@ class DispatchController extends Controller
         Cache::forget('sg.badge.courier');
 
         return ($dl->recipient_name ?: optional($dl->customer)->name) . ' رجع للطابور' . ($back ? ' · ورجعت الدفعة ' . TS::fmt($back) . ' د.ل' : '');
+    }
+
+    /** يرجّع دفعة: لو دخلت الخزينة تطلع منها، ولو كاش مع المندوب (ما دخلش) تنشال من الإيصال بس */
+    protected function reversePaid(\App\Models\PaidHistory $p, Order $o): void
+    {
+        $inTreasury = TreasuryHistory::where('type', 'order')->where('procedure_id', $o->id)->where('status', 'pay')
+            ->where('payment_id', $p->payment_id)->whereBetween('created_at', [$p->created_at->copy()->subMinutes(2), $p->created_at->copy()->addMinutes(2)])
+            ->whereRaw('ABS(price - ?) < 0.01', [(float) $p->paid_price])->exists();
+        if ($inTreasury) {
+            \App\Services\OrderPaymentService::edit($p, 0, (int) $p->payment_id);
+
+            return;
+        }
+        $o->refresh();
+        $o->paid_price = max(0, round((float) $o->paid_price - (float) $p->paid_price, 2));
+        $o->refreshPaymentStatus();
+        $o->save();
+        $p->delete();
     }
 
     /** إنشاء توصيل لإيصالات زبون (مستقل عن خدمة المندوبين) */

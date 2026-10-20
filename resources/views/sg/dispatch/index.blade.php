@@ -50,7 +50,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
             <td><b class="num">{{ optional($r->customer)->code }}</b> {{ optional($r->customer)->name ?: $r->recipient_name }}</td>
             <td class="num">{{ $r->cart_id ? 'سلة #' . $r->cart_id : ($r->orders->pluck('code')->implode('، ') ?: '—') }}</td>
             <td>{{ ['delivered' => '✅ مستلمة / مقبوضة', 'returned' => '↩ رجعت للرف', 'cancelled' => '✕ ملغية'][$r->status] ?? $r->status }}{{ (float) $r->collected_cash > 0 ? ' · ' . $f($r->collected_cash) . ' د.ل' : '' }}</td>
-            <td>@if (!($r->cart_id && $r->status === 'delivered'))<button type="button" class="btn sm" style="background:#262c4a;color:#fff" onclick="ra({{ $r->id }}, 'restore', 'نرجعوها للطابور زي ما كانت؟{{ $r->status === 'delivered' ? ' (الدفعة اللي تسجلت وقتها ترجع)' : '' }}')">↩ رجّعها</button>@else<span class="note">من صفحة الإيصال</span>@endif</td>
+            <td><button type="button" class="btn sm" style="background:#262c4a;color:#fff" onclick="ra({{ $r->id }}, 'restore', 'نرجعوها للطابور زي ما كانت؟{{ $r->status === 'delivered' ? ($r->cart_id ? ' (الدفعة ترجع والإيصال اللي انعمل يتلغى والحجز يرجع يستنى تأكيد)' : ' (الدفعة اللي تسجلت وقتها ترجع)') : '' }}')">↩ رجّعها</button></td>
         </tr>
     @endforeach
     </tbody></table>
