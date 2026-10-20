@@ -14,7 +14,16 @@ table.t td.w { white-space: normal; min-width: 110px; }
 .abar .inp { height: 38px; width: auto; }
 .kd { font-size: 12px; padding: 2px 8px; border-radius: 8px; border: 0; cursor: pointer; font: inherit; }
 .kd.order { background: #e7f0ff; color: #1c45a3; } .kd.deposit { background: #fff1e6; color: #b5480f; }
-.qa { display: flex; gap: 4px; flex-direction: column; align-items: stretch; min-width: 92px; }
+.qa { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; min-width: 150px; }
+/* 📏 صغير زي واجهة الطلبات */
+.dp table.t td, .dp table.t th { padding: 6px 8px !important; font-size: 13px !important; line-height: 1.45; vertical-align: middle; }
+.dp table.t td b, .dp table.t td .num, .dp table.t td span { font-size: 13px !important; }
+.dp table.t td small, .dp table.t td small * { font-size: 11.5px !important; }
+.dp table.t td .btn, .dp .kd { padding: 3px 9px !important; font-size: 12px !important; min-height: 0; height: auto; border-radius: 8px; }
+.dp table.t td .inp { height: 28px !important; font-size: 12.5px !important; padding: 0 6px; }
+.dp table.t td .chip { padding: 1px 7px; }
+.dp table.t tr td { border-radius: 0 !important; }
+.dp .top h1 { font-size: 22px; } .dp .dtabs a { padding: 6px 12px; font-size: 13.5px; }
 .qbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 10px 14px; background: var(--line-soft); border-bottom: 1px solid var(--line); }
 .qbar .inp { height: 34px; width: auto; } .qbar .sep { flex: 1; }
 </style>
