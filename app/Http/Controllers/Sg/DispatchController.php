@@ -45,14 +45,19 @@ class DispatchController extends Controller
                 $w->where(fn ($x) => $x->whereIn('customer_id', $ids)->orWhere('code', 'like', $q . '%'));
             })
             ->orderBy('arrived_at')->get()->groupBy('customer_id')->take(300);
-        $queue = Delivery::with(['customer', 'orders', 'courier'])->whereIn('status', self::ACTIVE)->whereNotNull('zone')
-            ->where('zone', $tab)->latest('assigned_at')->get();
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('deliveries', 'zone')) {
+            return redirect()->route('sg.couriers')->with('error', 'لازم تفتح /system-update مرة وحدة باش تخدم صفحة طلبيات دليفري');
+        }
+        // كل التوصيلات المفتوحة — حتى طلبات العملاء من حساباتهم تطلع هني طول
+        $all = Delivery::with(['customer', 'orders', 'courier'])->whereIn('status', self::ACTIVE)->latest('id')->get();
+        $all->each(fn ($d) => $d->zone = $d->zone ?: (CourierService::outsideBenghazi($d->city) ? 'out' : 'in'));
+        $queue = $all->where('zone', $tab)->values();
 
         return view('sg.dispatch.index', [
             'nav' => 'dispatch', 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
             'couriers' => CourierService::couriers()->where('status', true),
-            'counts' => Delivery::whereIn('status', self::ACTIVE)->whereNotNull('zone')->selectRaw('zone, COUNT(*) n')->groupBy('zone')->pluck('n', 'zone'),
-            'batches' => Delivery::whereIn('status', self::ACTIVE)->whereNotNull('batch')->where('zone', $tab)->select('batch')->distinct()->orderByDesc('batch')->pluck('batch'),
+            'counts' => $all->countBy('zone'),
+            'batches' => $queue->pluck('batch')->filter()->unique()->sortDesc()->values(),
             'defFee' => (float) AppSettings::get('courier_default_fee', 0),
         ]);
     }
@@ -127,8 +132,8 @@ class DispatchController extends Controller
 
                 return back()->with('success', 'تحول لـ' . ($delivery->kind === 'deposit' ? 'عربون (انبعتله الرابط والتفاصيل)' : 'طلبية'));
             case 'move':
-                $delivery->zone = $delivery->zone === 'out' ? 'in' : 'out';
-                $delivery->city = $delivery->zone === 'out' ? 'خارج بنغازي' : null;
+                $cur = $delivery->zone ?: (CourierService::outsideBenghazi($delivery->city) ? 'out' : 'in');
+                $delivery->zone = $cur === 'out' ? 'in' : 'out';
                 $delivery->save();
                 $delivery->log($delivery->status, $delivery->zone === 'out' ? 'تحول لطابور خارج بنغازي' : 'تحول لطابور المندوب');
 
@@ -180,11 +185,15 @@ class DispatchController extends Controller
     /** 📄 كشف الطلعة PDF: كل عمود بيان والزبائن تحت بعض */
     public function pdf(Request $request)
     {
+        $tab = $request->input('tab') === 'out' ? 'out' : 'in';
         $rows = Delivery::with(['customer', 'orders', 'courier'])
             ->when($request->filled('batch'), fn ($q) => $q->where('batch', $request->batch))
-            ->when(!$request->filled('batch'), fn ($q) => $q->whereIn('status', self::ACTIVE)->where('zone', $request->input('tab') === 'out' ? 'out' : 'in'))
+            ->when(!$request->filled('batch'), fn ($q) => $q->whereIn('status', self::ACTIVE))
             ->when($request->filled('ids'), fn ($q) => $q->whereIn('id', array_filter(array_map('intval', explode(',', (string) $request->ids)))))
             ->orderBy('id')->get();
+        if (!$request->filled('batch')) {
+            $rows = $rows->filter(fn ($d) => ($d->zone ?: (CourierService::outsideBenghazi($d->city) ? 'out' : 'in')) === $tab)->values();
+        }
         abort_if($rows->isEmpty(), 404);
         $temp = storage_path('app/mpdf-temp');
         if (!is_dir($temp)) {
