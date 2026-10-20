@@ -1,0 +1,147 @@
+<?php
+
+namespace App\Http\Controllers\Sg;
+
+use App\Http\Controllers\Controller;
+use App\Models\Customer;
+use App\Models\PaymentMethod;
+use App\Models\Trade\Invoice;
+use App\Models\Trade\Move;
+use App\Models\Trade\Partner;
+use App\Models\Trade\Wallet;
+use App\Services\TradeService;
+use App\Services\TreasuryService as TS;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
+
+/** 🌍 واجهة التجارة الخارجية (خزينة ومالية بروحها) */
+class TradeController extends Controller
+{
+    public function __construct()
+    {
+        $this->middleware(function ($request, $next) {
+            $u = auth()->user();
+            abort_unless($u && ($u->hasRole('Admin') || $u->can('trade-manage')), 403);
+
+            return $next($request);
+        });
+    }
+
+    protected function ready()
+    {
+        return Schema::hasTable('trade_wallets');
+    }
+
+    public function index(Request $request)
+    {
+        if (!$this->ready()) {
+            return redirect()->route('admin.home')->with('error', 'افتح /system-update مرة وحدة باش تخدم التجارة الخارجية');
+        }
+        $tab = in_array($request->tab, ['partners', 'invoices', 'moves'], true) ? $request->tab : 'home';
+        $partners = Partner::orderByDesc('is_company')->orderBy('name')->get();
+        $invoices = Invoice::with(['shares.partner', 'customer'])->latest('id')->take(100)->get();
+        $pid = (int) $request->p;
+
+        return view('sg.trade.index', [
+            'nav' => 'trade', 'tab' => $tab, 'partners' => $partners, 'wallets' => Wallet::orderBy('id')->get(), 'invoices' => $invoices,
+            'moves' => Move::with(['partner', 'wallet', 'invoice', 'user'])->when($pid, fn ($q) => $q->where('partner_id', $pid))->latest('id')->take(200)->get(),
+            'sel' => $pid ? $partners->firstWhere('id', $pid) : null,
+            'payments' => PaymentMethod::where('status', true)->orderBy('id')->get(),
+            'stats' => [
+                'open' => $invoices->where('status', 'open')->count(),
+                'profit' => (float) Invoice::where('status', 'closed')->sum('profit'),
+                'due' => (float) Invoice::where('status', 'open')->get()->sum(fn ($i) => max(0, (float) $i->sale_lyd - (float) $i->collected)),
+            ],
+        ]);
+    }
+
+    public function partner(Request $request)
+    {
+        $d = $request->validate(['name' => 'required|string|max:100', 'phone' => 'nullable|string|max:30', 'note' => 'nullable|string|max:300']);
+        Partner::create($d);
+
+        return back()->with('success', '✓ تضاف الشريك ' . $d['name']);
+    }
+
+    /** ➕ إيداع / ➖ سحب لشريك · 🏢 من خزينة الشركة · 🏢 لمالية الشركة */
+    public function money(Request $request)
+    {
+        $d = $request->validate(['a' => 'required|in:deposit,withdraw,company_in,to_company', 'partner_id' => 'nullable|integer', 'wallet_id' => 'required|integer',
+            'amount' => 'required|numeric|min:0.01', 'payment_id' => 'nullable|integer', 'kind' => 'nullable|string|max:100', 'note' => 'nullable|string|max:300']);
+        $w = Wallet::findOrFail($d['wallet_id']);
+        $amt = round((float) $d['amount'], 2);
+        try {
+            if ($d['a'] === 'company_in' || $d['a'] === 'to_company') {
+                $pm = PaymentMethod::findOrFail((int) ($d['payment_id'] ?? 0));
+                $d['a'] === 'company_in' ? TradeService::companyIn($w, $amt, $pm->id, $d['kind'] ?? null) : TradeService::toCompany($w, $amt, $pm->id, $d['note'] ?? null);
+                $msg = $d['a'] === 'company_in' ? '🏢 دخل ' . TS::fmt($amt) . ' د.ل من خزينة الشركة (' . $pm->name . ') لرصيد Shop & Go' : '🏢 تدرج ' . TS::fmt($amt) . ' د.ل لمالية الشركة (' . $pm->name . ')';
+            } else {
+                $p = Partner::findOrFail((int) ($d['partner_id'] ?? 0));
+                $d['a'] === 'deposit' ? TradeService::deposit($p, $w, $amt, $d['note'] ?? null) : TradeService::withdraw($p, $w, $amt, $d['note'] ?? null);
+                $msg = ($d['a'] === 'deposit' ? '➕ إيداع ' : '➖ سحب ') . TS::fmt($amt) . ' د.ل · ' . $p->name;
+            }
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', $msg);
+    }
+
+    public function invoiceStore(Request $request)
+    {
+        $d = $request->validate([
+            'kind' => 'nullable|string|max:40', 'source' => 'nullable|string|max:150', 'usd_total' => 'nullable|numeric|min:0', 'rate' => 'nullable|numeric|min:0',
+            'cost_lyd' => 'required|numeric|min:0', 'extra_lyd' => 'nullable|numeric|min:0', 'sale_lyd' => 'nullable|numeric|min:0', 'wallet_id' => 'required|integer',
+            'customer_code' => 'nullable|string|max:30', 'note' => 'nullable|string|max:500',
+            's' => 'required|array', 's.*.partner_id' => 'nullable|integer', 's.*.paid' => 'nullable|numeric|min:0', 's.*.source' => 'nullable|string|max:20', 's.*.kind' => 'nullable|string|max:100',
+        ]);
+        if (!empty($d['customer_code'])) {
+            $c = Customer::withoutGlobalScope('approved')->where('code', trim($d['customer_code']))->first();
+            if (!$c) {
+                return back()->withInput()->with('error', 'ما لقيناش عميل بالكود ' . $d['customer_code']);
+            }
+            $d['customer_id'] = $c->id;
+        }
+        try {
+            $inv = TradeService::createInvoice($d, $d['s']);
+        } catch (\RuntimeException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('sg.trade.invoice', $inv)->with('success', '🧾 تعملت الفاتورة ' . $inv->code);
+    }
+
+    public function invoice(Invoice $invoice)
+    {
+        $invoice->load(['shares.partner', 'customer']);
+
+        return view('sg.trade.invoice', [
+            'nav' => 'trade', 'inv' => $invoice, 'wallets' => Wallet::orderBy('id')->get(),
+            'moves' => Move::with(['partner', 'wallet', 'user'])->where('invoice_id', $invoice->id)->oldest('id')->get(),
+        ]);
+    }
+
+    public function invoiceAct(Request $request, Invoice $invoice)
+    {
+        $d = $request->validate(['a' => 'required|in:pay,close,sale', 'wallet_id' => 'nullable|integer', 'amount' => 'nullable|numeric|min:0', 'note' => 'nullable|string|max:300']);
+        try {
+            if ($d['a'] === 'pay') {
+                abort_if($invoice->status === 'closed', 422, 'الفاتورة مقفولة');
+                TradeService::customerPay($invoice, Wallet::findOrFail((int) $d['wallet_id']), round((float) $d['amount'], 2), $d['note'] ?? null);
+
+                return back()->with('success', '💵 تسجل سداد ' . TS::fmt($d['amount']) . ' د.ل');
+            }
+            if ($d['a'] === 'sale') {
+                $invoice->sale_lyd = round((float) $d['amount'], 2);
+                $invoice->save();
+
+                return back()->with('success', '✓ تعدل سعر البيع');
+            }
+            $p = TradeService::close($invoice);
+
+            return back()->with('success', '🔒 تقفلت الفاتورة · ' . ($p >= 0 ? 'الربح ' : 'الخسارة ') . TS::fmt(abs($p)) . ' د.ل اتقسم على الشركاء');
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+    }
+}

@@ -424,6 +424,12 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::post('finance/transfer', [$C . 'FinanceController', 'transfer'])->name('finance.transfer');
         Route::post('finance/close', [$C . 'FinanceController', 'closeCash'])->name('finance.close');
         Route::get('daily-close', [$C . 'DailyCloseController', 'index'])->name('daily');
+        Route::get('trade', [$C . 'TradeController', 'index'])->name('trade');
+        Route::post('trade/partner', [$C . 'TradeController', 'partner'])->name('trade.partner');
+        Route::post('trade/money', [$C . 'TradeController', 'money'])->name('trade.money');
+        Route::post('trade/invoices', [$C . 'TradeController', 'invoiceStore'])->name('trade.invoice.store');
+        Route::get('trade/invoices/{invoice}', [$C . 'TradeController', 'invoice'])->name('trade.invoice');
+        Route::post('trade/invoices/{invoice}', [$C . 'TradeController', 'invoiceAct'])->name('trade.invoice.act');
         Route::get('finance/adjust', [$C . 'FinanceController', 'adjustForm'])->name('finance.adjust.form');
         Route::post('finance/adjust', [$C . 'FinanceController', 'adjust'])->name('finance.adjust');
 

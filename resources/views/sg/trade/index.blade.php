@@ -1,0 +1,161 @@
+@extends('sg.layout')
+@section('title', 'التجارة الخارجية')
+@php use App\Services\TreasuryService as TS; use App\Models\Trade\Move; $f = fn ($n) => TS::fmt($n); $company = $partners->firstWhere('is_company', true); @endphp
+@push('style')
+<style>
+.tt { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.tt a { padding: 8px 14px; border-radius: 12px; background: #fff; border: 1px solid var(--line); font-weight: 700; }
+.tt a.on { background: #262c4a; color: #fff; border-color: #262c4a; }
+.tk { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.tk .card { padding: 14px; } .tk .l { font-size: 13px; color: var(--ink-3); } .tk .v { font-size: 22px; font-weight: 800; }
+.pl { color: #0f8a5f; font-weight: 800; } .mn { color: #c62828; font-weight: 800; }
+.fm { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; } .fm .inp { height: 38px; width: auto; }
+.shr td { padding: 4px !important; } .shr .inp { height: 34px; }
+table.t td.w { white-space: normal; }
+</style>
+@endpush
+@section('content')
+<div class="top">
+    <div><h1>🌍 التجارة الخارجية</h1><div class="sub">خزينة ومالية بروحها · الشركاء · فواتير الشراء · الأرباح على قد اللي دفعه كل واحد</div></div>
+    <div class="acts"><button class="btn" data-modal="mInv">+ فاتورة شراء</button><button class="sg-burger">☰</button></div>
+</div>
+
+<div class="tt">
+    @foreach (['home' => '🏠 الملخص', 'partners' => '👥 الشركاء', 'invoices' => '🧾 الفواتير', 'moves' => '📜 سجل الحركة'] as $k => $lb)<a href="?tab={{ $k }}" class="{{ $tab === $k ? 'on' : '' }}">{{ $lb }}</a>@endforeach
+</div>
+
+<div class="tk">
+    @foreach ($wallets as $w)<div class="card"><div class="l">{{ $w->name }}</div><div class="v num">{{ $f($w->balance) }}</div></div>@endforeach
+    <div class="card"><div class="l">🏢 رصيد Shop & Go</div><div class="v num">{{ $f(optional($company)->balance) }}</div></div>
+    <div class="card"><div class="l">🧾 فواتير مفتوحة</div><div class="v num">{{ $stats['open'] }}</div></div>
+    <div class="card"><div class="l">⏳ على العملاء</div><div class="v num">{{ $f($stats['due']) }}</div></div>
+    <div class="card"><div class="l">📈 أرباح مقفولة</div><div class="v num {{ $stats['profit'] < 0 ? 'mn' : 'pl' }}">{{ $f($stats['profit']) }}</div></div>
+</div>
+
+@if ($tab === 'home')
+<div class="grid g2 mb">
+    <div class="card" style="padding:14px">
+        <h3 style="margin-top:0">➕ إيداع / ➖ سحب لشريك</h3>
+        <form method="post" action="{{ route('sg.trade.money') }}" class="fm">@csrf
+            <select name="a" class="inp"><option value="deposit">➕ إيداع</option><option value="withdraw">➖ سحب</option></select>
+            <select name="partner_id" class="inp" required>@foreach ($partners as $p)<option value="{{ $p->id }}">{{ $p->name }} ({{ $f($p->balance) }})</option>@endforeach</select>
+            <select name="wallet_id" class="inp">@foreach ($wallets as $w)<option value="{{ $w->id }}">{{ $w->name }}</option>@endforeach</select>
+            <input name="amount" class="inp numr" style="width:110px" placeholder="المبلغ" required>
+            <input name="note" class="inp" style="width:150px" placeholder="ملاحظة">
+            <button class="btn">حفظ</button>
+        </form>
+    </div>
+    <div class="card" style="padding:14px">
+        <h3 style="margin-top:0">🏢 Shop & Go ↔ خزينة الشركة</h3>
+        <form method="post" action="{{ route('sg.trade.money') }}" class="fm" data-confirm="متأكد؟ الفلوس تتحرك بين خزينة الشركة والتجارة">@csrf
+            <select name="a" class="inp"><option value="company_in">⬅ زيد رصيد Shop & Go (يطلع من خزينة الشركة)</option><option value="to_company">➡ إدراج ربح لمالية الشركة</option></select>
+            <select name="payment_id" class="inp" title="خزينة الشركة">@foreach ($payments as $pm)<option value="{{ $pm->id }}">{{ $pm->name }}</option>@endforeach</select>
+            <select name="wallet_id" class="inp" title="خزينة التجارة">@foreach ($wallets as $w)<option value="{{ $w->id }}">{{ $w->name }}</option>@endforeach</select>
+            <input name="amount" class="inp numr" style="width:110px" placeholder="المبلغ" required>
+            <input name="kind" class="inp" style="width:140px" placeholder="نوع الخصم">
+            <button class="btn">تنفيذ</button>
+        </form>
+    </div>
+</div>
+@endif
+
+@if ($tab === 'home' || $tab === 'partners')
+<div class="card tw mb">
+    <div class="tw-h"><h3>👥 الشركاء</h3>
+        <form method="post" action="{{ route('sg.trade.partner') }}" class="fm" style="margin-inline-start:auto">@csrf<input name="name" class="inp" placeholder="اسم شريك جديد" required><input name="phone" class="inp" style="width:130px" placeholder="الهاتف"><button class="btn sm">+ شريك</button></form>
+    </div>
+    <table class="t"><thead><tr><th>الشريك</th><th class="n">الرصيد</th><th class="n">دفع في فواتير</th><th class="n">أرباحه</th><th></th></tr></thead><tbody>
+    @foreach ($partners as $p)
+        <tr><td><b>{{ $p->name }}</b>{{ $p->is_company ? ' 🏢' : '' }}<small class="note" style="display:block">{{ $p->phone }}</small></td>
+            <td class="n num"><b>{{ $f($p->balance) }}</b></td>
+            <td class="n num">{{ $f($p->shares()->sum('paid')) }}</td>
+            <td class="n num {{ $p->shares()->sum('profit') < 0 ? 'mn' : 'pl' }}">{{ $f($p->shares()->sum('profit')) }}</td>
+            <td><a class="btn ghost sm" href="?tab=moves&p={{ $p->id }}">📜 سجله</a></td></tr>
+    @endforeach
+    </tbody></table>
+</div>
+@endif
+
+@if ($tab === 'home' || $tab === 'invoices')
+<div class="card tw mb">
+    <div class="tw-h"><h3>🧾 الفواتير</h3></div>
+    <div class="scroll-x"><table class="t"><thead><tr><th>الفاتورة</th><th>النوع · الموقع</th><th>العميل</th><th class="n">$</th><th class="n">التكلفة</th><th class="n">البيع</th><th class="n">سدد</th><th>الشركاء</th><th>الحالة</th></tr></thead><tbody>
+    @forelse ($invoices as $i)
+        <tr>
+            <td><a href="{{ route('sg.trade.invoice', $i) }}"><b class="num">{{ $i->code }}</b></a><small class="note num" style="display:block">{{ $i->created_at->format('Y-m-d') }}</small></td>
+            <td class="w">{{ $i->kind }}{{ $i->source ? ' · ' . $i->source : '' }}</td>
+            <td>{{ optional($i->customer)->name ?: '—' }}</td>
+            <td class="n num">{{ $i->usd_total ? $f($i->usd_total) : '—' }}</td>
+            <td class="n num">{{ $f($i->totalCost()) }}</td>
+            <td class="n num">{{ $f($i->sale_lyd) }}</td>
+            <td class="n num">{{ $f($i->collected) }}</td>
+            <td class="w">{{ $i->shares->map(fn ($s) => optional($s->partner)->name . ' ' . $f($s->paid))->implode(' · ') }}</td>
+            <td>@if ($i->status === 'closed')<span class="chip u">مقفولة · <span class="{{ $i->profit < 0 ? 'mn' : 'pl' }}">{{ $f($i->profit) }}</span></span>@else<span class="chip w">مفتوحة</span>@endif</td>
+        </tr>
+    @empty
+        <tr><td colspan="9"><div class="empty">ما فيش فواتير — اضغط «+ فاتورة شراء»</div></td></tr>
+    @endforelse
+    </tbody></table></div>
+</div>
+@endif
+
+@if ($tab === 'moves')
+<div class="card tw mb">
+    <div class="tw-h"><h3>📜 سجل الحركة {{ $sel ? '· ' . $sel->name : '' }}</h3>
+        <form method="get" class="fm" style="margin-inline-start:auto"><input type="hidden" name="tab" value="moves"><select name="p" class="inp" onchange="this.form.submit()"><option value="">كل الحركات</option>@foreach ($partners as $p)<option value="{{ $p->id }}" @selected($sel && $sel->id === $p->id)>{{ $p->name }}</option>@endforeach</select></form>
+    </div>
+    <div class="scroll-x"><table class="t"><thead><tr><th>الوقت</th><th>الحركة</th><th>الشريك</th><th>الفاتورة</th><th>الخزينة</th><th class="n">الخزينة ±</th><th class="n">الرصيد ±</th><th class="n">رصيده بعد</th><th>ملاحظة</th></tr></thead><tbody>
+    @forelse ($moves as $m)
+        <tr>
+            <td class="num">{{ $m->created_at->format('m-d g:i a') }}</td>
+            <td>{{ Move::TYPES[$m->type] ?? $m->type }}</td>
+            <td>{{ optional($m->partner)->name ?: '—' }}</td>
+            <td>@if ($m->invoice)<a href="{{ route('sg.trade.invoice', $m->invoice) }}" class="num">{{ $m->invoice->code }}</a>@else—@endif</td>
+            <td>{{ optional($m->wallet)->name ?: '—' }}</td>
+            <td class="n num {{ $m->wallet_change < 0 ? 'mn' : ($m->wallet_change > 0 ? 'pl' : '') }}">{{ $m->wallet_id ? $f($m->wallet_change) : '' }}</td>
+            <td class="n num {{ $m->partner_change < 0 ? 'mn' : ($m->partner_change > 0 ? 'pl' : '') }}">{{ $m->partner_id ? $f($m->partner_change) : '' }}</td>
+            <td class="n num">{{ $m->partner_id ? $f($m->partner_after) : '' }}</td>
+            <td class="w note">{{ $m->note }}{{ $m->user ? ' · ' . $m->user->name : '' }}</td>
+        </tr>
+    @empty
+        <tr><td colspan="9"><div class="empty">ما فيش حركات</div></td></tr>
+    @endforelse
+    </tbody></table></div>
+</div>
+@endif
+
+{{-- ➕ فاتورة شراء --}}
+<div class="modal-bg" id="mInv"><div class="modal" style="max-width:820px;width:100%">
+    <h3>🧾 فاتورة شراء جديدة</h3>
+    <form method="post" action="{{ route('sg.trade.invoice.store') }}" id="invF">@csrf
+        <div class="grid g3">
+            <div><label class="l">النوع</label><input name="kind" class="inp" value="{{ old('kind') }}" placeholder="بضاعة / جملة / طلب عميل…"></div>
+            <div><label class="l">الموقع / المورد</label><input name="source" class="inp" value="{{ old('source') }}" placeholder="Amazon · Shein · …"></div>
+            <div><label class="l">كود العميل (اختياري)</label><input name="customer_code" class="inp numr" value="{{ old('customer_code') }}"></div>
+            <div><label class="l">الإجمالي بالدولار $</label><input name="usd_total" id="iUsd" class="inp numr" value="{{ old('usd_total') }}" oninput="calc()"></div>
+            <div><label class="l">سعر الصرف</label><input name="rate" id="iRate" class="inp numr" value="{{ old('rate') }}" oninput="calc()"></div>
+            <div><label class="l">تكلفة الفاتورة بالدينار *</label><input name="cost_lyd" id="iCost" class="inp numr" value="{{ old('cost_lyd') }}" required oninput="sum()"></div>
+            <div><label class="l">مصاريف إضافية (شحن/جمارك) د.ل</label><input name="extra_lyd" id="iExtra" class="inp numr" value="{{ old('extra_lyd', 0) }}" oninput="sum()"></div>
+            <div><label class="l">سعر البيع للعميل د.ل</label><input name="sale_lyd" class="inp numr" value="{{ old('sale_lyd') }}"></div>
+            <div><label class="l">تندفع من</label><select name="wallet_id" class="inp">@foreach ($wallets as $w)<option value="{{ $w->id }}">{{ $w->name }} ({{ $f($w->balance) }})</option>@endforeach</select></div>
+        </div>
+        <h4 style="margin:12px 0 6px">👥 الشركاء وكم دفع كل واحد <span class="note" id="sumN"></span></h4>
+        <table class="t shr"><thead><tr><th>الشريك</th><th>دفع د.ل</th><th>من وين</th><th>نوع الخصم (للشركة)</th></tr></thead><tbody>
+        @foreach ($partners->where('active', true)->values() as $k => $p)
+            <tr><td><input type="hidden" name="s[{{ $k }}][partner_id]" value="{{ $p->id }}"><b>{{ $p->name }}</b>{{ $p->is_company ? ' 🏢' : '' }}<small class="note" style="display:block">رصيده {{ $f($p->balance) }}</small></td>
+                <td><input name="s[{{ $k }}][paid]" class="inp numr sp" style="width:110px" oninput="sum()"></td>
+                <td><select name="s[{{ $k }}][source]" class="inp"><option value="balance">من رصيده</option><option value="cash">دفع توا للتجارة</option>@if ($p->is_company)@foreach ($payments as $pm)<option value="main:{{ $pm->id }}">خزينة الشركة · {{ $pm->name }}</option>@endforeach @endif</select></td>
+                <td>@if ($p->is_company)<input name="s[{{ $k }}][kind]" class="inp" style="width:140px" placeholder="نوع الخصم">@endif</td></tr>
+        @endforeach
+        </tbody></table>
+        <div class="grid g2" style="margin-top:8px"><div><label class="l">ملاحظات</label><input name="note" class="inp" value="{{ old('note') }}"></div></div>
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn green">حفظ الفاتورة</button><button type="button" class="btn ghost" data-close>إلغاء</button></div>
+    </form>
+</div></div>
+<script>
+function calc(){const u=parseFloat(document.getElementById('iUsd').value)||0,r=parseFloat(document.getElementById('iRate').value)||0;if(u&&r){document.getElementById('iCost').value=Math.round(u*r*100)/100;sum()}}
+function sum(){const t=(parseFloat(document.getElementById('iCost').value)||0)+(parseFloat(document.getElementById('iExtra').value)||0);let s=0;document.querySelectorAll('.sp').forEach(i=>s+=parseFloat(i.value)||0);
+  const n=document.getElementById('sumN');n.textContent='· المجموع '+s.toLocaleString('en-US')+' من '+t.toLocaleString('en-US')+(Math.abs(s-t)<0.01?' ✓':' — لازم يساويه');n.style.color=Math.abs(s-t)<0.01?'#0f8a5f':'#c62828'}
+@if ($errors->any() || old('cost_lyd'))document.addEventListener('DOMContentLoaded',()=>{const b=document.querySelector('[data-modal=mInv]');b&&b.click()});@endif
+</script>
+@endsection
