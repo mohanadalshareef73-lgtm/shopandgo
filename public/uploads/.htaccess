@@ -1,0 +1,17 @@
+# منع تشغيل أي ملفات برمجية داخل مجلد الرفع (حماية من رفع ملفات خبيثة)
+<FilesMatch "\.(php|phtml|php\d|phar|pl|py|cgi|sh|asp|aspx|jsp|htaccess|svg|html?)$">
+    Require all denied
+</FilesMatch>
+Options -Indexes -ExecCGI
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>

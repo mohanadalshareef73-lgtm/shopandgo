@@ -1,0 +1,55 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class ClassificationStoreRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     *
+     * @return bool
+     */
+    public function authorize()
+    {
+        return true;
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, mixed>
+     */
+    public function rules()
+    {
+        return [
+            'name' => ['required', 'string', 'max:50'],
+            'name_en' => ['required', 'string', 'max:50'],
+            'external_id' => ['required', 'int'],
+            'price' => ['required'],
+            'region_id'=>['required','exists:regions,id'],
+            'currency_id'=>['required','exists:currencies,id'],
+        ];
+    }
+
+    public function messages()
+    {
+        return [
+            'name.required' => __('validation.required'),
+            'name.string' => __('validation.string'),
+            'name.max' => __('validation.max.string', ['max' => 50]),
+            'name_en.required' => __('validation.required'),
+            'name_en.string' => __('validation.string'),
+            'name_en.max' => __('validation.max.string', ['max' => 50]),
+            'external_id.required' => __('validation.required'),
+            'external_id.int' => __('validation.int'),
+            'price.required' => __('validation.required'),
+            'region_id.required' => __('validation.required'),
+            'region_id.exists' => __('validation.exists'),
+            'currency_id.required' => __('validation.required'),
+            'currency_id.exists' => __('validation.exists'),
+        ];
+    }
+
+}

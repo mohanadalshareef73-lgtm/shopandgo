@@ -1,0 +1,16 @@
+{
+    "received": "Got your Amazon link, checking the price now...",
+    "invalid_url": "Please send the link of the Amazon product page: open the product, tap Share, and send that link.",
+    "unsupported_site": "This Amazon site is not supported. Supported: {supported_sites}. Please send a product link from one of these sites.",
+    "product_unavailable": "This product isn't available on Amazon for us right now (sold out or not shipped here). If you picked a size or colour, send the link of that exact option, or send another product.",
+    "region_not_allowed": "This Amazon link is from a region our account does not allow. Please send a link from an allowed region.",
+    "region_unverified": "We couldn't verify this product's region. Please open the product on {site} and send its link again.",
+    "staff_follow_up": "Thanks! We'll get back to you with the price shortly.",
+    "pricing_failed": "We couldn't price this product right now. Please send the link again in a few minutes.",
+    "expired": "The quote timed out. Please send the link again.",
+    "items_unavailable": "The items are unavailable. Please send a new link.",
+    "temporary_problem": "There is a temporary pricing problem. Please send the link again in a few minutes.",
+    "succeeded": "{product_name}\nPrice: {amount} {currency}{quantity_line}{discount_line}",
+    "quantity": "Quantity: {quantity} (single-product price × quantity, as requested).",
+    "discount": "Discounted on Amazon right now."
+}
