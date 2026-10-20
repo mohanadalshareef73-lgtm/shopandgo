@@ -74,6 +74,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
         <tr>
             <td><input type="checkbox" class="qk" name="ids[]" value="{{ $d->id }}" onchange="cq()"></td>
             <td><div class="qa">
+                <button type="button" class="btn ghost sm" onclick="const t=prompt('📝 الملاحظة اللي تبي تبعتها للعميل على الواتساب:');if(t&&t.trim())postTo(RA+{{ $d->id }},{a:'note',text:t})">📝 ملاحظة</button>
                 @if ($tab === 'out')
                 <input class="inp" style="width:120px;height:28px;font-size:12.5px" placeholder="كود الشركة" value="{{ $d->ext_code }}" data-id="{{ $d->id }}" onchange="ext(this)">
                 <button type="button" class="btn sm" style="background:#e8590c;color:#fff" onclick="settle({{ $d->id }}, {{ (float) ($d->kind === 'deposit' ? $d->amount : $d->amount) + 0 }})">💰 تحصيل</button>

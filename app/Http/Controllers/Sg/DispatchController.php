@@ -136,10 +136,22 @@ class DispatchController extends Controller
     /** إجراء على توصيل في الطابور: نوع · تحويل · تغيير المندوب · سلّم · رجّع */
     public function act(Request $request, Delivery $delivery)
     {
-        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
+        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle,note', 'text' => 'nullable|string|max:1000', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
         abort_unless(in_array($delivery->status, self::ACTIVE, true), 422, 'التوصيل هذا مقفول');
         $cu = $delivery->customer;
         switch ($d['a']) {
+            case 'note':
+                $txt = trim((string) ($d['text'] ?? ''));
+                $ph = optional($cu)->phone_1 ?: $delivery->recipient_phone;
+                if ($txt === '' || !$ph) {
+                    return back()->with('error', $txt === '' ? 'اكتب الملاحظة' : 'ما فيش رقم للعميل');
+                }
+                $nm = optional($cu)->name ?: $delivery->recipient_name;
+                $msg = trim(($nm ? $nm . " 👋\n" : '') . '📝 بخصوص طلبك' . ($delivery->cart_id ? ' (سلة #' . $delivery->cart_id . ')' : ($delivery->orders->count() ? ' (' . $delivery->orders->pluck('code')->implode('، ') . ')' : '')) . ":\n\n" . $txt);
+                $ok = MessageService::sendText('cart_note', $msg, [$ph], $cu);
+                $delivery->log($delivery->status, '📝 ملاحظة للعميل: ' . mb_substr($txt, 0, 200));
+
+                return back()->with($ok ? 'success' : 'error', $ok ? '📝 انبعتت الملاحظة' : 'الرسالة ما وصلتش (الواتساب)');
             case 'ext':
                 $delivery->ext_code = trim((string) ($d['ext_code'] ?? '')) ?: null;
                 $delivery->save();
