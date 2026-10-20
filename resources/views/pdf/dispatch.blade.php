@@ -13,11 +13,10 @@ table.t tr.tot td { background: #fff4e5; font-weight: bold; }
 @php $who = $rows->map(fn ($d) => $d->courier_name ?: optional($d->courier)->name)->filter()->unique()->implode('، '); @endphp
 <div class="hd"><b>Shop & Go</b> &nbsp;·&nbsp; كشف {{ $title }} @if ($who) &nbsp;·&nbsp; المندوب: <b>{{ $who }}</b>@endif &nbsp;·&nbsp; {{ now()->format('Y-m-d g:i a') }} &nbsp;·&nbsp; {{ $rows->count() }} زبون</div>
 <table class="t">
-    <tr><th>#</th><th>وقت الطلب</th><th>الكود</th><th>الزبون</th><th>الهاتف</th><th>العنوان</th><th>النوع</th><th>الإيصالات</th><th>التخزين</th><th>طرود</th><th>الباقي مع الشحن</th><th>التوصيل</th><th>المطلوب</th><th>توقيع</th></tr>
+    <tr><th>#</th><th>الكود</th><th>الزبون</th><th>الهاتف</th><th>العنوان</th><th>النوع</th><th>الإيصالات</th><th>التخزين</th><th>طرود</th><th>الباقي مع الشحن</th><th>التوصيل</th><th>المطلوب</th><th>توقيع</th></tr>
     @foreach ($rows as $i => $d)
         <tr>
             <td>{{ $i + 1 }}</td>
-            <td>{{ optional($d->created_at)->format('m-d g:i a') }}</td>
             <td><b>{{ optional($d->customer)->code }}</b></td>
             <td class="r">{{ $d->recipient_name ?: optional($d->customer)->name }}</td>
             <td>{{ $d->recipient_phone }}@if ($d->recipient_phone2)<br>{{ $d->recipient_phone2 }}@endif</td>
@@ -32,6 +31,6 @@ table.t tr.tot td { background: #fff4e5; font-weight: bold; }
             <td style="width:14mm"></td>
         </tr>
     @endforeach
-    <tr class="tot"><td colspan="9">الإجمالي</td><td>{{ $rows->sum('parcels') }}</td><td>{{ $f($rows->sum('amount')) }}</td><td>{{ $f($rows->sum('fee')) }}</td><td>{{ $f($rows->sum(fn ($d) => $d->amount + ($d->fee_payer === 'company' ? 0 : $d->fee))) }}</td><td></td></tr>
+    <tr class="tot"><td colspan="8">الإجمالي</td><td>{{ $rows->sum('parcels') }}</td><td>{{ $f($rows->sum('amount')) }}</td><td>{{ $f($rows->sum('fee')) }}</td><td>{{ $f($rows->sum(fn ($d) => $d->amount + ($d->fee_payer === 'company' ? 0 : $d->fee))) }}</td><td></td></tr>
 </table>
 </body></html>

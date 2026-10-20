@@ -1,8 +1,7 @@
 @php $f = fn ($n) => \App\Services\TreasuryService::fmt($n); $isFocus = isset($focus) && $focus && $focus->id === $d->id; @endphp
 <details class="dv {{ $d->status === 'problem' ? 'problem' : '' }} {{ $isFocus ? 'focus' : '' }}" @if ($isFocus || $d->status === 'problem') open @endif>
     <summary>
-        <span class="code">{{ $d->code }}</span>
-        <span class="chip w num" title="وقت طلب الدليفري">🕒 {{ optional($d->created_at)->format('m-d g:i a') }}</span>
+        <span class="code">{{ $d->code }}<small class="num" style="display:block;color:#000;font-size:11.5px">🕒 {{ optional($d->created_at)->format('Y-m-d g:i a') }}</small></span>
         <span class="chip {{ $d->statusChip() }}">{{ $d->statusLabel() }}</span>
         <div style="flex:1;min-width:180px"><b>{{ $d->recipient_name }}</b> <span class="num note">{{ $d->recipient_phone }}</span><div class="note">{{ $d->address ?: 'بدون عنوان' }} · {{ $d->parcels }} طرد · {{ $d->orders->pluck('code')->implode('، ') }}</div></div>
         <div style="text-align:left"><b class="num" style="font-size:17px">{{ $f($d->toCollect()) }}</b> <span class="note">د.ل</span><div class="note">{{ \App\Models\Delivery::PAY_TYPES[$d->pay_type] ?? '' }} · أجرة {{ $f($d->fee) }}{{ $d->companyPays() ? ' (على الشركة)' : '' }}</div></div>
