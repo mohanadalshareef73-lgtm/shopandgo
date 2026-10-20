@@ -23,7 +23,7 @@ class DispatchController extends Controller
     public function __construct()
     {
         $this->middleware('permission:courier-list', ['only' => ['index', 'pdf']]);
-        $this->middleware('permission:courier-edit', ['only' => ['assign', 'act']]);
+        $this->middleware('permission:courier-edit', ['only' => ['assign', 'act', 'bulk']]);
     }
 
     protected function readyQuery()
@@ -193,6 +193,46 @@ class DispatchController extends Controller
         return back();
     }
 
+    /** ☑ إجراء على المختارين: ترحيل · تعيين مندوب · رجوع للرف */
+    public function bulk(Request $request)
+    {
+        $d = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer', 'a' => 'required|in:move_out,move_in,courier,back',
+            'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100']);
+        $rows = Delivery::with('orders')->whereIn('id', $d['ids'])->whereIn('status', self::ACTIVE)->get();
+        $c = !empty($d['courier_id']) ? User::where('type_id', 4)->find($d['courier_id']) : null;
+        $n = trim((string) ($d['courier_name'] ?? ''));
+        if ($d['a'] === 'courier' && !$c && $n === '') {
+            return back()->with('error', 'اختار مندوب ولا اكتب اسمه');
+        }
+        foreach ($rows as $dl) {
+            if ($d['a'] === 'move_out' || $d['a'] === 'move_in') {
+                $dl->zone = $d['a'] === 'move_out' ? 'out' : 'in';
+                $dl->save();
+                $dl->log($dl->status, $dl->zone === 'out' ? 'ترحيل لخارج بنغازي' : 'ترحيل لطابور المندوب');
+            } elseif ($d['a'] === 'courier') {
+                $dl->courier_id = $c ? $c->id : null;
+                $dl->courier_name = $c ? null : $n;
+                $dl->status = $c ? 'assigned' : 'out';
+                $dl->assigned_at = now();
+                $dl->save();
+                $dl->log($dl->status, 'مع ' . ($c ? $c->name : $n));
+            } else {
+                foreach ($dl->orders as $o) {
+                    if (!$o->delivered) {
+                        $o->delivery_id = null;
+                        $o->save();
+                    }
+                }
+                $dl->status = 'returned';
+                $dl->save();
+                $dl->log('returned', 'رجعت للرف');
+            }
+        }
+        Cache::forget('sg.badge.ready');
+
+        return back()->with('success', '✓ ' . $rows->count() . ' ' . ['move_out' => 'ترحلوا لخارج بنغازي', 'move_in' => 'ترحلوا للمندوب', 'courier' => 'مع ' . ($c ? $c->name : $n), 'back' => 'رجعوا للرف'][$d['a']]);
+    }
+
     /** 📄 كشف الطلعة PDF: كل عمود بيان والزبائن تحت بعض */
     public function pdf(Request $request)
     {
@@ -212,11 +252,11 @@ class DispatchController extends Controller
         }
         $fontDirs = (new \Mpdf\Config\ConfigVariables())->getDefaults()['fontDir'];
         $fontData = (new \Mpdf\Config\FontVariables())->getDefaults()['fontdata'];
-        $pdf = new \Mpdf\Mpdf(['mode' => 'utf-8', 'format' => 'A4-L', 'orientation' => 'L',
+        $pdf = new \Mpdf\Mpdf(['mode' => 'utf-8', 'format' => 'A4', 'orientation' => 'P',
             'fontDir' => array_merge($fontDirs, [resource_path('fonts/somar')]),
             'fontdata' => array_merge($fontData, ['somar' => ['R' => 'Somar-Regular.ttf', 'B' => 'Somar-Bold.ttf', 'useOTL' => 0xFF, 'useKashida' => 75]]),
-            'tempDir' => $temp, 'default_font' => 'somar', 'default_font_size' => 10,
-            'margin_top' => 8, 'margin_bottom' => 10, 'margin_left' => 8, 'margin_right' => 8, 'autoScriptToLang' => true, 'autoLangToFont' => false]);
+            'tempDir' => $temp, 'default_font' => 'somar', 'default_font_size' => 8,
+            'margin_top' => 7, 'margin_bottom' => 8, 'margin_left' => 6, 'margin_right' => 6, 'autoScriptToLang' => true, 'autoLangToFont' => false]);
         $pdf->SetDirectionality('rtl');
         $title = 'طلعة ' . ($request->batch ?: now()->format('Y-m-d'));
         $pdf->SetTitle($title);

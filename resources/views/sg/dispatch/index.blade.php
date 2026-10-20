@@ -11,7 +11,9 @@ table.t td.w { white-space: normal; min-width: 160px; }
 .abar .inp { height: 38px; width: auto; }
 .kd { font-size: 12px; padding: 2px 8px; border-radius: 8px; border: 0; cursor: pointer; font: inherit; }
 .kd.order { background: #e7f0ff; color: #1c45a3; } .kd.deposit { background: #fff1e6; color: #b5480f; }
-.qa { display: flex; gap: 4px; flex-wrap: wrap; } .qa form { display: inline-flex; gap: 4px; }
+.qa { display: flex; gap: 4px; flex-direction: column; align-items: stretch; min-width: 92px; }
+.qbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 10px 14px; background: var(--line-soft); border-bottom: 1px solid var(--line); }
+.qbar .inp { height: 34px; width: auto; } .qbar .sep { flex: 1; }
 </style>
 @endpush
 @section('content')
@@ -25,19 +27,36 @@ table.t td.w { white-space: normal; min-width: 160px; }
     <a href="?tab=out" class="{{ $tab === 'out' ? 'on' : '' }}">🚚 خارج بنغازي ({{ (int) ($counts['out'] ?? 0) }})</a>
 </div>
 
-{{-- الطابور: منو مستلمها، ونسحبوها ولا نرجعوها --}}
-<div class="card tw mb">
-    <div class="tw-h"><h3>{{ $tab === 'out' ? '🚚 طابور خارج بنغازي' : '🛵 طلعات مع المناديب' }} <span class="h-note">{{ $queue->count() }} زبون · يقبضوا {{ $f($queue->sum('amount')) }} د.ل + توصيل {{ $f($queue->sum('fee')) }}</span></h3>
-        @if ($queue->count())<a class="btn sm" style="margin-inline-start:auto" target="_blank" href="{{ route('sg.dispatch.pdf', ['tab' => $tab]) }}">📄 كشف الطابور PDF</a>@endif
-        @foreach ($batches as $b)<a class="btn ghost sm" target="_blank" href="{{ route('sg.dispatch.pdf', ['batch' => $b]) }}">📄 {{ $b }}</a>@endforeach
+{{-- الطابور: منو مستلمها · علّم ← كشف / ترحيل / تعيين / رجوع --}}
+<form method="post" action="{{ route('sg.dispatch.bulk') }}" id="bk" class="card tw mb">
+    @csrf <input type="hidden" name="a" id="bkA">
+    <div class="tw-h"><h3>{{ $tab === 'out' ? '🚚 طابور خارج بنغازي' : '🛵 طلبيات مع المناديب' }} <span class="h-note">{{ $queue->count() }} زبون · {{ $f($queue->sum('amount')) }} د.ل + توصيل {{ $f($queue->sum('fee')) }}</span></h3>
+        @foreach ($batches as $bt)<a class="btn ghost sm" target="_blank" href="{{ route('sg.dispatch.pdf', ['batch' => $bt]) }}">📄 {{ $bt }}</a>@endforeach
     </div>
-    <div class="scroll-x"><table class="t"><thead><tr><th>مع</th><th>الكود</th><th>الزبون</th><th>الهاتف</th><th>العنوان</th><th>الإيصالات</th><th>التخزين</th><th class="n">طرود</th><th class="n">الباقي</th><th class="n">توصيل</th><th>النوع</th><th>إجراء</th></tr></thead><tbody>
+    @if ($queue->count())
+    <div class="qbar">
+        <b>المختار: <span id="nq" class="num">0</span></b>
+        <button type="button" class="btn sm" onclick="pdfSel()">📄 كشف PDF للمختار</button>
+        <button type="button" class="btn ghost sm" onclick="bk('{{ $tab === 'out' ? 'move_in' : 'move_out' }}')">{{ $tab === 'out' ? '🛵 ترحيل للمندوب' : '🚚 ترحيل خارج بنغازي' }}</button>
+        <span class="sep"></span>
+        <select name="courier_id" class="inp"><option value="">— مندوب —</option>@foreach ($couriers as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach</select>
+        <input name="courier_name" class="inp" style="width:120px" placeholder="ولا اكتب اسم">
+        <button type="button" class="btn ghost sm" onclick="bk('courier')">⇄ عطيهم له</button>
+        <button type="button" class="btn ghost sm" style="color:var(--down)" onclick="if(confirm('نرجعو المختارين للمحل والرف؟'))bk('back')">↩ للرف</button>
+    </div>
+    @endif
+    <div class="scroll-x"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.qk').forEach(x=>x.checked=this.checked);cq()"></th><th>إجراء</th><th>مع</th><th>الكود</th><th>الزبون</th><th>الهاتف</th><th>العنوان</th><th>الإيصالات</th><th>التخزين</th><th class="n">طرود</th><th class="n">الباقي</th><th class="n">توصيل</th></tr></thead><tbody>
     @forelse ($queue as $d)
         @php $who = $d->courier_name ?: optional($d->courier)->name; @endphp
         <tr>
+            <td><input type="checkbox" class="qk" name="ids[]" value="{{ $d->id }}" onchange="cq()"></td>
+            <td><div class="qa">
+                <button type="button" class="btn green sm" onclick="ra({{ $d->id }}, 'done', 'وصلته؟ نكملو الدفع والتسليم')">✓ وصلت</button>
+                <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
+            </div></td>
             <td><b>{{ $who ?: '— ما تعيّنش' }}</b>@if (!$d->courier_id && $d->courier_name)<small class="note" style="display:block">بدون حساب</small>@endif<small class="note num" style="display:block">{{ optional($d->assigned_at)->format('m-d g:i a') }}</small></td>
             <td class="num"><b>{{ optional($d->customer)->code }}</b></td>
-            <td>{{ optional($d->customer)->name }}</td>
+            <td>{{ optional($d->customer)->name ?: $d->recipient_name }}</td>
             <td class="num">{{ $d->recipient_phone }}</td>
             <td class="w">{{ $d->address }}</td>
             <td class="num w">{{ $d->orders->pluck('code')->implode('، ') }}</td>
@@ -45,20 +64,13 @@ table.t td.w { white-space: normal; min-width: 160px; }
             <td class="n num">{{ $d->parcels }}</td>
             <td class="n num"><b>{{ $f($d->amount) }}</b></td>
             <td class="n num">{{ $f($d->fee) }}</td>
-            <td><form method="post" action="{{ route('sg.dispatch.act', $d) }}">@csrf<input type="hidden" name="a" value="kind"><button class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button></form></td>
-            <td><div class="qa">
-                <form method="post" action="{{ route('sg.dispatch.act', $d) }}" data-confirm="{{ optional($d->customer)->name }} وصلته؟ نكملو الدفع والتسليم">@csrf<input type="hidden" name="a" value="done"><button class="btn green sm">✓ وصلت</button></form>
-                <form method="post" action="{{ route('sg.dispatch.act', $d) }}">@csrf<input type="hidden" name="a" value="courier">
-                    <select name="courier_id" class="inp" style="height:32px;width:110px"><option value="">سحب لـ…</option>@foreach ($couriers as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach</select><input name="courier_name" class="inp" style="height:32px;width:90px" placeholder="ولا اسم"><button class="btn ghost sm">⇄</button></form>
-                <form method="post" action="{{ route('sg.dispatch.act', $d) }}">@csrf<input type="hidden" name="a" value="move"><button class="btn ghost sm">{{ $d->zone === 'out' ? '🛵 للمندوب' : '🚚 لخارج بنغازي' }}</button></form>
-                <form method="post" action="{{ route('sg.dispatch.act', $d) }}" data-confirm="نرجعوها للمحل والرف؟">@csrf<input type="hidden" name="a" value="back"><button class="btn ghost sm" style="color:var(--down)">↩ للرف</button></form>
-            </div></td>
         </tr>
     @empty
         <tr><td colspan="12"><div class="empty">ما فيش شي في الطابور</div></td></tr>
     @endforelse
     </tbody></table></div>
-</div>
+</form>
+<form method="post" id="rowAct" style="display:none">@csrf<input type="hidden" name="a" id="raA"></form>
 
 {{-- الجاهز في الرف --}}
 <form method="post" action="{{ route('sg.dispatch.assign') }}" id="asg" class="card tw">
@@ -97,5 +109,12 @@ table.t td.w { white-space: normal; min-width: 160px; }
     </div>
 </form>
 @if (session('print_url'))<script>window.open(@json(session('print_url')), '_blank');</script>@endif
-<script>function cnt(){document.getElementById('nsel').textContent=document.querySelectorAll('.pk:checked').length}</script>
+<script>
+const RA = @json(route('sg.dispatch.act', 0)).replace(/0$/, ''), PDF = @json(route('sg.dispatch.pdf'));
+function cq(){document.getElementById('nq').textContent=document.querySelectorAll('.qk:checked').length}
+function sel(){return [...document.querySelectorAll('.qk:checked')].map(x=>x.value)}
+function bk(a){if(!sel().length){alert('علّم على الزبائن الأول');return}document.getElementById('bkA').value=a;document.getElementById('bk').submit()}
+function pdfSel(){const s=sel();if(!s.length){alert('علّم على الزبائن الأول');return}window.open(PDF+'?tab={{ $tab }}&ids='+s.join(','),'_blank')}
+function ra(id,a,q){if(q&&!confirm(q))return;const f=document.getElementById('rowAct');f.action=RA+id;document.getElementById('raA').value=a;f.submit()}
+function cnt(){document.getElementById('nsel').textContent=document.querySelectorAll('.pk:checked').length}</script>
 @endsection

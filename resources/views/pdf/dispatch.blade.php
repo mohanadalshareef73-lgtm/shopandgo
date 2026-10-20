@@ -1,11 +1,11 @@
 <html dir="rtl"><head><meta charset="utf-8">
 <style>
-body { font-family: somar; font-size: 10pt; color: #1f2433; }
+body { font-family: somar; font-size: 8pt; color: #1f2433; }
 .hd { border-bottom: 0.6mm solid #1c45a3; padding-bottom: 2mm; margin-bottom: 3mm; }
-.hd b { font-size: 15pt; color: #1c45a3; }
+.hd b { font-size: 13pt; color: #1c45a3; }
 table.t { width: 100%; border-collapse: collapse; }
-table.t th { background: #1c45a3; color: #fff; padding: 2mm 1.5mm; font-size: 9.5pt; }
-table.t td { border: 0.3mm solid #d5d9e4; padding: 2mm 1.5mm; text-align: center; vertical-align: top; }
+table.t th { background: #1c45a3; color: #fff; padding: 1.5mm 1mm; font-size: 7.5pt; }
+table.t td { border: 0.3mm solid #d5d9e4; padding: 1.5mm 1mm; text-align: center; vertical-align: top; }
 table.t td.r { text-align: right; }
 table.t tr.tot td { background: #fff4e5; font-weight: bold; }
 .dep { color: #b5480f; font-weight: bold; }
@@ -20,7 +20,7 @@ table.t tr.tot td { background: #fff4e5; font-weight: bold; }
             <td><b>{{ optional($d->customer)->code }}</b></td>
             <td class="r">{{ $d->recipient_name ?: optional($d->customer)->name }}</td>
             <td>{{ $d->recipient_phone }}@if ($d->recipient_phone2)<br>{{ $d->recipient_phone2 }}@endif</td>
-            <td class="r">{{ $d->address ?: '—' }}</td>
+            <td class="r" style="width:30mm">{{ $d->address ?: '—' }}</td>
             <td class="{{ $d->kind === 'deposit' ? 'dep' : '' }}">{{ $d->kind === 'deposit' ? 'عربون' : 'طلبية' }}</td>
             <td>{{ $d->orders->pluck('code')->implode('، ') }}</td>
             <td>{{ $d->orders->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }}</td>
@@ -28,7 +28,7 @@ table.t tr.tot td { background: #fff4e5; font-weight: bold; }
             <td>{{ $f($d->amount) }}</td>
             <td>{{ $f($d->fee) }}</td>
             <td><b>{{ $f($d->amount + ($d->fee_payer === 'company' ? 0 : $d->fee)) }}</b></td>
-            <td style="width:18mm"></td>
+            <td style="width:14mm"></td>
         </tr>
     @endforeach
     <tr class="tot"><td colspan="8">الإجمالي</td><td>{{ $rows->sum('parcels') }}</td><td>{{ $f($rows->sum('amount')) }}</td><td>{{ $f($rows->sum('fee')) }}</td><td>{{ $f($rows->sum(fn ($d) => $d->amount + ($d->fee_payer === 'company' ? 0 : $d->fee))) }}</td><td></td></tr>

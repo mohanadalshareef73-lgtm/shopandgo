@@ -298,6 +298,7 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::get('dispatch', [$C . 'DispatchController', 'index'])->name('dispatch');
         Route::post('dispatch', [$C . 'DispatchController', 'assign'])->name('dispatch.assign');
         Route::get('dispatch/pdf', [$C . 'DispatchController', 'pdf'])->name('dispatch.pdf');
+        Route::post('dispatch/bulk', [$C . 'DispatchController', 'bulk'])->name('dispatch.bulk');
         Route::post('dispatch/{delivery}', [$C . 'DispatchController', 'act'])->name('dispatch.act');
         Route::get('couriers', [$C . 'CouriersController', 'index'])->name('couriers');
         Route::post('couriers', [$C . 'CouriersController', 'store'])->name('couriers.store');
