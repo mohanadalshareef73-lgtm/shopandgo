@@ -445,9 +445,35 @@ class DispatchController extends Controller
         $delivery->loadMissing('customer', 'courier', 'orders');
         $cart = $delivery->cart_id ? \App\Models\CartQuote::find($delivery->cart_id) : null;
         $order = $delivery->deposit_order_id ? Order::find($delivery->deposit_order_id) : $delivery->orders->first();
+        $order = $order ?: ($cart && !empty($cart->order_id) ? Order::find($cart->order_id) : null);
 
-        // نفس شكل فاتورة الشركة (A4 · اللوقو · الملاحظات والعنوان من إعدادات الفاتورة)
-        return view('sg.dispatch.receipt', ['d' => $delivery, 'cart' => $cart, 'order' => $order, 'invoice' => \App\Models\Invoice::first(), 'f' => fn ($n) => TS::fmt($n)]);
+        // نفس بيانات وشكل فاتورة الشركة: المنصة · الكمية · الشحن · الإجمالي · المدفوع · المستحق
+        $c = $delivery->customer;
+        $dep = round((float) $delivery->amount, 2);
+        if ($order) {
+            $paid = (float) $order->paid_price + ($delivery->status === 'delivered' ? 0 : $dep);
+            $r = ['code' => $order->code, 'date' => optional($order->created_at)->format('Y-m-d'), 'platform' => optional($order->platform)->name ?: '-', 'qty' => $order->qty,
+                'ship' => (float) $order->ship_price, 'total' => (float) $order->total_price, 'discount' => (float) $order->discount];
+        } else {
+            $tot = 0;
+            $qty = '-';
+            if ($cart) {
+                try {
+                    $q = $cart->retailer === 'amazon' ? (array) $cart->amazon_pricing : app(\App\Services\SheinQuotationPdf::class)->quotationForPdf($cart);
+                    $tot = (float) data_get($q, 'total.amount', 0);
+                    $qty = $cart->retailer === 'amazon' ? data_get($q, 'quantity', '-') : ($q['available_quantity'] ?? '-');
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+            $paid = (float) optional($cart)->paid_amount + ($delivery->status === 'delivered' ? 0 : $dep);
+            $r = ['code' => $cart ? 'SG-' . $cart->id : $delivery->code, 'date' => optional(optional($cart)->created_at ?? $delivery->created_at)->format('Y-m-d'),
+                'platform' => $cart ? $cart->retailer_label : '-', 'qty' => $qty, 'ship' => 0.0, 'total' => $tot, 'discount' => 0.0];
+        }
+        $r += ['name' => optional($c)->name ?: $delivery->recipient_name, 'ccode' => optional($c)->code, 'deposit' => $dep, 'paid' => round($paid, 2)];
+        $r['due'] = round(max(0, $r['total'] + $r['ship'] - $r['discount'] - $r['paid']), 2);
+
+        return view('sg.dispatch.receipt', ['r' => $r, 'invoice' => \App\Models\Invoice::first(), 'f' => fn ($n) => TS::fmt($n)]);
     }
 
     /** 📄 كشف الطلعة PDF: كل عمود بيان والزبائن تحت بعض */

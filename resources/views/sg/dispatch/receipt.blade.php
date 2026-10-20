@@ -1,13 +1,8 @@
-@php
-    $ph = fn ($p) => (str_contains((string) $p, '@') || strlen(preg_replace('/\D/', '', (string) $p)) > 13) ? '' : $p;
-    $c = $d->customer; $fee = $d->fee_payer === 'company' ? 0 : (float) $d->fee; $who = $d->courier_name ?: optional($d->courier)->name;
-    $code = $order ? $order->code : ($cart ? 'SG-' . $cart->id : $d->code);
-@endphp
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إيصال عربون {{ $code }}</title>
+    <title>إيصال عربون {{ $r['code'] }}</title>
     <style>
 
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@500&display=swap');
@@ -99,61 +94,114 @@
         }
 
     </style>
-    <style>@media print { body { background: #fff; } .container { box-shadow: none; } .noprint { display: none; } }</style>
+    <style>@media print { body { background: #fff; } .container { box-shadow: none; } }</style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <img src="{{ asset('assets/images/loggo.png') }}" alt="Shop and Go Logo">
+            <img src="{{asset('assets/images/loggo.png')}}" alt="Shop and Go Logo">
             <h5>SHOP AND GO</h5>
         </div>
 
-        <h4 style="text-align: right; margin-top: 0px; margin-bottom: -5px;"> # {{ $code }} </h4>
+        <h4 style="text-align: right; margin-top: 0px;  margin-bottom: -5px;"> # {{ $r['code'] }} </h4>
 
+        @if (!$r['ship'])
+        <div class="info">
+        @else
         <div class="info" style="margin-bottom: 15px;">
-            <div><span style="font-size: 24px;">اسم العميل : </span> <span style="font-size: 24px; color: #282E4D;">{{ optional($c)->name ?: $d->recipient_name }}{{ optional($c)->code ? ' - ' . $c->code : '' }}</span></div>
+        @endif
+            <div><span style="font-size: 24px;">اسم العميل : </span> <span style="font-size: 24px; color: #282E4D;">{{ $r['name'] }}{{ $r['ccode'] ? ' - ' . $r['ccode'] : '' }}</span></div>
         </div>
 
-        <span style="color: rgb(187, 122, 0); font-size: 14px;">إيصال عربون{{ $cart ? ' · حجز سلة ' . $cart->retailer_label . ' #' . $cart->id : '' }}</span>
+        @if (!$r['ship'])
+        <span
+            class="text-warning" style="color: rgb(187, 122, 0); font-size: 14px;">ملاحطة
+            :: اجمالي القيمة بدون سعر
+            الشحن</span>
+        @endif
 
         <div class="dates" style="font-size: 14px;">
-            <div><p>تاريخ الإيصال: <span style="color: #282E4D;">{{ now()->format('Y-m-d') }}</span></p></div>
-            <div><p>الهاتف: <span style="color: #282E4D;">{{ $ph($d->recipient_phone) }}</span></p></div>
+            <div>
+                <p>تاريخ الفاتورة: <span style=" color: #282E4D;">{{ now()->format('Y-m-d') }}</span></p>
+            </div>
+            <div>
+                <p>تاريخ الطلب:  <span style=" color: #282E4D;">{{ $r['date'] }}</span></p>
+            </div>
         </div>
 
-        <div class="details" style="font-size: 14px;">
+        <div class="details"  style="font-size: 14px;">
             <table>
                 <tr>
-                    <th>البيان</th>
-                    <th>المندوب</th>
-                    <th>القيمة</th>
+                    <th>المنصة</th>
+                    <th>الكمية</th>
+                    <th>سعر الشحن</th>
+                    <th>اجمالي القيمة</th>
                 </tr>
-                <tr style="color: #282E4D;">
-                    <td>عربون{{ $cart ? ' (سلة ' . $cart->retailer_label . ')' : '' }}</td>
-                    <td>{{ $who ?: '-' }}</td>
-                    <td>{{ $f($d->amount) }} د.ل</td>
+                <tr style=" color: #282E4D;">
+                    <td>{{ $r['platform'] }}</td>
+                    <td>{{ $r['qty'] }}</td>
+
+                    <td>{{ $r['ship'] ? $f($r['ship']) . ' د.ل' : ' - ' }}</td>
+                    <td>{{ $f($r['total'] + $r['ship']) }} د.ل
+                    @if ($r['discount'])<span style="color: red;">(تخفيض: {{ $f($r['discount']) }} د.ل)</span>@endif
+                    </td>
+
                 </tr>
+
+
                 <tr>
-                    <td style="border: none;"></td>
-                    <td style="color: white; background-color: #282E4D;">قيمة العربون</td>
-                    <td style="color: white; background-color: #282E4D;">{{ $f($d->amount) }} د.ل</td>
+                    <td colspan="2" style="border: none;"></td>
+                    <td style="color: white; background-color: #282E4D;">القيمة المدفوعة</td>
+                    <td style="color: white; background-color: #282E4D;">{{ $f($r['paid']) }} د.ل</td>
                 </tr>
+
+                <tr>
+                    <td colspan="2" style="border: none;"></td>
+                    <td>عربون {{ now()->format('Y-m-d') }}</td>
+                    <td>{{ $f($r['deposit']) }} د.ل</td>
+                </tr>
+
+                <tr style=" color: #282E4D;">
+                    <td colspan="2" style="border: none;"></td>
+                    <td style="background-color: lightgrey;">القيمة المستحقة</td>
+                    <td style="background-color: lightgrey;">{{ $f($r['due']) }} د.ل</td>
+                </tr>
+
             </table>
         </div>
 
-        @if ($invoice)
-        <div class="info" style="font-size: 14px; padding-bottom: 10px;"><div><span>{{ $invoice->welcome }}</span></div></div>
-        <div class="notes" style="font-size: 14px;">
-            <div><span style="color: #282E4D;">{{ $invoice->note }}</span></div>
-            <div style="padding-top: 10px;">{{ $invoice->note2 }}</div>
-            <div style="margin-top: 10px;"><span>نحن سعداء لخدمتكم.</span></div>
+        <div class="info" style="font-size: 14px; padding-bottom: 10px;">
+            <div><span>{{ optional($invoice)->welcome }}</span></div>
         </div>
-        @endif
+
+        <div class="notes" style="font-size: 14px;">
+            <div style=" color: #282E4D;">الشروط:</div>
+            <ul>
+                <li>دفع قيمة الشراء فوراً</li>
+                <li>دفع تكلفة الشحن عند وصول الاصناف اعلاه</li>
+            </ul>
+
+            <div><span style=" color: #282E4D;">{{ optional($invoice)->note }}</span></div>
+            <div style=" padding-top: 10px;">{{ optional($invoice)->note2 }}</div>
+
+            <div style=" color: #282E4D; margin-top: 10px;">نقدم ضمانات الاتية:</div>
+            <ul>
+                <li>مطابقة للمواصفات و الكمية المتفق عليها مسبقا</li>
+                <li>عدم مطالبة بتكلفة اضافية من الزبون بعد الاتفاق و دفع الفاتورة</li>
+            </ul>
+            <div><span>نحن سعداء لخدمتكم.</span></div>
+
+            <div style="text-align: left; margin-top: -30px; padding-left: 35px;"><span>الـتـوقـيـع : </span></div>
+            <div style="text-align: left; padding-left: 20px; margin-top: 15px;"><span>............................</span></div>
+
+
+        </div>
 
         <div class="footer" style="font-size: 14px;">
             <p>{{ optional($invoice)->address }}</p>
         </div>
     </div>
+
     <script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));</script>
 </body>
 </html>
