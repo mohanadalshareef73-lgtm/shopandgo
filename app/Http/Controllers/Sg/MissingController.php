@@ -18,16 +18,16 @@ class MissingController extends Controller
     public function __construct()
     {
         $this->middleware('permission:order-list|order-edit', ['only' => ['index']]);
-        $this->middleware('permission:order-edit', ['only' => ['store', 'remove']]);
+        $this->middleware('permission:order-edit', ['only' => ['store', 'remove', 'settle']]);
     }
 
     /** كل نواقص الإيصال (اللي ما تقررش فيها + المخصومة) */
     public static function rows(Order $o): array
     {
         $rows = [];
-        if ((int) $o->missing_qty > 0 && in_array($o->missing_action, [null, '', 'deduct'], true)) {
+        if ((int) $o->missing_qty > 0 && in_array($o->missing_action, [null, '', 'deduct', 'refund'], true)) {
             $rows[] = ['kind' => 'order', 'id' => $o->id, 'title' => 'قطع ناقصة ما وصلتش', 'qty' => (int) $o->missing_qty, 'value' => (float) $o->missing_value,
-                'state' => $o->missing_action === 'deduct' ? 'مخصومة من الإيصال' : 'ما تقررش فيها', 'done' => $o->missing_action === 'deduct'];
+                'state' => $o->missing_action === 'deduct' ? 'مخصومة من الإيصال' : ($o->missing_action === 'refund' ? 'اترجعت قيمتها' : 'ما تقررش فيها'), 'done' => in_array($o->missing_action, ['deduct', 'refund'], true)];
         }
         if (Schema::hasTable('order_soldouts')) {
             foreach (OrderSoldout::where('order_id', $o->id)->whereIn('status', ['pending', 'cancelled'])->get() as $s) {
@@ -53,7 +53,7 @@ class MissingController extends Controller
 
     public function index(Order $order)
     {
-        return response()->json(['code' => $order->code, 'rows' => static::rows($order), 'canEdit' => auth()->user()->can('order-edit')]);
+        return response()->json(['code' => $order->code, 'rows' => static::rows($order), 'canEdit' => auth()->user()->can('order-edit'), 'remaining' => round(max(0, $order->remaining()), 2)]);
     }
 
     /** ➕ إضافة نقص: يتسجل «مشكلة نواقص» مفتوحة — تطلع وقت التسليم وتقدر تخصمها */
@@ -67,6 +67,59 @@ class MissingController extends Controller
         Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' إضافة نواقص (' . $order->code . ')', 'log' => ' ' . $d['item'] . ' · ' . $d['qty'] . ' قطعة' . (!empty($d['value']) ? ' · ' . TS::fmt($d['value']) . ' د.ل' : '')]);
 
         return response()->json(['ok' => true, 'rows' => static::rows($order->fresh()), 'open' => static::openCount($order->fresh())]);
+    }
+
+    /**
+     * 💸 تسوية نقص: لو على العميل باقي ← يتخصم من الإيصال، ولو ما عليهش (أو الباقي أقل) ← «استرجاع قيمة» من الخزينة (كاش).
+     * للنواقص اللي ما تقررش فيها (إيصال / مشكلة نواقص) وفيها قيمة.
+     */
+    public function settle(Request $request, Order $order)
+    {
+        $d = $request->validate(['kind' => 'required|in:order,issue', 'id' => 'required|integer', 'value' => 'nullable|numeric|min:0']);
+        try {
+            $msg = DB::transaction(function () use ($d, $order) {
+                $issue = $d['kind'] === 'issue' ? OrderIssue::where('order_id', $order->id)->where('status', 'open')->findOrFail($d['id']) : null;
+                if ($d['kind'] === 'order' && ((int) $order->missing_qty <= 0 || !in_array($order->missing_action, [null, ''], true))) {
+                    throw new \RuntimeException('النقص هذا متسوّي من قبل');
+                }
+                $value = round((float) ($d['value'] ?? 0) ?: (float) ($issue ? $issue->value : $order->missing_value), 2);
+                if ($value <= 0) {
+                    throw new \RuntimeException('اكتب قيمة النقص أولاً');
+                }
+                $deduct = round(min($value, max(0, $order->remaining())), 2);
+                $refund = round($value - $deduct, 2);
+                if ($deduct > 0) {
+                    $order->discount = (float) $order->discount + $deduct;
+                    $order->discount_reason = trim(($order->discount_reason ? $order->discount_reason . ' + ' : '') . 'نواقص');
+                }
+                if ($refund > 0) {
+                    \App\Services\TreasuryService::withdraw($refund, 'dinar', \App\Services\AppSettings::cashPaymentId(), 'missing_refund', $order->id, 'استرجاع قيمة نواقص · ' . $order->code . ' · ' . optional($order->customer)->name);
+                }
+                $how = trim(($deduct > 0 ? 'خُصم ' . TS::fmt($deduct) . ' من الإيصال' : '') . ($deduct > 0 && $refund > 0 ? ' و' : '') . ($refund > 0 ? 'رجعنا ' . TS::fmt($refund) . ' د.ل من الخزينة' : ''));
+                if ($issue) {
+                    $issue->value = $value;
+                    $issue->status = 'resolved';
+                    $issue->action = $refund > 0 ? 'refund' : 'deduct';
+                    $issue->resolution = $how;
+                    $issue->resolved_by = auth()->id();
+                    $issue->resolved_at = now();
+                    $issue->save();
+                } else {
+                    $order->missing_value = $value;
+                    $order->missing_action = $refund > 0 ? 'refund' : 'deduct';
+                }
+                $order->refreshPaymentStatus();
+                $order->save();
+                Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' تسوية نواقص (' . $order->code . ')', 'log' => ' ' . $how]);
+
+                return $how;
+            });
+        } catch (\RuntimeException $e) {
+            return response()->json(['ok' => false, 'msg' => $e->getMessage()], 422);
+        }
+        $o = $order->fresh();
+
+        return response()->json(['ok' => true, 'msg' => $msg, 'rows' => static::rows($o), 'open' => static::openCount($o), 'remaining' => round(max(0, $o->remaining()), 2)]);
     }
 
     /** ❌ إلغاء نقص تسجل بالغلط — ولو كان مخصوم من الإيصال يرجع الخصم */

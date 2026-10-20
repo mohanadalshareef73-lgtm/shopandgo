@@ -27,6 +27,7 @@ body { background: #fff; font-size: 13px; }
     @foreach ($orders as $o)
         <div class="r"><b class="num">{{ $o->code }}</b><span>{{ $o->received_qty ?? $o->qty }} قطعة · {{ $o->bags_num ?: 1 }} طرد</span></div>
         <div class="r" style="color:#555"><span>فاتورة {{ $f($o->total_price - $o->discount) }} + شحن {{ $f($o->ship_price) }}{{ \App\Services\ShippingService::isDual($o) && $o->ship_pay ? ' (' . ($o->ship_pay === 'bank' ? 'مصرف' : 'كاش') . ')' : '' }}</span><span>الباقي {{ $f(max(0, $o->remaining())) }}</span></div>
+        @if ((int) $o->missing_qty > 0)<div class="r" style="color:#b42318"><span>⚠ نواقص {{ (int) $o->missing_qty }} قطعة</span><span>{{ (float) $o->missing_value > 0 ? ($o->missing_action === 'deduct' ? 'خُصم ' . $f($o->missing_value) : ($o->missing_action === 'credit' ? 'رصيد ' . $f($o->missing_value) : 'قيمتها ' . $f($o->missing_value))) : 'بدون خصم' }}</span></div>@endif
     @endforeach
     <hr>
     <div class="r tot"><span>المدفوع الآن</span><span class="num">{{ $f($paid) }} د.ل</span></div>

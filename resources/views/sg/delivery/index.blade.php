@@ -66,6 +66,7 @@
     <span class="hint2">كود · هاتف · اسم · رقم إيصال</span>
     <div id="dSug" hidden style="position:absolute;top:100%;right:0;left:0;z-index:30;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.12);max-height:360px;overflow:auto;margin-top:6px"></div>
 </form>
+@if ($q === '') {{-- وقت البحث: يبان العميل اللي بحثت عليه بس --}}
 <div class="queue no-embed"><div class="qh">📦 جاهزين يستلموا ومستنيينهم</div>
     @if ($queue->isEmpty())
         <span class="note">لا يوجد أحد</span>
@@ -101,11 +102,12 @@
     @endif
     @if ($queueMore)<span class="note">+{{ $queueMore }} عميل</span>@endif
 </div>
+@endif
 
 @if ($q !== '' && !$customer)
     <div class="card"><div class="empty"><span class="ic">🔍</span>لم نجد عميل بـ "{{ $q }}"</div></div>
 @elseif ($customer)
-    @if ($matches->count() > 1)<div class="hint mb">فيه أكثر من عميل بالاسم هذا — اختار: @foreach ($matches as $m)<a class="chip {{ $m->id === $customer->id ? 'u' : 'n' }}" style="margin:2px;text-decoration:none" href="{{ request()->fullUrlWithQuery(['q' => $m->code ?: $m->phone_1]) }}">{{ $m->name }} · {{ $m->code }}</a>@endforeach</div>@endif
+    @if ($matches->count() > 1)<div class="hint mb">فيه أكثر من عميل مطابق — اختار: @foreach ($matches as $m)<a class="chip {{ $m->id === $customer->id ? 'u' : 'n' }}" style="margin:2px;text-decoration:none" href="{{ request()->fullUrlWithQuery(['cid' => $m->id]) }}">{{ $m->name }} · {{ $m->code }}</a>@endforeach</div>@endif
     <div class="card cust">
         <span class="av" style="width:58px;height:58px;font-size:24px">{{ mb_substr($customer->name, 0, 1) }}</span>
         <div><div style="font-size:21px;font-weight:800">{{ $customer->name }}@if ($customer->is_vip) <span class="chip w" style="font-size:12px;vertical-align:middle">⭐ VIP</span>@endif</div><div class="note" style="font-size:13.5px"><span class="code" style="color:var(--ink);background:var(--line-soft);padding:2px 9px;border-radius:7px">{{ $customer->code }}</span> <span class="num">{{ $customer->phone_1 }}</span> · {{ $custOrders }} طلبية</div></div>
@@ -288,7 +290,7 @@
       try {
         if (ctl) ctl.abort(); ctl = new AbortController();
         const r = await (await fetch(@json(route('sg.delivery.suggest')) + '?q=' + encodeURIComponent(v), { signal: ctl.signal })).json();
-        box.innerHTML = r.length ? r.map(c => `<a href="?q=${encodeURIComponent(c.code)}" style="display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)"><b class="num" style="min-width:60px">${c.code || ''}</b><span style="flex:1">${c.name || ''}</span><small class="note num">${c.phone || ''}</small>${c.ready ? `<span class="chip u">${c.ready} جاهز</span>` : ''}${c.open > c.ready ? `<span class="chip w">${c.open - c.ready} مش جاهزة</span>` : ''}${!c.open ? '<span class="note" style="font-size:11.5px">ما عنده شي</span>' : ''}</a>`).join('') : '<div class="note" style="padding:12px">لا يوجد عميل</div>';
+        box.innerHTML = r.length ? r.map(c => `<a href="?q=${encodeURIComponent(c.code)}&cid=${c.id}" style="display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)"><b class="num" style="min-width:60px">${c.code || ''}</b><span style="flex:1">${c.name || ''}</span><small class="note num">${c.phone || ''}</small>${c.ready ? `<span class="chip u">${c.ready} جاهز</span>` : ''}${c.open > c.ready ? `<span class="chip w">${c.open - c.ready} مش جاهزة</span>` : ''}${!c.open ? '<span class="note" style="font-size:11.5px">ما عنده شي</span>' : ''}</a>`).join('') : '<div class="note" style="padding:12px">لا يوجد عميل</div>';
         box.hidden = false;
       } catch (e) {}
     }, 250);

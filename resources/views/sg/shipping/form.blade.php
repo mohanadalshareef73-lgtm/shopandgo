@@ -69,9 +69,9 @@
         <div><span class="l">عدد الطرود</span><input name="bags" class="inp numr" value="{{ old('bags', optional($o)->bags_num ?: 1) }}"></div>
         <div><span class="l">نوع الشحن</span><select name="package_type" id="ptype" class="inp">@foreach ($types as $t)<option @selected(old('package_type', optional($o)->package_type ?: ($types[0] ?? '')) == $t)>{{ $t }}</option>@endforeach</select></div>
         <div><span class="l">المنصة (شرى منها)</span><input name="ship_platform" class="inp" list="plats" value="{{ old('ship_platform', optional($o)->ship_platform) }}" placeholder="SHEIN · Amazon · Temu…"><datalist id="plats">@foreach ($platforms as $pl)<option value="{{ $pl }}">@endforeach</datalist></div>
-        <div><span class="l">الوزن (كغ)</span><input name="kilo" id="kg" class="inp numr" value="{{ old('kilo', optional($o)->kilo) }}" placeholder="يُكتب عند الوصول للمخزن"></div>
-        <div><span class="l">سعر الكيلو ($)</span><input name="per_kg" id="pk" class="inp numr" value="{{ old('per_kg', optional($o)->usd_per_kg) }}"></div>
-        <div><span class="l">تخفيض على الكيلو ($)</span><input name="discount" id="disc" class="inp numr" value="{{ old('discount', optional($o)->usd_discount ?: 0) }}"></div>
+        <div><span class="l" data-u="w">الوزن (كغ)</span><input name="kilo" id="kg" class="inp numr" value="{{ old('kilo', optional($o)->kilo) }}" placeholder="يُكتب عند الوصول للمخزن"></div>
+        <div><span class="l" data-u="p">سعر الكيلو ($)</span><input name="per_kg" id="pk" class="inp numr" value="{{ old('per_kg', optional($o)->usd_per_kg) }}"></div>
+        <div><span class="l" data-u="d">تخفيض على الكيلو ($)</span><input name="discount" id="disc" class="inp numr" value="{{ old('discount', optional($o)->usd_discount ?: 0) }}"></div>
         <div><span class="l">الحالة</span><select name="stage" id="stage" class="inp">@foreach (['expected', 'warehouse', 'transit', 'arrived'] as $k)<option value="{{ $k }}" @selected($stage0 === $k)>{{ SS::STAGES[$k][0] }}</option>@endforeach</select></div>
         <div><span class="l">مكان التخزين (عند الوصول)</span><input name="storage" class="inp" value="{{ old('storage', optional($o)->storage_num) }}" list="shelves" placeholder="A-4"></div>
         @php $cur0 = old('ship_cur', optional($o)->ship_cur ?: 'usd'); $amt0 = old('ship_amt', $o ? ($cur0 === 'lyd' ? $o->ship_price : $o->usd_amount) : ''); @endphp
@@ -144,6 +144,14 @@
   document.querySelectorAll('input[name=origin]').forEach(r => r.addEventListener('change', () => { pkTouched = false; setPk(); }));
   [kg, pk, disc].forEach(i => i.addEventListener('input', calc));
   if (!pk.value) setPk(); else { setPk(); calc(); }
+})();
+
+/* 🚢 بحري ← CBM (متر مكعب) بدل الكيلو */
+(function () {
+  const pt = document.getElementById('ptype'); if (!pt) return;
+  const T = { w: ['الوزن (كغ)', 'الحجم (CBM متر مكعب)'], p: ['سعر الكيلو ($)', 'سعر الـCBM ($)'], d: ['تخفيض على الكيلو ($)', 'تخفيض على الـCBM ($)'] };
+  const upd = () => { const sea = (pt.value || '').includes('بحري'); document.querySelectorAll('[data-u]').forEach(el => el.textContent = T[el.dataset.u][sea ? 1 : 0]); };
+  pt.addEventListener('change', upd); upd();
 })();
 </script>
 @endpush

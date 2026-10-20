@@ -69,7 +69,7 @@
                 <td><b>{{ optional($o->customer)->name }}</b><div class="note num">{{ optional($o->customer)->code }}</div></td>
                 <td><span class="og">{{ $og['flag'] ?? '🌍' }} {{ $og['name'] ?? $o->ship_origin }}</span></td>
                 <td class="n"><span class="pk">{{ $o->bags_num }}</span> <span class="note">{{ $o->package_type }}</span></td>
-                <td class="n">@if ($o->kilo)<span class="pk">{{ $f($o->kilo) }}</span> <span class="note">كغ</span>@else<span class="note">—</span>@endif</td>
+                <td class="n">@if ($o->kilo)<span class="pk">{{ $f($o->kilo) }}</span> <span class="note">{{ \App\Services\ShippingService::unit($o) }}</span>@else<span class="note">—</span>@endif</td>
                 <td class="n ppk">@if ($o->usd_discount > 0)<del>{{ $f($o->usd_per_kg) }}$</del>@endif<b>{{ $f($o->usd_per_kg - $o->usd_discount) }}$</b></td>
                 <td class="n cost"><b>{{ $f($o->usd_amount) }}$</b><small>@if (\App\Services\ShippingService::isDual($o)) @php $dp = \App\Services\ShippingService::dualPrices($o); @endphp💵 {{ $f($dp['cash']) }} · 🏦 {{ $f($dp['bank']) }} د.ل @else ≈ {{ $f($o->ship_price) }} د.ل @endif</small></td>
                 <td><span class="st" style="background:{{ $stc }}1a;color:{{ $stc === '#b7bccb' ? 'var(--ink-3)' : $stc }}"><i></i>{{ $stt }}</span></td>

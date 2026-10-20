@@ -165,7 +165,26 @@ class ShippingService
     {
         $tpl = MessageService::template('ship_arrived');
 
-        return \App\Services\ArrivalNotify::withIssues($o, MessageService::render($tpl->message ?? static::ARRIVED_MSG, static::vars($o)));
+        return \App\Services\ArrivalNotify::withIssues($o, static::unitize($o, MessageService::render($tpl->message ?? static::ARRIVED_MSG, static::vars($o))));
+    }
+
+    /** 🚢 الشحن البحري يُحسب بالـ CBM (متر مكعب) بدل الكيلو */
+    public static function isSea(?Order $o): bool
+    {
+        return $o && str_contains((string) $o->package_type, 'بحري');
+    }
+
+    public static function unit(?Order $o): string
+    {
+        return static::isSea($o) ? 'CBM' : 'كغ';
+    }
+
+    /** يبدّل «كغ/الكيلو/الوزن» في نص الرسالة لـ CBM/الحجم لو الشحنة بحري */
+    public static function unitize(?Order $o, string $text): string
+    {
+        return static::isSea($o)
+            ? str_replace(['⚖️ الوزن', 'الوزن', ' كغ', 'كغ', 'سعر الكيلو', 'الكيلو'], ['📦 الحجم', 'الحجم', ' CBM', 'CBM', 'سعر الـCBM', 'الـCBM'], $text)
+            : $text;
     }
 
     /** ✅ يبعت «وصل طلبك» + PDF الشحنة — ينفع يتعاود أكثر من مرة · $custom = النص بعد ما عدلوه في المعاينة */

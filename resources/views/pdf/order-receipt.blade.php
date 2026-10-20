@@ -27,7 +27,7 @@ table.m td.v { text-align: left; font-weight: bold; }
     <tr><td>✈️ نوع الشحن</td><td class="v">{{ $order->package_type ?: 'جوي' }}</td></tr>
     @if ($order->tracking_no)<tr><td>🔎 رقم التتبع</td><td class="v">{{ $order->tracking_no }}</td></tr>@endif
     <tr><td>📦 عدد الطرود</td><td class="v">{{ $order->bags_num ?: 1 }}</td></tr>
-    @if ($order->kilo)<tr><td>⚖️ الوزن</td><td class="v">{{ $fmt($order->kilo) }} كغ</td></tr>@endif
+    @if ($order->kilo)<tr><td>{{ \App\Services\ShippingService::isSea($order) ? '📦 الحجم' : '⚖️ الوزن' }}</td><td class="v">{{ $fmt($order->kilo) }} {{ \App\Services\ShippingService::unit($order) }}</td></tr>@endif
     @if ($order->storage_num)<tr><td>🗄 الرف</td><td class="v">{{ $order->storage_num }}</td></tr>@endif
     @if (\App\Services\ShippingService::isDual($order))
         @php $dp = \App\Services\ShippingService::dualPrices($order); @endphp

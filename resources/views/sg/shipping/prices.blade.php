@@ -31,7 +31,7 @@
                         <div class="adr" style="border:1px solid var(--line);border-radius:12px;padding:8px;margin-bottom:8px;background:#fafbfe">
                             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
                                 <select name="og[{{ $k }}][addrs][{{ $i }}][mode]" class="inp" style="width:110px;height:36px">@foreach (\App\Services\ShippingService::MODES as $m => $ic)<option value="{{ $m }}" @selected(($a['mode'] ?? 'جوي') === $m)>{{ $ic }} {{ $m }}</option>@endforeach</select>
-                                <span class="note">سعر الكيلو $</span><input name="og[{{ $k }}][addrs][{{ $i }}][per_kg]" class="inp n2" style="height:36px" value="{{ $a['per_kg'] ?? 0 }}">
+                                <span class="note">سعر الكيلو $ (البحري: سعر CBM)</span><input name="og[{{ $k }}][addrs][{{ $i }}][per_kg]" class="inp n2" style="height:36px" value="{{ $a['per_kg'] ?? 0 }}">
                                 <label class="ck" style="margin:0"><input type="checkbox" name="og[{{ $k }}][addrs][{{ $i }}][active]" value="1" @checked(!isset($a['active']) || $a['active'])> مفعّل</label>
                                 <button type="button" class="btn ghost sm" style="color:var(--down);margin-inline-start:auto" onclick="if(confirm('نمسحو العنوان هذا؟'))this.closest('.adr').remove()">🗑 مسح</button>
                             </div>
@@ -97,7 +97,7 @@ window.sgAddAddr = function (b) {
   d.style.cssText = 'border:1px solid var(--line);border-radius:12px;padding:8px;margin-bottom:8px;background:#fafbfe';
   d.innerHTML = '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'
     + '<select name="og[' + k + '][addrs][' + i + '][mode]" class="inp" style="width:110px;height:36px"><option value="جوي">✈️ جوي</option><option value="بحري" selected>🚢 بحري</option></select>'
-    + '<span class="note">سعر الكيلو $</span><input name="og[' + k + '][addrs][' + i + '][per_kg]" class="inp n2" style="height:36px" value="0">'
+    + '<span class="note">سعر الكيلو $ (البحري: سعر CBM)</span><input name="og[' + k + '][addrs][' + i + '][per_kg]" class="inp n2" style="height:36px" value="0">'
     + '<label class="ck" style="margin:0"><input type="checkbox" name="og[' + k + '][addrs][' + i + '][active]" value="1" checked> مفعّل</label>'
     + '<button type="button" class="btn ghost sm" style="color:var(--down);margin-inline-start:auto" onclick="this.closest(\'.adr\').remove()">🗑 مسح</button></div>'
     + '<textarea name="og[' + k + '][addrs][' + i + '][address]" class="inp" placeholder="{الكود} {الاسم}&#10;العنوان…"></textarea>';

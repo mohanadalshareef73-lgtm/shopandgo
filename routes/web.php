@@ -353,6 +353,7 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::get('orders/{order}/missing-list', [$C . 'MissingController', 'index'])->name('missing.list');
         Route::post('orders/{order}/missing-add', [$C . 'MissingController', 'store'])->name('missing.add');
         Route::post('orders/{order}/missing-remove', [$C . 'MissingController', 'remove'])->name('missing.remove');
+        Route::post('orders/{order}/missing-settle', [$C . 'MissingController', 'settle'])->name('missing.settle');
         Route::get('shipping/{order}/ready-preview', [$C . 'ShippingController', 'readyPreview'])->name('shipping.ready.preview');
         Route::get('signups', [$C . 'SignupsController', 'index'])->name('signups');
         Route::post('signups/{id}/approve', [$C . 'SignupsController', 'approve'])->name('signups.approve');

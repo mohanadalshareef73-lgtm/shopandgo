@@ -157,6 +157,28 @@ class MessageService
         return static::sendText($type, static::render($tpl->message, $vars), $phones, $customer, $order);
     }
 
+    /** أنواع الرسائل اللي يبقى فيها رابط المنظومة */
+    public const LINK_TYPES = ['new', 'ship_registered', 'arrived', 'ship_arrived', 'ship_address'];
+
+    /** يشيل أسطر رابط المنظومة (والسطر اللي قبلها لو كان «اضغط هنا 👇») من نص الرسالة */
+    public static function stripLinks(string $text, string $host = 'shopandgo.ly'): string
+    {
+        $lines = preg_split('/\R/u', $text);
+        $out = [];
+        foreach ($lines as $l) {
+            if (stripos($l, $host) !== false) {
+                // السطر اللي قبل الرابط لو كان دعوة للضغط (👇 / 👈 / ينتهي بـ :) نشيلوه معاه
+                while ($out && trim(end($out)) !== '' && preg_match('/(👇|👈|:\s*$|اضغط|الرابط)/u', end($out))) {
+                    array_pop($out);
+                }
+                continue;
+            }
+            $out[] = $l;
+        }
+
+        return trim(preg_replace("/\n{3,}/u", "\n\n", implode("\n", $out)));
+    }
+
     /** يجرب الرقم الأول، وإذا فشل يجرب الثاني */
     public static function sendText(string $type, string $text, array $phones, ?Customer $customer = null, ?Order $order = null, ?string $logText = null, ?string $session = null): bool
     {
@@ -164,9 +186,14 @@ class MessageService
         if ($customer && !in_array($type, ['otp', 'alert', 'report', 'backup'], true)) {
             CustomerNotify::inbox($customer, $logText ?? $text, $order, $type);
         }
-        // رسائل العملاء: نزيدو تحتها رابط حسابه في المنظومة (باش يتعود يدخل)
-        if ($customer && !in_array($type, ['otp', 'alert', 'report', 'backup', 'shift_closed'], true)
-            && !str_contains($text, parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'shopandgo.ly')) {
+        // 🔗 رابط المنظومة يبقى فقط في: تسجيل طلب جديد · جاهز للاستلام · عنوان الشحن — وينشال من باقي الرسائل
+        $host = parse_url((string) config('app.url'), PHP_URL_HOST) ?: 'shopandgo.ly';
+        if ($customer && !in_array($type, self::LINK_TYPES, true)) {
+            $text = static::stripLinks($text, $host);
+        }
+        // رسائل العملاء المسموح فيها الرابط: نزيدو تحتها رابط حسابه (باش يتعود يدخل)
+        if ($customer && in_array($type, self::LINK_TYPES, true)
+            && !str_contains($text, $host)) {
             $f = AppSettings::waFooter();
             $text .= $f !== '' ? "\n\n" . $f : '';
         }

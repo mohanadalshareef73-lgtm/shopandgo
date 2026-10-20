@@ -65,11 +65,18 @@ class DeliveryController extends Controller
             if ($hit && !$request->filled('pick')) {
                 $request->merge(['pick' => $hit->id]); // رقم إيصال: يتختار طول
             }
-            $customer = $C()->where('code', $q)->first()
+            // 🔢 كود بجزء منه: 6823 يطلع 6823 و 76823 وأي كود فيه الأرقام هذي
+            if (ctype_digit($q) && !$hit) {
+                $matches = $C()->where('code', 'like', '%' . \App\Support\Search::esc($q) . '%')
+                    ->withCount(['orders as open_n' => fn ($o) => $o->where('delivered', false)->where('status', '!=', 'canceld')])
+                    ->orderByRaw('CASE WHEN code = ? THEN 0 ELSE 1 END', [$q])->orderByDesc('open_n')->orderBy('code')->limit(15)->get(['id', 'name', 'code', 'phone_1']);
+            }
+            $customer = ($request->filled('cid') ? $C()->find((int) $request->cid) : null)
+                ?? ($matches->count() ? $matches->first() : null)
                 ?? ($hit ? $C()->find($hit->customer_id) : null)
                 ?? ($digits && strlen($digits) >= 6 ? $C()->where(fn ($w) => $w->where('phone_1', 'like', '%' . substr($digits, -9))->orWhere('phone_2', 'like', '%' . substr($digits, -9)))->first() : null)
                 ?? (($oh = Order::where('code', 'like', '%' . $q)->first()) ? $C()->find($oh->customer_id) : null);
-            if (!$customer && mb_strlen($q) >= 2) {
+            if (!$customer && mb_strlen($q) >= 2 && !$matches->count()) {
                 // اللي عنده طلبيات ما تسلمتش يطلع الأول
                 $matches = $C()->where('name', 'like', "%$q%")
                     ->withCount(['orders as open_n' => fn ($o) => $o->where('delivered', false)->where('status', '!=', 'canceld')])
@@ -506,7 +513,7 @@ class DeliveryController extends Controller
         // اللي عنده طلبيات ما تسلمتش فوق
         $cs = $cs->sortByDesc(fn ($c) => ($c->code === $t ? 100000 : 0) + (int) ($open[$c->id] ?? 0))->values();
 
-        return response()->json($cs->map(fn ($c) => ['code' => $c->code, 'name' => $c->name, 'phone' => $c->phone_1, 'ready' => (int) ($ready[$c->id] ?? 0), 'open' => (int) ($open[$c->id] ?? 0)]));
+        return response()->json($cs->map(fn ($c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name, 'phone' => $c->phone_1, 'ready' => (int) ($ready[$c->id] ?? 0), 'open' => (int) ($open[$c->id] ?? 0)]));
     }
 
     /** جرد الرفوف: نكتب الأكواد الموجودة فعلاً ونقارنها بالمنظومة */

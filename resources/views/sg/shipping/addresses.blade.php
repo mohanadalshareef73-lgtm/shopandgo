@@ -26,12 +26,12 @@
         @foreach ($origins as $k => $og)
             <div class="f" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                 <label class="ck" style="flex:1;min-width:140px"><input type="checkbox" name="origins[]" value="{{ $k }}" checked> {{ $og['flag'] }} <b>{{ $og['name'] }}</b> <span class="note">{{ $og['city'] }}</span></label>
-                <span class="note">سعر الكيلو $</span><input name="price[{{ $k }}]" class="inp numr pr" data-k="{{ $k }}" data-base="{{ $og['per_kg'] }}" value="{{ $og['per_kg'] }}" style="width:90px;height:38px">
+                <span class="note">سعر الكيلو/CBM $</span><input name="price[{{ $k }}]" class="inp numr pr" data-k="{{ $k }}" data-base="{{ $og['per_kg'] }}" value="{{ $og['per_kg'] }}" style="width:90px;height:38px">
                 <small class="note dsc" style="width:100%"></small>
             </div>
         @endforeach
         <label class="ck f"><input type="checkbox" name="with_image" value="1" @checked($hasCard) @disabled(!$hasCard)> أرسل صورة الكود مع أول رسالة @if (!$hasCard)<a class="note" href="{{ route('sg.shipping.prices') }}#card">(ارفع الصورة الثابتة أول)</a>@endif</label>
-        <div class="note mb">لو نزّلت سعر الكيلو تحت سعر البلد: يتسجل سعر خاص للعميل، والرسالة تقول «كان بـ … وقعد بـ … لأنك عميل خاص».</div>
+        <div class="note mb">لو نزّلت السعر تحت سعر البلد: يتسجل سعر خاص للعميل (يُستعمل في حساب شحناته). الرسالة فيها: الاسم + العنوان + الكود فقط، وكل عنوان (جوي/بحري) رسالة بروحه.</div>
         <button class="btn green block" data-confirm="نرسلو العناوين؟">💬 أرسل العناوين</button>
     </div>
 </form>

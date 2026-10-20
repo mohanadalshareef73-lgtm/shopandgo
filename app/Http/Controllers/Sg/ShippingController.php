@@ -174,7 +174,7 @@ class ShippingController extends Controller
         if ($request->boolean('send_whatsapp')) {
             // 📨 رسالة تسجيل الشحنة — ولو العميل جديد نزيدوله تحتها بيانات الدخول لحسابه
             $tpl = MessageService::template('ship_registered');
-            $txt = $tpl && ($tpl->enabled ?? true) ? MessageService::render($tpl->message, SS::vars($o)) : '';
+            $txt = $tpl && ($tpl->enabled ?? true) ? SS::unitize($o, MessageService::render($tpl->message, SS::vars($o))) : '';
             if ($this->newAcc && $o->customer) {
                 $txt = trim($txt . "\n\n" . \App\Support\GuestAccount::accountText($o->customer, true));
             }
@@ -389,37 +389,23 @@ class ShippingController extends Controller
                 continue;
             }
             $o = $all[$k];
-            $tiers = collect(SS::tiers($o))->map(fn ($p, $kg) => "من {$kg} كغ: {$p}$")->implode(' · ');
-            // كل عنوان مفعّل (✈️ جوي / 🚢 بحري) بسعره
-            $blocks = [];
+            // ✉️ كل عنوان (✈️ جوي / 🚢 بحري) في رسالة بروحه: الاسم + العنوان + كود العميل فقط (بدون أسعار)
             foreach (SS::addrs($o) as $a) {
-                $base = (float) ($a['per_kg'] ?? $o['per_kg']);
-                $mine = SS::perKg($c, $k, $a['mode'] ?? null);
-                $pl = $mine < $base - 0.0001 ? "💰 سعر الكيلو: كان بـ {$base}$ وقعد بـ {$mine}$ لأنك عميل خاص 🌟" : "💰 سعر الكيلو: {$base}$";
-                $blocks[] = (SS::MODES[$a['mode'] ?? 'جوي'] ?? '✈️') . ' *شحن ' . ($a['mode'] ?? 'جوي') . "*\n" . SS::addressFor($o, $c, $a) . "\n\n" . $pl;
+                $mode = $a['mode'] ?? 'جوي';
+                $text = "اهلا {$first} 👋\n"
+                    . (SS::MODES[$mode] ?? '✈️') . " *عنوان الشحن {$mode}* من {$o['flag']} {$o['name']}:\n\n"
+                    . SS::addressFor($o, $c, $a)
+                    . "\n\n🔖 كودك: SG{$c->code}";
+                try {
+                    $ok = app(\App\Services\WhatsAppService::class)->sendMessage($phone, $text, null, [], $img);
+                } catch (\Throwable $e) {
+                    report($e);
+                    $ok = false;
+                }
+                $img = null; // الصورة مع أول رسالة بس
+                \App\Models\CustomerMessage::create(['customer_id' => $c->id, 'body' => $text, 'sent' => $ok, 'created_id' => auth()->id()]);
+                $sent += $ok ? 1 : 0;
             }
-            $priceLine = '';
-            $text = "اهلا {$first} 👋
-عنوان الشحن من {$o['flag']} {$o['name']}:
-
-" . implode("\n\n━━━━━━━━━━\n\n", $blocks)
-                . ($tiers ? "
-📉 تخفيض حسب الوزن: {$tiers}" : '')
-                . (!empty($o['min']) ? "
-📦 أقل شحنة: {$o['min']}$" : '') . (!empty($o['days']) ? "
-⏱ المدة: {$o['days']}" : '')
-                . "
-
-🔖 كودك: SG{$c->code}";
-            try {
-                $ok = app(\App\Services\WhatsAppService::class)->sendMessage($phone, $text, null, [], $img);
-            } catch (\Throwable $e) {
-                report($e);
-                $ok = false;
-            }
-            $img = null; // الصورة مع أول رسالة بس
-            \App\Models\CustomerMessage::create(['customer_id' => $c->id, 'body' => $text, 'sent' => $ok, 'created_id' => auth()->id()]);
-            $sent += $ok ? 1 : 0;
         }
         \App\Models\Log::create(['user_id' => auth()->id(), 'type' => 'customer', 'title' => ' عناوين شحن (' . $c->name . ')', 'log' => ' أُرسل ' . $sent . ' من ' . count($data['origins'])]);
 

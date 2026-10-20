@@ -20,15 +20,17 @@
 <button type="button" id="msOpener" data-modal="mMiss" hidden></button>
 <script>
 (function () {
-  const U = { list: @json(route('sg.missing.list', 0)), add: @json(route('sg.missing.add', 0)), rm: @json(route('sg.missing.remove', 0)) }, u = (k, id) => U[k].replace('/orders/0/', '/orders/' + id + '/'), tok = () => (document.querySelector('meta[name=csrf-token]') || {}).content;
+  const U = { list: @json(route('sg.missing.list', 0)), add: @json(route('sg.missing.add', 0)), rm: @json(route('sg.missing.remove', 0)), st: @json(route('sg.missing.settle', 0)) }, u = (k, id) => U[k].replace('/orders/0/', '/orders/' + id + '/'), tok = () => (document.querySelector('meta[name=csrf-token]') || {}).content;
   let cur = null, btn = null;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fmt = n => (Math.round((+n || 0) * 100) / 100).toLocaleString('en-US');
+  let rem = 0;
   const draw = (rows, canEdit) => {
     const L = document.getElementById('msList');
     if (!rows.length) { L.innerHTML = '<div class="note">ما فيش نواقص مسجلة على الإيصال هذا ✓</div>'; return; }
     L.innerHTML = rows.map(r => `<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)">
       <div style="flex:1"><b>${esc(r.title)}</b><div class="note">${r.qty} قطعة · <span class="num">${fmt(r.value)}</span> د.ل · ${esc(r.state)}</div></div>
+      ${canEdit && !r.done && r.kind !== 'soldout' ? `<button type="button" class="btn sm" data-st="${r.kind}:${r.id}" data-v="${r.value}">${rem > 0.009 ? '➖ خصم من الطلب' : '💸 استرجاع قيمة'}</button>` : ''}
       ${canEdit ? `<button type="button" class="btn ghost sm" style="color:var(--down)" data-rm="${r.kind}:${r.id}">❌ إلغاء</button>` : ''}</div>`).join('');
   };
   const setBtn = n => { if (!btn) return; btn.textContent = n ? '📉 نواقص (' + n + ')' : '📉 النواقص'; btn.style.color = n ? '#b3261e' : ''; btn.style.borderColor = n ? '#f3b8b2' : ''; };
@@ -39,8 +41,18 @@
     const b = e.target.closest('[data-miss]');
     if (b) { e.preventDefault(); btn = b; cur = b.dataset.miss; document.getElementById('msCode').textContent = b.dataset.missCode || '';
       document.getElementById('msList').innerHTML = '<div class="note">جاري التحميل…</div>'; document.getElementById('msOpener').click();
-      fetch(u('list', cur), { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' }).then(r => r.json()).then(j => draw(j.rows || [], j.canEdit)).catch(() => { document.getElementById('msList').innerHTML = '<div class="note">ما قدرناش نجيبوها — عاود</div>'; });
+      fetch(u('list', cur), { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' }).then(r => r.json()).then(j => { rem = +j.remaining || 0; draw(j.rows || [], j.canEdit); }).catch(() => { document.getElementById('msList').innerHTML = '<div class="note">ما قدرناش نجيبوها — عاود</div>'; });
       return; }
+    const st = e.target.closest('[data-st]');
+    if (st && cur) {
+      let v = +st.dataset.v || 0;
+      if (v <= 0) { const x = prompt('قيمة النقص بالدينار؟'); if (x === null) return; v = parseFloat(x) || 0; if (v <= 0) return; }
+      const d = Math.min(v, rem), r = Math.round((v - d) * 100) / 100;
+      if (!confirm((d > 0 ? 'خصم ' + fmt(d) + ' د.ل من الإيصال' : '') + (d > 0 && r > 0 ? ' + ' : '') + (r > 0 ? 'استرجاع ' + fmt(r) + ' د.ل من الخزينة (كاش)' : '') + '؟')) return;
+      const [kind, id] = st.dataset.st.split(':'); const fd = new FormData(); fd.set('kind', kind); fd.set('id', id); fd.set('value', v); fd.set('_token', tok());
+      post(u('st', cur), fd).then(({ ok, j, st: s2 }) => { if (!ok) { toast(j.msg || ('ما تمش (' + s2 + ')'), true); return; } rem = +j.remaining || 0; draw(j.rows, true); setBtn(j.open); toast('✓ ' + j.msg); });
+      return;
+    }
     const rm = e.target.closest('[data-rm]');
     if (rm && cur) { if (!confirm('نلغيو النقص هذا؟ (لو كان مخصوم، الخصم يرجع)')) return;
       const [kind, id] = rm.dataset.rm.split(':'); const fd = new FormData(); fd.set('kind', kind); fd.set('id', id); fd.set('_token', tok());

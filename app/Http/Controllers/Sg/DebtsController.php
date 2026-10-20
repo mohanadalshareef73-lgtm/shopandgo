@@ -93,7 +93,7 @@ class DebtsController extends Controller
         if ($request->filled('q')) {
             $t = mb_strtolower(trim($request->q));
             $d = preg_replace('/\D/', '', $t);
-            $rows = $rows->filter(fn ($r) => str_contains(mb_strtolower($r->customer->name), $t) || str_starts_with((string) $r->customer->code, trim($request->q)) || (strlen($d) >= 4 && (str_contains((string) $r->customer->phone_1, $d) || str_contains((string) $r->customer->phone_2, $d))));
+            $rows = $rows->filter(fn ($r) => str_contains(mb_strtolower($r->customer->name), $t) || str_contains((string) $r->customer->code, trim($request->q)) || (strlen($d) >= 4 && (str_contains((string) $r->customer->phone_1, $d) || str_contains((string) $r->customer->phone_2, $d))));
         }
         if ($request->filled('w')) {
             $rows = $rows->filter(fn ($r) => $r->{$request->w} > 0);
