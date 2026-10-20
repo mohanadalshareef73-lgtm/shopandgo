@@ -58,6 +58,11 @@ class DispatchController extends Controller
             }
         }
         $queue = $all->where('zone', $tab)->values();
+        // 🔍 خارج بنغازي: بحث بكود شركة التوصيل
+        $xq = trim((string) $request->xq);
+        if ($xq !== '') {
+            $queue = $queue->filter(fn ($d) => str_contains(mb_strtolower((string) $d->ext_code), mb_strtolower($xq)) || str_contains((string) optional($d->customer)->code, $xq) || str_contains((string) $d->recipient_phone, $xq))->values();
+        }
 
         // 🛒 حجوزات السلات اللي في الطابور: تأكيد الحجز ← ⚡ احجز الان من هني
         $cartIds = $queue->pluck('cart_id')->filter()->unique();
@@ -67,7 +72,7 @@ class DispatchController extends Controller
         $bookTo = (string) AppSettings::get('booking_last_phone', $nums[0] ?? '');
 
         return view('sg.dispatch.index', [
-            'nav' => 'dispatch', 'carts' => $carts, 'cartOrders' => $cartOrders, 'bookTo' => $bookTo, 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
+            'nav' => 'dispatch', 'xq' => $xq, 'payments' => \App\Models\PaymentMethod::where('status', true)->orderBy('id')->get(), 'cashId' => AppSettings::cashPaymentId(), 'carts' => $carts, 'cartOrders' => $cartOrders, 'bookTo' => $bookTo, 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
             'couriers' => User::where('type_id', 4)->where('status', true)->orderBy('name')->get(),
             'counts' => $all->countBy('zone'),
             'batches' => $queue->pluck('batch')->filter()->unique()->sortDesc()->values(),
@@ -131,10 +136,26 @@ class DispatchController extends Controller
     /** إجراء على توصيل في الطابور: نوع · تحويل · تغيير المندوب · سلّم · رجّع */
     public function act(Request $request, Delivery $delivery)
     {
-        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect', 'amount' => 'nullable|numeric|min:0', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
+        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
         abort_unless(in_array($delivery->status, self::ACTIVE, true), 422, 'التوصيل هذا مقفول');
         $cu = $delivery->customer;
         switch ($d['a']) {
+            case 'ext':
+                $delivery->ext_code = trim((string) ($d['ext_code'] ?? '')) ?: null;
+                $delivery->save();
+                $delivery->log($delivery->status, 'كود شركة التوصيل: ' . ($delivery->ext_code ?: '—'));
+
+                return $request->expectsJson() ? response()->json(['ok' => true]) : back()->with('success', '✓ تحفظ الكود');
+            case 'settle':
+                try {
+                    $got = $this->settleOut($delivery, (int) ($d['payment_id'] ?? AppSettings::cashPaymentId()), $request->filled('amount') ? (float) $request->amount : null);
+                } catch (\Throwable $e) {
+                    report($e);
+
+                    return back()->with('error', $e->getMessage());
+                }
+
+                return back()->with('success', '💰 تحصّل ' . TS::fmt($got) . ' د.ل' . ($delivery->ext_code ? ' · كود ' . $delivery->ext_code : '') . ' (بدون رسالة)');
             case 'collect':
                 // ✓ تأكيد: المندوب قبض ← نتأكدو من القيمة (لو تغيرت نعدلوها) ← ينعمل الإيصال ويوصل العميل
                 if (!$delivery->cart_id) {
@@ -258,8 +279,8 @@ class DispatchController extends Controller
     /** ☑ إجراء على المختارين: ترحيل · تعيين مندوب · رجوع للرف */
     public function bulk(Request $request)
     {
-        $d = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer', 'a' => 'required|in:move_out,move_in,courier,back,silent',
-            'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100']);
+        $d = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer', 'a' => 'required|in:move_out,move_in,courier,back,silent,settle',
+            'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'payment_id' => 'nullable|integer']);
         $rows = Delivery::with('orders')->whereIn('id', $d['ids'])->whereIn('status', self::ACTIVE)->get();
         $c = !empty($d['courier_id']) ? User::where('type_id', 4)->find($d['courier_id']) : null;
         $n = trim((string) ($d['courier_name'] ?? ''));
@@ -267,6 +288,15 @@ class DispatchController extends Controller
             return back()->with('error', 'اختار مندوب ولا اكتب اسمه');
         }
         foreach ($rows as $dl) {
+            if ($d['a'] === 'settle') {
+                try {
+                    $this->settleOut($dl, (int) ($d['payment_id'] ?? AppSettings::cashPaymentId()), null);
+                } catch (\Throwable $e) {
+                    report($e);
+                    session()->flash('error', $dl->code . ': ' . $e->getMessage());
+                }
+                continue;
+            }
             if ($d['a'] === 'silent') {
                 try {
                     $this->deliverSilent($dl);
@@ -300,7 +330,7 @@ class DispatchController extends Controller
         }
         Cache::forget('sg.badge.ready');
 
-        return back()->with('success', '✓ ' . $rows->count() . ' ' . ['move_out' => 'ترحلوا لخارج بنغازي', 'move_in' => 'ترحلوا للمندوب', 'courier' => 'مع ' . ($c ? $c->name : $n), 'back' => 'رجعوا للرف', 'silent' => 'مستلمين (بدون رسالة)'][$d['a']]);
+        return back()->with('success', '✓ ' . $rows->count() . ' ' . ['move_out' => 'ترحلوا لخارج بنغازي', 'move_in' => 'ترحلوا للمندوب', 'courier' => 'مع ' . ($c ? $c->name : $n), 'back' => 'رجعوا للرف', 'silent' => 'مستلمين (بدون رسالة)', 'settle' => 'تحصّلوا (بدون رسالة)'][$d['a']]);
     }
 
     /** 📄 كشف الطلعة PDF: كل عمود بيان والزبائن تحت بعض */
@@ -338,10 +368,96 @@ class DispatchController extends Controller
     }
 
     /**
+     * 💰 تحصيل قيمة من شركة التوصيل (خارج بنغازي): بدون رسالة للعميل.
+     * المبلغ يدخل الخزينة حسب طريقة الدفع اللي تختارها، والإيصالات تصير مستلمة (العربون: دفعة بس والبضاعة تقعد).
+     */
+    protected function settleOut(Delivery $dl, int $pid, ?float $amount): float
+    {
+        $got = 0;
+        $was = \App\Services\CustomerNotify::$enabled;
+        \App\Services\CustomerNotify::$enabled = false; // 🤫 بدون أي إشعار للعميل
+        try {
+        DB::transaction(function () use ($dl, $pid, $amount, &$got) {
+            $dl->loadMissing('orders');
+            $tag = 'تحصيل شركة التوصيل' . ($dl->ext_code ? ' · كود ' . $dl->ext_code : '') . ' (' . $dl->code . ')';
+            $isDep = $dl->kind === 'deposit' || $dl->deposit_order_id || $dl->cart_id;
+            $orders = $dl->deposit_order_id ? Order::whereKey($dl->deposit_order_id)->get() : $dl->orders->where('delivered', false)->values();
+            $left = $amount !== null ? round($amount, 2) : ($isDep ? round((float) $dl->amount, 2) : round($orders->sum(fn ($o) => max(0, $o->remaining())), 2));
+            foreach ($orders as $o) {
+                if ($left <= 0.009) {
+                    break;
+                }
+                $take = $isDep ? $left : round(min($left, max(0, $o->remaining())), 2);
+                if ($take > 0.009) {
+                    \App\Services\OrderPaymentService::pay($o, $take, $pid, $tag);
+                    $left -= $take;
+                    $got += $take;
+                }
+            }
+            if ($left > 0.009 && $dl->cart_id) {
+                // حجز سلة بدون إيصال: المبلغ يدخل الخزينة ويتسجل على السلة
+                \App\Services\TreasuryService::deposit($left, 'dinar', $pid, 'order', 0, $tag . ' · سلة #' . $dl->cart_id);
+                $cart = \App\Models\CartQuote::find($dl->cart_id);
+                if ($cart) {
+                    $cart->paid_amount = round((float) $cart->paid_amount + $left, 2);
+                    $cart->paid_at = now();
+                    $cart->save();
+                }
+                $got += $left;
+                $left = 0;
+            }
+            foreach ($dl->orders as $o) {
+                if ($o->delivered) {
+                    continue;
+                }
+                if ($isDep) {
+                    if ((int) $o->delivery_id === (int) $dl->id) {
+                        $o->delivery_id = null;
+                        $o->save();
+                    }
+                    continue;
+                }
+                $o = $o->fresh();
+                $o->delivered = true;
+                $o->delivered_at = now()->toDateString();
+                $o->delivered_time = now();
+                $o->delivered_by = auth()->id();
+                $o->delivery_type = 'توصيل عن طريق مكتب';
+                $o->delivery_name = $dl->courier_name ?: optional($dl->courier)->name;
+                $o->delivery_id = $dl->id;
+                $o->save();
+            }
+            $dl->collected_cash = round($got, 2);
+            $dl->status = 'delivered';
+            $dl->delivered_at = now();
+            $dl->save();
+            $dl->log('delivered', $tag . ' · ' . TS::fmt($got) . ' د.ل');
+            Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' تحصيل خارج بنغازي (' . ($dl->recipient_name ?: optional($dl->customer)->name) . ')', 'log' => ' ' . $tag . ' · ' . TS::fmt($got) . ' د.ل']);
+        });
+        } finally {
+            \App\Services\CustomerNotify::$enabled = $was;
+        }
+        Cache::forget('sg.badge.ready');
+
+        return $got;
+    }
+
+    /**
      * ✅ تسليم بدون رسالة للعميل: الباقي يتسجل مقبوض كاش والإيصالات تصير مستلمة.
      * مندوب بحساب: الكاش يقعد عليه لين إقفال حسابه (زي العادة) · مندوب بالاسم: الكاش يدخل الخزينة طول.
      */
     protected function deliverSilent(Delivery $dl): void
+    {
+        $was = \App\Services\CustomerNotify::$enabled;
+        \App\Services\CustomerNotify::$enabled = false; // 🤫 بدون إشعار للعميل
+        try {
+            $this->deliverSilentRun($dl);
+        } finally {
+            \App\Services\CustomerNotify::$enabled = $was;
+        }
+    }
+
+    protected function deliverSilentRun(Delivery $dl): void
     {
         if ($dl->cart_id) {
             // 🛒 عربون حجز سلة: المندوب قبض ← الحجز يتأكد ويوصل العميل إيصاله (نفس نظام المندوبين)

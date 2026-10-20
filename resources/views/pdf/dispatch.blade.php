@@ -1,3 +1,4 @@
+@php $ph = fn ($p) => (str_contains((string) $p, '@') || strlen(preg_replace('/\D/', '', (string) $p)) > 13) ? '' : $p; @endphp
 <html dir="rtl"><head><meta charset="utf-8">
 <style>
 body { font-family: somar; font-size: 8pt; color: #1f2433; }
@@ -19,7 +20,7 @@ table.t tr.tot td { background: #fff4e5; font-weight: bold; }
             <td>{{ $i + 1 }}</td>
             <td><b>{{ optional($d->customer)->code }}</b></td>
             <td class="r">{{ $d->recipient_name ?: optional($d->customer)->name }}</td>
-            <td>{{ $d->recipient_phone }}@if ($d->recipient_phone2)<br>{{ $d->recipient_phone2 }}@endif</td>
+            <td>{{ $ph($d->recipient_phone) }}@if ($d->recipient_phone2)<br>{{ $ph($d->recipient_phone2) }}@endif</td>
             <td class="r" style="width:30mm">{{ $d->address ?: '—' }}</td>
             <td class="{{ $d->kind === 'deposit' ? 'dep' : '' }}">{{ $d->kind === 'deposit' ? 'عربون' : 'طلبية' }}</td>
             <td>{{ $d->orders->pluck('code')->implode('، ') }}</td>

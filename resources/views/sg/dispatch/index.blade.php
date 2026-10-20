@@ -1,6 +1,6 @@
 @extends('sg.layout')
 @section('title', 'طلبيات دليفري')
-@php use App\Services\TreasuryService as TS; $f = fn ($n) => TS::fmt($n); @endphp
+@php use App\Services\TreasuryService as TS; $f = fn ($n) => TS::fmt($n); $ph = fn ($p) => (str_contains((string) $p, '@') || strlen(preg_replace('/\D/', '', (string) $p)) > 13) ? '' : $p; @endphp
 @push('style')
 <style>
 .dtabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -46,6 +46,15 @@ table.t td.w { white-space: normal; min-width: 110px; }
     <div class="tw-h"><h3>{{ $tab === 'out' ? '🚚 طابور خارج بنغازي' : '🛵 طلبيات مع المناديب' }} <span class="h-note">{{ $queue->count() }} زبون · {{ $f($queue->sum('amount')) }} د.ل + توصيل {{ $f($queue->sum('fee')) }}</span></h3>
         @foreach ($batches as $bt)<a class="btn ghost sm" target="_blank" href="{{ route('sg.dispatch.pdf', ['batch' => $bt]) }}">📄 {{ $bt }}</a>@endforeach
     </div>
+    @if ($tab === 'out')
+    <div class="qbar" style="background:#fff4e5">
+        <input type="search" class="inp" style="width:220px" placeholder="🔍 كود شركة التوصيل / كود العميل" value="{{ $xq }}" onkeydown="if(event.key==='Enter'){event.preventDefault();location='?tab=out&xq='+encodeURIComponent(this.value)}">
+        @if ($xq !== '')<a class="btn ghost sm" href="?tab=out">✕ مسح</a>@endif
+        <span class="sep"></span>
+        <label class="note">التحصيل في</label><select name="payment_id" id="payOut" class="inp">@foreach ($payments as $pm)<option value="{{ $pm->id }}" @selected($pm->id == $cashId)>{{ $pm->name }}</option>@endforeach</select>
+        <button type="button" class="btn sm" style="background:#e8590c;color:#fff" onclick="if(confirm('نحصّلو المختارين بقيمتهم كاملة؟ (بدون رسالة للعميل)'))bk('settle')">💰 تحصيل المختار</button>
+    </div>
+    @endif
     @if ($queue->count())
     <div class="qbar">
         <b>المختار: <span id="nq" class="num">0</span></b>
@@ -65,6 +74,10 @@ table.t td.w { white-space: normal; min-width: 110px; }
         <tr>
             <td><input type="checkbox" class="qk" name="ids[]" value="{{ $d->id }}" onchange="cq()"></td>
             <td><div class="qa">
+                @if ($tab === 'out')
+                <input class="inp" style="width:120px;height:28px;font-size:12.5px" placeholder="كود الشركة" value="{{ $d->ext_code }}" data-id="{{ $d->id }}" onchange="ext(this)">
+                <button type="button" class="btn sm" style="background:#e8590c;color:#fff" onclick="settle({{ $d->id }}, {{ (float) ($d->kind === 'deposit' ? $d->amount : $d->amount) + 0 }})">💰 تحصيل</button>
+                @endif
                 @if (!$d->cart_id)<button type="button" class="btn green sm" onclick="ra({{ $d->id }}, 'silent', '{{ $d->kind === 'deposit' ? 'العربون (' . $f($d->amount) . ' د.ل) يتسجل مقبوض كاش على الإيصال، والبضاعة تقعد في الرف؟' : 'تسليم بدون رسالة؟ الباقي (' . $f($d->amount) . ' د.ل) يتسجل مقبوض كاش' }}')">{{ $d->kind === 'deposit' ? '✅ قبض العربون' : '✅ مستلمة' }}</button>@endif
                 <button type="button" class="btn ghost sm" onclick="ra({{ $d->id }}, 'done', 'نفتحو صفحة التسليم باش تدير الدفع بنفسك؟')">💵 بالكاشير</button>
                 @php $ct = $d->cart_id ? ($carts[$d->cart_id] ?? null) : null; @endphp
@@ -78,7 +91,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
                 <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
             </div></td>
             <td><b>{{ $who ?: '— ما تعيّنش' }}</b>@if (!$d->courier_id && $d->courier_name)<small class="note" style="display:block">بدون حساب</small>@endif</td>
-            <td class="w"><b class="num">{{ optional($d->customer)->code }}</b> {{ optional($d->customer)->name ?: $d->recipient_name }}<small class="note num" style="display:block">{{ $d->recipient_phone }}</small>@if ($d->bank_receipt)<a class="chip u" target="_blank" href="{{ asset('storage/' . $d->bank_receipt) }}">📎 دافع تحويل</a>@endif</td>
+            <td class="w"><b class="num">{{ optional($d->customer)->code }}</b> {{ optional($d->customer)->name ?: $d->recipient_name }}<small class="note num" style="display:block">{{ $ph($d->recipient_phone) }}</small>@if ($d->bank_receipt)<a class="chip u" target="_blank" href="{{ asset('storage/' . $d->bank_receipt) }}">📎 دافع تحويل</a>@endif</td>
             <td class="w">{{ $d->address ?: '—' }}@if ($d->note)<small class="note" style="display:block">{{ \Illuminate\Support\Str::limit($d->note, 90) }}</small>@endif</td>
             <td class="w num">@if ($d->cart_id)<b>🛒 حجز سلة #{{ $d->cart_id }}</b>@else{{ $d->orders->pluck('code')->implode('، ') ?: '—' }}@endif<small class="num" style="display:block;color:#000;font-size:11.5px">🕒 {{ optional($d->created_at)->format('Y-m-d g:i a') }}</small><small class="note" style="display:block">📍 {{ $d->orders->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }} · {{ $d->parcels }} طرد</small></td>
             <td class="n num"><b>{{ $f($d->amount) }}</b></td>
@@ -103,7 +116,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
         @continue(!$c)
         <tr>
             <td><input type="checkbox" class="pk" name="c[]" value="{{ $cid }}" onchange="cnt()"></td>
-            <td class="w"><b class="num">{{ $c->code }}</b> {{ $c->name }}<small class="note num" style="display:block">{{ $c->phone_1 }}</small></td>
+            <td class="w"><b class="num">{{ $c->code }}</b> {{ $c->name }}<small class="note num" style="display:block">{{ $ph($c->phone_1) }}</small></td>
             <td class="w">{{ $c->address ?: '—' }}</td>
             <td class="w num">{{ $os->pluck('code')->implode('، ') }}<small class="note" style="display:block">📍 {{ $os->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }} · {{ max(1, $os->sum(fn ($o) => $o->bags_num ?: 1)) }} طرد</small></td>
             <td class="n num"><b>{{ $f($os->sum(fn ($o) => max(0, $o->remaining()))) }}</b></td>
@@ -138,5 +151,9 @@ function fee(i){const fd=new FormData();fd.set('a','fee');fd.set('fee',i.value||
 function postTo(u,data,q){if(q&&!confirm(q))return;const f=document.createElement('form');f.method='post';f.action=u;data._token=document.querySelector('meta[name=csrf-token]').content;for(const k in data){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=data[k];f.appendChild(i)}document.body.appendChild(f);f.submit()}
 function collect(id,amt){const v=prompt('كم قبض المندوب (العربون بدون التوصيل)؟ لو نفسها اضغط OK',amt);if(v===null)return;const n=parseFloat(v);if(isNaN(n)||n<0){alert('اكتب رقم صحيح');return}
   const f=document.getElementById('rowAct');f.action=RA+id;document.getElementById('raA').value='collect';let i=f.querySelector('input[name=amount]');if(!i){i=document.createElement('input');i.type='hidden';i.name='amount';f.appendChild(i)}i.value=n;f.submit()}
+function ext(i){const fd=new FormData();fd.set('a','ext');fd.set('ext_code',i.value);fd.set('_token',document.querySelector('meta[name=csrf-token]').content);
+  fetch(RA+i.dataset.id,{method:'POST',body:fd,headers:{'Accept':'application/json'},credentials:'same-origin'}).then(r=>{i.style.borderColor=r.ok?'#0f8a5f':'#c62828'}).catch(()=>{i.style.borderColor='#c62828'})}
+function settle(id,amt){const v=prompt('كم سلمتلك شركة التوصيل؟ (بدون رسالة للعميل)',amt);if(v===null)return;const n=parseFloat(v);if(isNaN(n)||n<0){alert('اكتب رقم صحيح');return}
+  const p=document.getElementById('payOut');postTo(RA+id,{a:'settle',amount:n,payment_id:p?p.value:''})}
 function cnt(){document.getElementById('nsel').textContent=document.querySelectorAll('.pk:checked').length}</script>
 @endsection
