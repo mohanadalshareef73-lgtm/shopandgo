@@ -34,7 +34,7 @@
         $rep = $ct->retailer === 'amazon' ? (int) data_get($q, 'quantity', 1) > 1 : collect((array) ($q['items'] ?? []))->contains(fn ($i) => (int) ($i['qty'] ?? 0) > 1 && ($i['availability'] ?? 'available') === 'available');
     @endphp
     <tr>
-        <td><b>{{ $ct->retailer_label }} #{{ $ct->id }}</b><small class="num" style="display:block;color:#000;font-size:11.5px">🕒 {{ optional($ct->ordered_at ?: $ct->created_at)->format('Y-m-d g:i a') }}</small></td>
+        <td><b>{{ $ct->retailer_label }} #{{ $ct->id }}</b><small class="num" style="display:block;color:#000;font-size:11.5px">🕒 {{ ($ct->ordered_at ?: $ct->created_at) ? \Carbon\Carbon::parse($ct->ordered_at ?: $ct->created_at)->format('Y-m-d g:i a') : '' }}</small></td>
         <td class="cell2">@if (!$ct->customer_id && !$ct->guest_phone && !in_array($ct->portal_status, ['ordered', 'confirmed'], true))
             @php $waP = preg_replace('/^218/', '0', preg_replace('/\D/', '', (string) $ct->whatsapp_customer_phone)); $waP = strlen($waP) > 13 || str_contains((string) $ct->whatsapp_customer_phone, '@') ? '' : $waP; if ($waP === '' && $ct->incomingMessage) { $waP = preg_replace('/^218/', '0', preg_replace('/\D/', '', (string) ($ct->incomingMessage->contact_phone ?: $ct->incomingMessage->phone))); $waP = strlen($waP) > 13 ? '' : $waP; } $waN = optional($ct->incomingMessage)->name; @endphp
             <b>{{ $waN && $waN !== 'زائر' ? $waN : 'عميل' }}</b> <span class="chip n" style="font-size:11px">📱 من الواتساب</span><small class="num">{{ $waP ?: 'رقمه مخفي في الواتساب' }}</small>
