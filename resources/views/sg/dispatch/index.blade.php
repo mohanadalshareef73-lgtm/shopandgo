@@ -99,6 +99,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
                 @if ($d->kind !== 'deposit' && !$d->cart_id)<button type="button" class="btn ghost sm" style="color:#c62828" data-p="{{ $d->problem }}" onclick="const t=prompt('⚠ شن المشكلة؟ (فاضي = تنحل)',this.dataset.p||'');if(t!==null)postTo(RA+{{ $d->id }},{a:'problem',text:t})">⚠ مشكلة</button>@endif
                 <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
                 @endif
+                <button type="button" class="btn ghost sm" style="color:#c62828" title="حذف" onclick="ra({{ $d->id }}, 'delete', 'نحذفوه من طلبيات دليفري؟{{ $d->cart_id ? ' الحجز يرجع لتأكيد الحجوزات' : ' الإيصالات ترجع للرف' }}')">🗑</button>
             </div></td>
             <td><b>{{ $who ?: '— ما تعيّنش' }}</b>@if (!$d->courier_id && $d->courier_name)<small class="note" style="display:block">بدون حساب</small>@endif</td>
             <td class="w"><b class="num">{{ optional($d->customer)->code }}</b> {{ optional($d->customer)->name ?: $d->recipient_name }}<small class="note num" style="display:block">{{ $ph($d->recipient_phone) }}</small>@if ($d->bank_receipt)<a class="chip u" target="_blank" href="{{ asset('storage/' . $d->bank_receipt) }}">📎 دافع تحويل</a>@endif</td>

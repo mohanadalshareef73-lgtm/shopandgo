@@ -150,7 +150,29 @@ class DispatchController extends Controller
     /** إجراء على توصيل في الطابور: نوع · تحويل · تغيير المندوب · سلّم · رجّع */
     public function act(Request $request, Delivery $delivery)
     {
-        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle,note,hide,problem', 'text' => 'nullable|string|max:1000', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
+        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle,note,hide,problem,delete', 'text' => 'nullable|string|max:1000', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
+        if ($d['a'] === 'delete') {
+            // 🗑 حذف من طلبيات دليفري: يتلغى التوصيل (ما يتمسحش من السجل) · الإيصالات ترجع للرف · الحجز يرجع لتأكيد الحجوزات
+            foreach ($delivery->orders as $o) {
+                if (!$o->delivered && (int) $o->delivery_id === (int) $delivery->id) {
+                    $o->delivery_id = null;
+                    $o->save();
+                }
+            }
+            if (in_array($delivery->status, self::ACTIVE, true)) {
+                $delivery->status = 'cancelled';
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('deliveries', 'kept')) {
+                $delivery->kept = false;
+            }
+            $delivery->save();
+            $delivery->log('cancelled', '🗑 انحذف من طلبيات دليفري');
+            Cache::forget('sg.badge.ready');
+            Cache::forget('sg.badge.courier');
+            Cache::forget('sg.badge.pcart');
+
+            return back()->with('success', '🗑 انحذف' . ($delivery->cart_id ? ' · الحجز رجع لـ«تأكيد الحجوزات»' : ''));
+        }
         if ($d['a'] === 'hide') {
             $delivery->kept = false;
             $delivery->save();
