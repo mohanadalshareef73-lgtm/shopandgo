@@ -74,22 +74,30 @@ table.t td.w { white-space: normal; min-width: 110px; }
         <tr>
             <td><input type="checkbox" class="qk" name="ids[]" value="{{ $d->id }}" onchange="cq()"></td>
             <td><div class="qa">
+                @php $ct = $d->cart_id ? ($carts[$d->cart_id] ?? null) : null; $done = $d->status === 'delivered'; @endphp
+                @if ($done)
+                    {{-- ✓ متأكد: احجز الان · نسخ · PDF التكرار · ✓ إخفاء --}}
+                    <span class="chip u">✓ متأكد</span>
+                    @if ($ct)
+                        @if ($bookTo !== '')<button type="button" class="btn sm" style="background:#e8590c;color:#fff" onclick="postTo('{{ route('sg.pcarts.booknow', $ct) }}', {to_phone: '{{ $bookTo }}'}, 'نبعتو الحجز #{{ $ct->id }} على الواتساب؟')">⚡ احجز الان{{ !empty($ct->book_sent_to) ? ' (مرة ثانية)' : '' }}</button>@else<a class="btn sm" style="background:#e8590c;color:#fff" href="{{ route('sg.pcarts', ['q' => $ct->id]) }}">⚡ احجز الان</a>@endif
+                        @if (!empty($ct->book_sent_to))<small style="color:#1e7b45">✅ انبعت</small>@endif
+                        <button type="button" class="btn ghost sm" data-copy="{{ $ct->source_url }}" onclick="cp(this)">⧉ نسخ الرابط</button>
+                        @if (!empty($reps[$ct->id]))<a class="btn ghost sm" href="{{ route('sg.pcarts.download', $ct) }}">⬇ تحميل PDF</a><a class="btn ghost sm" style="color:#e8590c" href="{{ route('sg.pcarts.booking', $ct) }}" target="_blank">📄 PDF التكرار 🔁</a>@endif
+                        @if (!empty($ct->order_id) && isset($cartOrders[$ct->order_id]))<a class="btn ghost sm" target="_blank" href="{{ route('order.invoice', $cartOrders[$ct->order_id]) }}">🖨 إيصال</a>@endif
+                    @endif
+                    @if ($d->customer)<button type="button" class="btn ghost sm" data-copy="{{ $d->customer->code }}" onclick="cp(this)">⧉ كود العميل {{ $d->customer->code }}</button>@endif
+                    <button type="button" class="btn green sm" title="إخفاء ← حجوزات متأكدة" onclick="ra({{ $d->id }}, 'hide')">✓</button>
+                @else
                 <button type="button" class="btn ghost sm" onclick="const t=prompt('📝 الملاحظة اللي تبي تبعتها للعميل على الواتساب:');if(t&&t.trim())postTo(RA+{{ $d->id }},{a:'note',text:t})">📝 ملاحظة</button>
                 @if ($tab === 'out')
                 <input class="inp" style="width:120px;height:28px;font-size:12.5px" placeholder="كود الشركة" value="{{ $d->ext_code }}" data-id="{{ $d->id }}" onchange="ext(this)">
-                <button type="button" class="btn sm" style="background:#e8590c;color:#fff" onclick="settle({{ $d->id }}, {{ (float) ($d->kind === 'deposit' ? $d->amount : $d->amount) + 0 }})">💰 تحصيل</button>
+                <button type="button" class="btn sm" style="background:#e8590c;color:#fff" onclick="settle({{ $d->id }}, {{ (float) $d->amount + 0 }})">💰 تحصيل</button>
                 @endif
-                @if (!$d->cart_id)<button type="button" class="btn green sm" onclick="ra({{ $d->id }}, 'silent', '{{ $d->kind === 'deposit' ? 'العربون (' . $f($d->amount) . ' د.ل) يتسجل مقبوض كاش على الإيصال، والبضاعة تقعد في الرف؟' : 'تسليم بدون رسالة؟ الباقي (' . $f($d->amount) . ' د.ل) يتسجل مقبوض كاش' }}')">{{ $d->kind === 'deposit' ? '✅ قبض العربون' : '✅ مستلمة' }}</button>@endif
+                @if ($d->cart_id)<button type="button" class="btn sm" style="background:#0f8a5f;color:#fff" onclick="collect({{ $d->id }}, {{ (float) $d->amount + 0 }})">✓ تأكيد</button>
+                @else<button type="button" class="btn green sm" onclick="silentAmt({{ $d->id }}, {{ (float) $d->amount + 0 }}, {{ $d->kind === 'deposit' ? 1 : 0 }})">{{ $d->kind === 'deposit' ? '✅ قبض العربون' : '✅ مستلمة' }}</button>@endif
                 <button type="button" class="btn ghost sm" onclick="ra({{ $d->id }}, 'done', 'نفتحو صفحة التسليم باش تدير الدفع بنفسك؟')">💵 بالكاشير</button>
-                @php $ct = $d->cart_id ? ($carts[$d->cart_id] ?? null) : null; @endphp
-                @if ($d->cart_id)<button type="button" class="btn sm" style="background:#0f8a5f;color:#fff" onclick="collect({{ $d->id }}, {{ (float) $d->amount + 0 }})">✓ تأكيد</button>@endif
-                @if ($ct && !empty($ct->order_id) && isset($cartOrders[$ct->order_id]))<a class="btn ghost sm" target="_blank" href="{{ route('order.invoice', $cartOrders[$ct->order_id]) }}">🖨 طباعة إيصال</a>@endif
-                @if (false)
-                @elseif ($ct && $ct->portal_status === 'confirmed')
-                    @if ($bookTo !== '')<button type="button" class="btn sm" style="background:#e8590c;color:#fff" onclick="postTo('{{ route('sg.pcarts.booknow', $ct) }}', {to_phone: '{{ $bookTo }}'}, 'نبعتو الحجز #{{ $ct->id }} على الواتساب؟')">⚡ احجز الان{{ !empty($ct->book_sent_to) ? ' (مرة ثانية)' : '' }}</button>@else<a class="btn sm" style="background:#e8590c;color:#fff" href="{{ route('sg.pcarts', ['q' => $ct->id]) }}">⚡ احجز الان</a>@endif
-                    @if (!empty($ct->book_sent_to))<small style="display:block;color:#1e7b45">✅ انبعت</small>@endif
-                @endif
                 <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
+                @endif
             </div></td>
             <td><b>{{ $who ?: '— ما تعيّنش' }}</b>@if (!$d->courier_id && $d->courier_name)<small class="note" style="display:block">بدون حساب</small>@endif</td>
             <td class="w"><b class="num">{{ optional($d->customer)->code }}</b> {{ optional($d->customer)->name ?: $d->recipient_name }}<small class="note num" style="display:block">{{ $ph($d->recipient_phone) }}</small>@if ($d->bank_receipt)<a class="chip u" target="_blank" href="{{ asset('storage/' . $d->bank_receipt) }}">📎 دافع تحويل</a>@endif</td>
@@ -156,5 +164,7 @@ function ext(i){const fd=new FormData();fd.set('a','ext');fd.set('ext_code',i.va
   fetch(RA+i.dataset.id,{method:'POST',body:fd,headers:{'Accept':'application/json'},credentials:'same-origin'}).then(r=>{i.style.borderColor=r.ok?'#0f8a5f':'#c62828'}).catch(()=>{i.style.borderColor='#c62828'})}
 function settle(id,amt){const v=prompt('كم سلمتلك شركة التوصيل؟ (بدون رسالة للعميل)',amt);if(v===null)return;const n=parseFloat(v);if(isNaN(n)||n<0){alert('اكتب رقم صحيح');return}
   const p=document.getElementById('payOut');postTo(RA+id,{a:'settle',amount:n,payment_id:p?p.value:''})}
+function cp(b){navigator.clipboard.writeText(b.dataset.copy||'');const t=b.textContent;b.textContent='✓ تنسخ';setTimeout(()=>b.textContent=t,1500)}
+function silentAmt(id,amt,dep){const v=prompt(dep?'كم قبض المندوب من العربون؟':'كم دفع العميل؟ (بدون رسالة للعميل — يطلعلك الإيصال)',amt);if(v===null)return;const n=parseFloat(v);if(isNaN(n)||n<0){alert('اكتب رقم صحيح');return}postTo(RA+id,{a:'silent',amount:n})}
 function cnt(){document.getElementById('nsel').textContent=document.querySelectorAll('.pk:checked').length}</script>
 @endsection

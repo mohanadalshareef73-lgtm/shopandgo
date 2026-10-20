@@ -20,6 +20,10 @@ class DispatchController extends Controller
 {
     public const ACTIVE = ['requested', 'assigned', 'out', 'problem'];
 
+    protected ?float $silentAmount = null;
+
+    protected float $silentGot = 0;
+
     public function __construct()
     {
         $this->middleware('permission:courier-list', ['only' => ['index', 'pdf']]);
@@ -48,7 +52,7 @@ class DispatchController extends Controller
             return redirect()->route('sg.couriers')->with('error', 'لازم تفتح /system-update مرة وحدة باش تخدم صفحة طلبيات دليفري');
         }
         // كل التوصيلات المفتوحة — حتى طلبات العملاء من حساباتهم تطلع هني طول
-        $all = Delivery::with(['customer', 'orders', 'courier'])->whereIn('status', self::ACTIVE)->latest('id')->get();
+        $all = Delivery::with(['customer', 'orders', 'courier'])->where(fn ($w) => $w->whereIn('status', self::ACTIVE)->when(\Illuminate\Support\Facades\Schema::hasColumn('deliveries', 'kept'), fn ($x) => $x->orWhere('kept', true)))->latest('id')->get();
         $all->each(fn ($d) => $d->zone = $d->zone ?: (static::outside($d->city) ? 'out' : 'in'));
         // 💵 تحصيل عربون/حجز جاي من رابط العميل ← يقعد «عربون» تلقائي
         foreach ($all as $d) {
@@ -67,12 +71,22 @@ class DispatchController extends Controller
         // 🛒 حجوزات السلات اللي في الطابور: تأكيد الحجز ← ⚡ احجز الان من هني
         $cartIds = $queue->pluck('cart_id')->filter()->unique();
         $carts = $cartIds->isNotEmpty() ? \App\Models\CartQuote::whereIn('id', $cartIds)->get()->keyBy('id') : collect();
+        $reps = $carts->mapWithKeys(function ($ct) {
+            try {
+                $q = $ct->retailer === 'amazon' ? (array) $ct->amazon_pricing : app(\App\Services\SheinQuotationPdf::class)->quotationForPdf($ct);
+                $r = $ct->retailer === 'amazon' ? (int) data_get($q, 'quantity', 1) > 1 : collect((array) ($q['items'] ?? []))->contains(fn ($i) => (int) ($i['qty'] ?? 0) > 1 && ($i['availability'] ?? 'available') === 'available');
+            } catch (\Throwable $e) {
+                $r = false;
+            }
+
+            return [$ct->id => $r];
+        });
         $cartOrders = $carts->pluck('order_id')->filter()->isNotEmpty() ? Order::whereIn('id', $carts->pluck('order_id')->filter())->pluck('code', 'id') : collect();
         $nums = (array) AppSettings::get('booking_numbers', []);
         $bookTo = (string) AppSettings::get('booking_last_phone', $nums[0] ?? '');
 
         return view('sg.dispatch.index', [
-            'nav' => 'dispatch', 'xq' => $xq, 'payments' => \App\Models\PaymentMethod::where('status', true)->orderBy('id')->get(), 'cashId' => AppSettings::cashPaymentId(), 'carts' => $carts, 'cartOrders' => $cartOrders, 'bookTo' => $bookTo, 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
+            'nav' => 'dispatch', 'xq' => $xq, 'payments' => \App\Models\PaymentMethod::where('status', true)->orderBy('id')->get(), 'cashId' => AppSettings::cashPaymentId(), 'carts' => $carts, 'reps' => $reps, 'cartOrders' => $cartOrders, 'bookTo' => $bookTo, 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
             'couriers' => User::where('type_id', 4)->where('status', true)->orderBy('name')->get(),
             'counts' => $all->countBy('zone'),
             'batches' => $queue->pluck('batch')->filter()->unique()->sortDesc()->values(),
@@ -136,7 +150,13 @@ class DispatchController extends Controller
     /** إجراء على توصيل في الطابور: نوع · تحويل · تغيير المندوب · سلّم · رجّع */
     public function act(Request $request, Delivery $delivery)
     {
-        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle,note', 'text' => 'nullable|string|max:1000', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
+        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle,note,hide', 'text' => 'nullable|string|max:1000', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
+        if ($d['a'] === 'hide') {
+            $delivery->kept = false;
+            $delivery->save();
+
+            return back()->with('success', '✓ تخفى · تلقاه في «تأكيد الحجوزات ← متأكدة»');
+        }
         abort_unless(in_array($delivery->status, self::ACTIVE, true), 422, 'التوصيل هذا مقفول');
         $cu = $delivery->customer;
         switch ($d['a']) {
@@ -197,15 +217,35 @@ class DispatchController extends Controller
                 }
                 Cache::forget('sg.badge.pcart');
                 $cart = \App\Models\CartQuote::find($delivery->cart_id);
+                if ($cart) {
+                    $cart->portal_status = 'confirmed';
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('cart_quotes', 'confirmed_at')) {
+                        $cart->confirmed_at = now();
+                    }
+                    $cart->save();
+                }
+                if (\Illuminate\Support\Facades\Schema::hasColumn('deliveries', 'kept')) {
+                    Delivery::whereKey($delivery->id)->update(['kept' => true]);
+                }
                 $o = $cart && $cart->order_id ? Order::find($cart->order_id) : null;
                 $r = back()->with('success', '✅ تأكد الحجز #' . $delivery->cart_id . ($o ? ' · الإيصال ' . $o->code . ' انعمل ووصل العميل' : ''));
 
                 return $o ? $r->with('print_url', route('order.invoice', $o->code)) : $r;
             case 'silent':
                 try {
+                    $this->silentAmount = $request->filled('amount') ? round((float) $request->amount, 2) : null;
+                    if ($this->silentAmount !== null && $delivery->kind === 'deposit') {
+                        $delivery->amount = $this->silentAmount;
+                        $delivery->save();
+                    }
+                    $oids = $delivery->orders->pluck('id')->implode(',');
                     $this->deliverSilent($delivery);
                 } catch (\RuntimeException $e) {
                     return back()->with('error', $e->getMessage());
+                }
+                if ($oids !== '' && $delivery->kind !== 'deposit') {
+                    return back()->with('success', '✅ ' . (optional($cu)->name ?: $delivery->recipient_name) . ' مستلمة (بدون رسالة)')
+                        ->with('print_url', route('sg.delivery.slip', ['ids' => $oids, 'paid' => $this->silentGot]));
                 }
 
                 return back()->with('success', '✅ ' . (optional($cu)->name ?: $delivery->recipient_name) . ' مستلمة (بدون رسالة)');
@@ -522,6 +562,9 @@ class DispatchController extends Controller
                     continue;
                 }
                 $need = round(max(0, $o->remaining()), 2);
+                if ($this->silentAmount !== null) {
+                    $need = round(min($need, max(0, $this->silentAmount - $got)), 2); // المبلغ اللي كتبته (لو أقل يقعد الباقي دين)
+                }
                 if ($need > 0.009) {
                     if ($dl->courier_id) {
                         $ph = new \App\Models\PaidHistory;
@@ -547,6 +590,7 @@ class DispatchController extends Controller
                 $o->delivery_id = $dl->id;
                 $o->save();
             }
+            $this->silentGot = round($got, 2);
             $dl->collected_cash = round($got + (float) $dl->fee, 2);
             $dl->status = 'delivered';
             $dl->delivered_at = now();
