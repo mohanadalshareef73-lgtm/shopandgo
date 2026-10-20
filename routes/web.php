@@ -295,6 +295,10 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::post('delivery/old-no-trip', [$C . 'OldDeliveriesController', 'noTripStore'])->name('delivery.old.notrip.store');
         Route::post('delivery/remind', [$C . 'DeliveryController', 'remindShelf'])->name('delivery.remind');
 
+        Route::get('dispatch', [$C . 'DispatchController', 'index'])->name('dispatch');
+        Route::post('dispatch', [$C . 'DispatchController', 'assign'])->name('dispatch.assign');
+        Route::get('dispatch/pdf', [$C . 'DispatchController', 'pdf'])->name('dispatch.pdf');
+        Route::post('dispatch/{delivery}', [$C . 'DispatchController', 'act'])->name('dispatch.act');
         Route::get('couriers', [$C . 'CouriersController', 'index'])->name('couriers');
         Route::post('couriers', [$C . 'CouriersController', 'store'])->name('couriers.store');
         Route::put('couriers/{courier}', [$C . 'CouriersController', 'update'])->name('couriers.update');
