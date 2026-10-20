@@ -52,7 +52,15 @@
     $nav = $nav ?? '';
     $u = auth()->user();
     $readyCount = \Illuminate\Support\Facades\Cache::remember('sg.badge.ready', 60, fn () => \App\Models\Order::where('arrived', true)->where('delivered', false)->whereNull('delivery_id')->where('status', '!=', 'canceld')->count());
-    $courierBadge = \App\Support\Fast::hasTable('deliveries') ? \Illuminate\Support\Facades\Cache::remember('sg.badge.courier', 30, fn () => \App\Models\Delivery::whereIn('status', ['requested', 'problem'])->count()) : 0;
+    // 🛵 عدّاد طلبيات دليفري: الطلبيات اللي ما تسلمتش + العربون اللي ما تحجزش (⚡ احجز الان ما انضغطش)
+    $courierBadge = \App\Support\Fast::hasTable('deliveries') ? \Illuminate\Support\Facades\Cache::remember('sg.badge.courier', 30, function () {
+        $n = \App\Models\Delivery::whereIn('status', ['requested', 'assigned', 'out', 'problem'])->count();
+        if (\App\Support\Fast::hasColumn('deliveries', 'kept') && \App\Support\Fast::hasColumn('cart_quotes', 'book_sent_to')) {
+            $n += \App\Models\Delivery::where('kept', true)->whereNotNull('cart_id')->whereIn('cart_id', \App\Models\CartQuote::whereNull('book_sent_to')->select('id'))->count();
+        }
+
+        return $n;
+    }) : 0;
     $signupBadge = \App\Support\Fast::hasColumn('customers', 'signup_status') ? \Illuminate\Support\Facades\Cache::remember('sg.badge.signups', 30, fn () => \App\Models\Customer::withoutGlobalScope('approved')->where('signup_status', 'pending')->count()) : 0;
     $ticketBadge = \App\Support\Fast::hasTable('support_tickets') ? \Illuminate\Support\Facades\Cache::remember('sg.badge.tickets', 30, fn () => \Illuminate\Support\Facades\DB::table('support_tickets')->where('status', 'open')->count()) : 0;
     $icons = [
