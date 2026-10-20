@@ -125,25 +125,18 @@
             <table>
                 <tr>
                     <th>البيان</th>
-                    <th>العنوان</th>
                     <th>المندوب</th>
                     <th>القيمة</th>
                 </tr>
                 <tr style="color: #282E4D;">
                     <td>عربون{{ $cart ? ' (سلة ' . $cart->retailer_label . ')' : '' }}</td>
-                    <td>{{ $d->address ?: '-' }}</td>
                     <td>{{ $who ?: '-' }}</td>
                     <td>{{ $f($d->amount) }} د.ل</td>
                 </tr>
                 <tr>
-                    <td colspan="2" style="border: none;"></td>
-                    <td>التوصيل</td>
-                    <td>{{ $f($fee) }} د.ل</td>
-                </tr>
-                <tr>
-                    <td colspan="2" style="border: none;"></td>
-                    <td style="color: white; background-color: #282E4D;">المطلوب من العميل</td>
-                    <td style="color: white; background-color: #282E4D;">{{ $f((float) $d->amount + $fee) }} د.ل</td>
+                    <td style="border: none;"></td>
+                    <td style="color: white; background-color: #282E4D;">قيمة العربون</td>
+                    <td style="color: white; background-color: #282E4D;">{{ $f($d->amount) }} د.ل</td>
                 </tr>
             </table>
         </div>
