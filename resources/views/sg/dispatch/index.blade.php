@@ -1,5 +1,5 @@
 @extends('sg.layout')
-@section('title', 'تجهيز طلعة')
+@section('title', 'طلبيات دليفري')
 @php use App\Services\TreasuryService as TS; $f = fn ($n) => TS::fmt($n); @endphp
 @push('style')
 <style>
@@ -16,7 +16,7 @@ table.t td.w { white-space: normal; min-width: 160px; }
 @endpush
 @section('content')
 <div class="top">
-    <div><h1>🛵 تجهيز طلعة</h1><div class="sub">اختار الزبائن الجاهزين ← اعطيهم لمندوب (بحساب ولا بالاسم) ← اطبع الكشف PDF</div></div>
+    <div><h1>🛵 طلبيات دليفري</h1><div class="sub">اختار الزبائن الجاهزين ← اعطيهم لمندوب (بحساب ولا بالاسم) ← اطبع الكشف PDF</div></div>
     <div class="acts"><a class="btn ghost" href="{{ route('sg.couriers') }}">المندوبين</a><button class="sg-burger">☰</button></div>
 </div>
 
