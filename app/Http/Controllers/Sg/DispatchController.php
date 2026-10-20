@@ -60,8 +60,14 @@ class DispatchController extends Controller
         }
         $queue = $all->where('zone', $tab)->values();
 
+        // 🛒 حجوزات السلات اللي في الطابور: تأكيد الحجز ← ⚡ احجز الان من هني
+        $cartIds = $queue->pluck('cart_id')->filter()->unique();
+        $carts = $cartIds->isNotEmpty() ? \App\Models\CartQuote::whereIn('id', $cartIds)->get()->keyBy('id') : collect();
+        $nums = (array) AppSettings::get('booking_numbers', []);
+        $bookTo = (string) AppSettings::get('booking_last_phone', $nums[0] ?? '');
+
         return view('sg.dispatch.index', [
-            'nav' => 'dispatch', 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
+            'nav' => 'dispatch', 'carts' => $carts, 'bookTo' => $bookTo, 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
             'couriers' => User::where('type_id', 4)->where('status', true)->orderBy('name')->get(),
             'counts' => $all->countBy('zone'),
             'batches' => $queue->pluck('batch')->filter()->unique()->sortDesc()->values(),

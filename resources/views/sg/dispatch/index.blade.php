@@ -67,6 +67,12 @@ table.t td.w { white-space: normal; min-width: 110px; }
             <td><div class="qa">
                 <button type="button" class="btn green sm" onclick="ra({{ $d->id }}, 'silent', '{{ $d->kind === 'deposit' ? 'العربون (' . $f($d->amount) . ' د.ل) يتسجل مقبوض كاش على الإيصال، والبضاعة تقعد في الرف؟' : 'تسليم بدون رسالة؟ الباقي (' . $f($d->amount) . ' د.ل) يتسجل مقبوض كاش' }}')">{{ $d->kind === 'deposit' ? '✅ قبض العربون' : '✅ مستلمة' }}</button>
                 <button type="button" class="btn ghost sm" onclick="ra({{ $d->id }}, 'done', 'نفتحو صفحة التسليم باش تدير الدفع بنفسك؟')">💵 بالكاشير</button>
+                @php $ct = $d->cart_id ? ($carts[$d->cart_id] ?? null) : null; @endphp
+                @if ($ct && $ct->portal_status === 'ordered')<button type="button" class="btn sm" style="background:#0f8a5f;color:#fff" onclick="postTo('{{ route('sg.pcarts.decide', $ct) }}', {do: 'confirm', send_whatsapp: 1}, 'نأكدو الحجز #{{ $ct->id }}؟ ينعمل الإيصال ويوصل العميل التأكيد')">✓ تأكيد الحجز</button>
+                @elseif ($ct && $ct->portal_status === 'confirmed')
+                    @if ($bookTo !== '')<button type="button" class="btn sm" style="background:#e8590c;color:#fff" onclick="postTo('{{ route('sg.pcarts.booknow', $ct) }}', {to_phone: '{{ $bookTo }}'}, 'نبعتو الحجز #{{ $ct->id }} على الواتساب؟')">⚡ احجز الان{{ !empty($ct->book_sent_to) ? ' (مرة ثانية)' : '' }}</button>@else<a class="btn sm" style="background:#e8590c;color:#fff" href="{{ route('sg.pcarts', ['q' => $ct->id]) }}">⚡ احجز الان</a>@endif
+                    @if (!empty($ct->book_sent_to))<small style="display:block;color:#1e7b45">✅ انبعت</small>@endif
+                @endif
                 <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
             </div></td>
             <td><b>{{ $who ?: '— ما تعيّنش' }}</b>@if (!$d->courier_id && $d->courier_name)<small class="note" style="display:block">بدون حساب</small>@endif</td>
@@ -127,5 +133,6 @@ function pdfSel(){const s=sel();if(!s.length){alert('علّم على الزبا�
 function ra(id,a,q){if(q&&!confirm(q))return;const f=document.getElementById('rowAct');f.action=RA+id;document.getElementById('raA').value=a;f.submit()}
 function fee(i){const fd=new FormData();fd.set('a','fee');fd.set('fee',i.value||0);fd.set('_token',document.querySelector('meta[name=csrf-token]').content);
   fetch(RA+i.dataset.id,{method:'POST',body:fd,headers:{'Accept':'application/json'},credentials:'same-origin'}).then(r=>{i.style.borderColor=r.ok?'#0f8a5f':'#c62828'}).catch(()=>{i.style.borderColor='#c62828'})}
+function postTo(u,data,q){if(q&&!confirm(q))return;const f=document.createElement('form');f.method='post';f.action=u;data._token=document.querySelector('meta[name=csrf-token]').content;for(const k in data){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=data[k];f.appendChild(i)}document.body.appendChild(f);f.submit()}
 function cnt(){document.getElementById('nsel').textContent=document.querySelectorAll('.pk:checked').length}</script>
 @endsection
