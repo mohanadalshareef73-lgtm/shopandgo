@@ -180,7 +180,7 @@
     <div class="back"><a class="icb" href="?tab=home"><svg width="20" height="20"><use href="#i-back"/></svg></a><h1>طلب توصيل</h1></div>
     @foreach ($deliveries->whereIn('status', ['requested', 'assigned', 'out', 'problem']) as $d)
         <div class="o2"><div class="t"><span class="cd">{{ $d->code }}</span><span class="chip {{ $d->status === 'out' ? 'c-way' : 'c-wait' }}"><i></i>{{ $d->statusLabel() }}</span></div><div class="m">{{ $d->orders->pluck('code')->implode('، ') }} · {{ $d->address }}</div>
-            <div class="b"><span>{{ $d->courier ? 'المندوب: ' . $d->courier->name : 'بانتظار إسناد مندوب' }}</span><b>{{ $f($d->toCollect()) }} د.ل</b></div>
+            <div class="b"><span>{{ $d->courier ? 'المندوب: ' . $d->courier->name : 'بانتظار إسناد مندوب' }}</span><b>{{ $f($d->amount) }} د.ل</b></div>
             @if ($d->status === 'requested')<form method="post" action="{{ route('portal.delivery.cancel', $d->id) }}" onsubmit="return confirm('إلغاء طلب التوصيل؟')" style="margin-top:8px">@csrf<button class="btn ghost sm" style="width:100%">إلغاء الطلب</button></form>@endif
         </div>
     @endforeach
@@ -201,7 +201,7 @@
         <div class="fl"><label>الموقع على الخريطة (اختياري)</label><div class="inp" style="justify-content:space-between;padding:0 0 0 8px;height:50px"><input name="location_url" id="loc" value="{{ old('location_url', $c->location_url) }}" placeholder="رابط Google Maps" style="border:0;outline:0;background:none;flex:1;height:100%;padding:0 14px;direction:ltr;font-size:13px"><button type="button" class="cp" id="gps" style="border:0;cursor:pointer">📍 موقعي الآن</button></div><div class="lbl" id="gpsN" style="margin-top:4px"></div></div>
         @if ($pointsOn && $pts >= $pointsMin && $pts > 0)<label class="ck2"><input type="checkbox" name="use_points" value="1" id="useP" data-v="{{ $pts * $pointValue }}"> استخدام نقاطي ({{ $pts }} نقطة = {{ $f($pts * $pointValue) }} د.ل)</label>@endif
         <div class="fl"><label>كوبون خصم (اختياري)</label><input name="coupon_code" class="inp" style="height:50px;direction:ltr;text-transform:uppercase" value="{{ old('coupon_code') }}" placeholder="مثلاً PTX7K2Q9"></div>
-        <label style="display:block;font-size:13.5px;font-weight:700;margin:4px 0 7px">كيف ستدفع <span id="dueT" class="num">0</span> د.ل + {{ $f($settings['courier_default_fee']) }} أجرة التوصيل؟</label>
+        <label style="display:block;font-size:13.5px;font-weight:700;margin:4px 0 7px">كيف ستدفع <span id="dueT" class="num">0</span> د.ل؟</label>
         <div class="pay2"><div><span>💵 نقداً للمندوب</span><input name="plan_cash" id="pc" class="inp num" style="height:44px;margin-top:6px;font-weight:800" value="{{ old('plan_cash') }}" inputmode="decimal"></div><div><span>🏦 تحويل مصرفي</span><input name="plan_bank" id="pb" class="inp num" style="height:44px;margin-top:6px;font-weight:800" value="{{ old('plan_bank', 0) }}" inputmode="decimal"></div></div>
         <div id="bankBox" style="display:none">
             @if (!empty($settings['bank_accounts_text']))<div class="note-c" style="background:var(--s1-bg);color:#1d4f8f;white-space:pre-line">{{ $settings['bank_accounts_text'] }}</div>@endif
@@ -440,7 +440,7 @@ document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click'
 }));
 (function () {
   const f = document.getElementById('dlF'); if (!f) return;
-  const pc = document.getElementById('pc'), pb = document.getElementById('pb'), FEE = {{ (float) ($settings['courier_default_fee'] ?? 0) }};
+  const pc = document.getElementById('pc'), pb = document.getElementById('pb'), FEE = 0;
   const due = () => { let d = 0; f.querySelectorAll('input[name="order_ids[]"]:checked').forEach(i => d += parseFloat(i.dataset.rem) || 0); const up = document.getElementById('useP'); if (up && up.checked) d = Math.max(0, d - parseFloat(up.dataset.v)); return Math.round(d * 100) / 100; };
   const upd = (auto) => { const d = due(); document.getElementById('dueT').textContent = d.toLocaleString('en-US'); if (auto) pc.value = Math.max(0, Math.round((d + FEE - (parseFloat(pb.value) || 0)) * 100) / 100); document.getElementById('bankBox').style.display = (parseFloat(pb.value) || 0) > 0 ? 'block' : 'none'; };
   f.querySelectorAll('input[name="order_ids[]"], #useP').forEach(i => i && i.addEventListener('change', () => upd(true)));

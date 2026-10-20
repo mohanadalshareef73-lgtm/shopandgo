@@ -1,12 +1,12 @@
 @php $ph = fn ($p) => (str_contains((string) $p, '@') || strlen(preg_replace('/\D/', '', (string) $p)) > 13) ? '' : $p; @endphp
 <html dir="rtl"><head><meta charset="utf-8">
 <style>
-body { font-family: somar; font-size: 11pt; color: #1f2433; }
-.hd { border-bottom: 0.8mm solid #1c45a3; padding-bottom: 3mm; margin-bottom: 4mm; font-size: 12pt; }
-.hd b { font-size: 17pt; color: #1c45a3; }
+body { font-family: somar; font-size: 16pt; color: #000; font-weight: bold; }
+.hd { border-bottom: 1mm solid #000; padding-bottom: 3mm; margin-bottom: 4mm; font-size: 15pt; }
+.hd b { font-size: 22pt; color: #000; }
 table.t { width: 100%; border-collapse: collapse; }
-table.t th { background: #1c45a3; color: #fff; padding: 2.5mm 1.5mm; font-size: 10.5pt; }
-table.t td { border: 0.4mm solid #9aa3b8; padding: 3mm 1.5mm; font-size: 11pt; text-align: center; vertical-align: top; }
+table.t th { background: #000; color: #fff; padding: 3mm 1.5mm; font-size: 14pt; }
+table.t td { border: 0.5mm solid #000; padding: 4mm 1.5mm; font-size: 16pt; font-weight: bold; color: #000; text-align: center; vertical-align: top; }
 table.t td.r { text-align: right; }
 table.t tr.tot td { background: #fff4e5; font-weight: bold; }
 .dep { color: #b5480f; font-weight: bold; }
@@ -14,7 +14,7 @@ table.t tr.tot td { background: #fff4e5; font-weight: bold; }
 @php $who = $rows->map(fn ($d) => $d->courier_name ?: optional($d->courier)->name)->filter()->unique()->implode('، '); @endphp
 <div class="hd"><b>Shop & Go</b> &nbsp;·&nbsp; كشف {{ $title }} @if ($who) &nbsp;·&nbsp; المندوب: <b>{{ $who }}</b>@endif &nbsp;·&nbsp; {{ now()->format('Y-m-d g:i a') }} &nbsp;·&nbsp; {{ $rows->count() }} زبون</div>
 <table class="t">
-    <tr><th>#</th><th>الكود</th><th>الزبون</th><th>الهاتف</th><th>العنوان</th><th>النوع</th><th>الإيصالات</th><th>التخزين</th><th>طرود</th><th>الباقي مع الشحن</th></tr>
+    <tr><th>#</th><th>الكود</th><th>الزبون</th><th>الهاتف</th><th>العنوان</th><th>النوع</th><th>التخزين</th><th>طرود</th><th>الباقي مع الشحن</th></tr>
     @foreach ($rows as $i => $d)
         <tr>
             <td>{{ $i + 1 }}</td>
@@ -23,12 +23,11 @@ table.t tr.tot td { background: #fff4e5; font-weight: bold; }
             <td>{{ $ph($d->recipient_phone) }}@if ($d->recipient_phone2)<br>{{ $ph($d->recipient_phone2) }}@endif</td>
             <td class="r" style="width:34mm">{{ $d->address ?: '—' }}</td>
             <td class="{{ $d->kind === 'deposit' ? 'dep' : '' }}">{{ $d->kind === 'deposit' ? 'عربون' : 'طلبية' }}</td>
-            <td>{{ $d->orders->pluck('code')->implode('، ') }}</td>
             <td>{{ $d->orders->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }}</td>
             <td>{{ $d->parcels }}</td>
             <td><b>{{ $f($d->amount) }}</b></td>
         </tr>
     @endforeach
-    <tr class="tot"><td colspan="8">الإجمالي</td><td>{{ $rows->sum('parcels') }}</td><td>{{ $f($rows->sum('amount')) }}</td></tr>
+    <tr class="tot"><td colspan="7">الإجمالي</td><td>{{ $rows->sum('parcels') }}</td><td>{{ $f($rows->sum('amount')) }}</td></tr>
 </table>
 </body></html>

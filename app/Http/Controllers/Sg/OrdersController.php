@@ -563,7 +563,7 @@ class OrdersController extends Controller
         $c = $order->customer;
         if ($request->boolean('notify') && $c && $dl->courier) {
             try {
-                \App\Services\MessageService::sendText('customer_note', "مرحبا {$c->name} 👋\n🛵 المندوب *{$dl->courier->name}* جاي يقبض عربون طلبك *{$order->code}*\n💵 المبلغ: *" . \App\Services\TreasuryService::fmt($dl->toCollect()) . " د.ل*\nبيكلمك قبل ما يوصل 📱", [$c->phone_1], $c, $order);
+                \App\Services\MessageService::sendText('customer_note', "مرحبا {$c->name} 👋\n🛵 المندوب *{$dl->courier->name}* جاي يقبض عربون طلبك *{$order->code}*\n💵 المبلغ: *" . \App\Services\TreasuryService::fmt($dl->amount) . " د.ل*\nبيكلمك قبل ما يوصل 📱", [$c->phone_1], $c, $order);
             } catch (\Throwable $e) {
                 report($e);
             }

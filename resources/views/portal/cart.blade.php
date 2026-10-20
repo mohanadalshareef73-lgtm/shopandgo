@@ -137,7 +137,7 @@ body { background: var(--bgx); }
             err.style.display = low ? '' : 'none'; err.innerHTML = 'المبلغ شوية 🙏 أقل شي <b class="num">' + fmt(min) + '</b> د.ل';
             const go = document.getElementById('go'); if (go) go.disabled = low || !tot;
             n.innerHTML = '🛍 قيمة الطلب: <b class="num">' + fmt(tot) + '</b> د.ل <small style="color:#b45309">(الشحن غير محسوب)</small><br>✅ تدفع توا: <b class="num">' + fmt(pay) + '</b> د.ل · الباقي وقت الاستلام: <b class="num">' + fmt(Math.max(0, tot - pay)) + '</b>'
-              + (cour ? '<br>🛵 أجرة التوصيل: <b class="num">' + fmt(FEE) + '</b> د.ل<br>💵 <b>الإجمالي اللي تعطيه للمندوب: <span class="num">' + fmt(pay + FEE) + '</span> د.ل</b>' : '<br>🏦 <b>حوّل <span class="num">' + fmt(pay) + '</span> د.ل وارفع صورة الإيصال</b>'); };
+              + (cour ? '<br>💵 <b>اللي تعطيه للمندوب: <span class="num">' + fmt(pay) + '</span> د.ل</b>' : '<br>🏦 <b>حوّل <span class="num">' + fmt(pay) + '</span> د.ل وارفع صورة الإيصال</b>'); };
           document.querySelectorAll('input[name=pay_method]').forEach(i => i.addEventListener('change', upd));
           inp.addEventListener('input', upd); setInterval(upd, 1500); upd();
         })();

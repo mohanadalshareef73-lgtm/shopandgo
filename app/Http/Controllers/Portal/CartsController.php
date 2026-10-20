@@ -558,7 +558,7 @@ class CartsController extends Controller
                     $dl = \App\Services\CourierService::cartCollect($fresh, $pay);
                 }
                 if ($dl) {
-                    return redirect()->route('portal.cart', $cart->id)->with('success', 'وصلنا طلبك ✓ المندوب بيكلمك ويجيك يقبض ' . number_format($dl->toCollect(), 2) . ' د.ل (' . number_format($pay, 2) . ' عربون + ' . number_format($dl->customerFee(), 2) . ' توصيل)، وأول ما يقبض يجيك الإيصال على الواتساب وطلبك يتحجز');
+                    return redirect()->route('portal.cart', $cart->id)->with('success', 'وصلنا طلبك ✓ المندوب بيكلمك ويجيك يقبض العربون ' . number_format($pay, 2) . ' د.ل، وأول ما يقبض يجيك الإيصال على الواتساب وطلبك يتحجز');
                 }
             } catch (\Throwable $e) {
                 report($e);

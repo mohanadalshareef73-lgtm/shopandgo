@@ -132,7 +132,7 @@ class CourierService
         }
         MessageService::sendTemplate($type, $dl->customer, MessageService::orderVars($o, [
             '{رقم_الإيصال}' => $dl->orders->pluck('code')->implode('، '),
-            '{الباقي}' => TreasuryService::fmt($dl->toCollect()),
+            '{الباقي}' => TreasuryService::fmt($dl->amount),
             '{المندوب}' => optional($dl->courier)->name,
             '{تليفون_المندوب}' => static::publicPhone($dl->courier),
         ]), $o);
@@ -248,7 +248,6 @@ class CourierService
                 . '🛍 قيمة الطلب: ' . TreasuryService::fmt($o->total_price) . " د.ل\n"
                 . '✅ دفعت (عربون): ' . TreasuryService::fmt($got) . " د.ل\n"
                 . '⏳ الباقي: ' . TreasuryService::fmt(max(0, $o->remaining())) . " د.ل\n"
-                . ($fee > 0.009 ? '🛵 أجرة المندوب: ' . TreasuryService::fmt($fee) . " د.ل\n" : '')
                 . '📅 ' . now()->format('Y-m-d g:i a') . "\n\nشكراً 💙\n\n🧾 إيصالك 👇\n" . route('order.invoice', $o->code);
             try {
                 MessageService::sendText('cart_paid', $msg, array_filter([$c->phone_1]), $c, $o);
@@ -348,8 +347,7 @@ class CourierService
                 . ($total !== null ? '🛍 قيمة الطلب: ' . TreasuryService::fmt($total) . " د.ل\n🚚 _الشحن غير محسوب من ضمن هذه التكلفة_\n" : '')
                 . '✅ دفعت (عربون): ' . TreasuryService::fmt($forCart) . " د.ل\n"
                 . ($total !== null ? '⏳ الباقي وقت الاستلام: ' . TreasuryService::fmt(max(0, $total - $forCart)) . " د.ل\n" : '')
-                . '🛵 أجرة التوصيل: ' . TreasuryService::fmt($fee) . " د.ل (خالصة ✓)\n"
-                . '💵 *الإجمالي اللي استلمه المندوب: ' . TreasuryService::fmt($got) . " د.ل*\n"
+                . '💵 *اللي استلمه المندوب: ' . TreasuryService::fmt($forCart) . " د.ل*\n"
                 . '📅 ' . now()->format('Y-m-d g:i a') . ' · المندوب ' . optional($dl->courier)->name . "\n\n"
                 . "🛍 بدينا في حجز طلبك، ونبلغوك أول بأول 💙"
                 . ($order ? "\n\n🧾 فاتورتك 👇\n" . route('order.invoice', $order->code) : '')

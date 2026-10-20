@@ -73,7 +73,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
         <button type="button" class="btn ghost sm" style="color:var(--down)" onclick="if(confirm('نرجعو المختارين للمحل والرف؟'))bk('back')">↩ للرف</button>
     </div>
     @endif
-    <div class="scroll-x"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.qk').forEach(x=>x.checked=this.checked);cq()"></th><th>إجراء</th><th>مع</th><th>الزبون</th><th>العنوان</th><th>الإيصالات · التخزين</th><th class="n">الباقي</th><th class="n">توصيل</th></tr></thead><tbody>
+    <div class="scroll-x"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.qk').forEach(x=>x.checked=this.checked);cq()"></th><th>إجراء</th><th>مع</th><th>الزبون</th><th>العنوان</th><th>الإيصالات · التخزين</th><th class="n">الباقي</th></tr></thead><tbody>
     @forelse ($queue as $d)
         @php $who = $d->courier_name ?: optional($d->courier)->name; @endphp
         <tr>
@@ -114,10 +114,9 @@ table.t td.w { white-space: normal; min-width: 110px; }
                 @if ($d->kind !== 'deposit' && !$d->cart_id && $d->orders->count())<small style="display:block;color:#000;font-size:12px">🛍 أكياس: <b>{{ $d->orders->sum(fn ($o) => (int) $o->bags_num) ?: $d->parcels }}</b> · 🗄 الرف: <b>{{ $d->orders->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }}</b></small>@endif
                 @foreach ($probs[$d->id] ?? [] as $pr)<small style="display:block;color:#c62828;font-weight:700">{{ $pr }}</small>@endforeach</td>
             <td class="n num"><b>{{ $f($d->amount) }}</b></td>
-            <td class="n"><input class="inp numr fe" style="width:64px;height:32px" value="{{ $d->fee + 0 }}" data-id="{{ $d->id }}" onchange="fee(this)" title="سعر التوصيل"></td>
         </tr>
     @empty
-        <tr><td colspan="8"><div class="empty">ما فيش شي في الطابور</div></td></tr>
+        <tr><td colspan="7"><div class="empty">ما فيش شي في الطابور</div></td></tr>
     @endforelse
     </tbody></table></div>
 </form>
@@ -129,7 +128,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
     <div class="tw-h"><h3>📦 جاهز في الرف <span class="h-note">{{ $ready->count() }} زبون</span></h3>
         <input type="search" class="inp" style="margin-inline-start:auto;width:220px;height:38px" placeholder="🔍 كود / اسم / هاتف" value="{{ $q }}" onkeydown="if(event.key==='Enter'){event.preventDefault();location='?tab={{ $tab }}&q='+encodeURIComponent(this.value)}">
     </div>
-    <div class="scroll-x"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.pk').forEach(x=>x.checked=this.checked);cnt()"></th><th>الزبون</th><th>العنوان</th><th>الإيصالات · التخزين</th><th class="n">الباقي مع الشحن</th><th class="n">توصيل</th><th>النوع</th></tr></thead><tbody>
+    <div class="scroll-x"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.pk').forEach(x=>x.checked=this.checked);cnt()"></th><th>الزبون</th><th>العنوان</th><th>الإيصالات · التخزين</th><th class="n">الباقي مع الشحن</th><th>النوع</th></tr></thead><tbody>
     @forelse ($ready as $cid => $os)
         @php $c = $os->first()->customer; @endphp
         @continue(!$c)
@@ -139,11 +138,10 @@ table.t td.w { white-space: normal; min-width: 110px; }
             <td class="w">{{ $c->address ?: '—' }}</td>
             <td class="w num">{{ $os->pluck('code')->implode('، ') }}<small class="note" style="display:block">📍 {{ $os->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }} · {{ max(1, $os->sum(fn ($o) => $o->bags_num ?: 1)) }} طرد</small></td>
             <td class="n num"><b>{{ $f($os->sum(fn ($o) => max(0, $o->remaining()))) }}</b></td>
-            <td class="n"><input name="fee_c[{{ $cid }}]" class="inp numr fc" style="width:64px;height:32px" value="{{ $defFee + 0 }}"></td>
             <td><select name="kind[{{ $cid }}]" class="inp" style="height:32px;width:auto"><option value="order">📦 طلبية</option><option value="deposit">💵 عربون</option></select></td>
         </tr>
     @empty
-        <tr><td colspan="7"><div class="empty">ما فيش طلبيات جاهزة{{ $q !== '' ? ' بالبحث هذا' : '' }}</div></td></tr>
+        <tr><td colspan="6"><div class="empty">ما فيش طلبيات جاهزة{{ $q !== '' ? ' بالبحث هذا' : '' }}</div></td></tr>
     @endforelse
     </tbody></table></div>
     <div class="abar">

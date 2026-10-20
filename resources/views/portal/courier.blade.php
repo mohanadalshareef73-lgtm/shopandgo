@@ -4,7 +4,6 @@
         🛒 سلة {{ $cart->retailer_label }} <span class="num">#{{ $cart->id }}</span><br>
         💰 قيمة السلة: <b class="num">{{ number_format($total) }}</b> د.ل<br>
         💵 العربون ({{ (int) $pct }}%): <b class="num" style="font-size:20px;color:#1d8a5f">{{ number_format($deposit) }}</b> د.ل
-        @if ($fee > 0)<br>🛵 أجرة المندوب: <b class="num">{{ number_format($fee) }}</b> د.ل @endif
     </div>
 </div>
 @if ($done)

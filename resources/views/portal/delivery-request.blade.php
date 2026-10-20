@@ -14,7 +14,7 @@
         <div style="margin:10px 0"><span style="background:#f2f3f7;color:{{ $stl[1] }};border-radius:99px;padding:6px 14px;font-weight:800">{{ $stl[0] }}</span></div>
         <div class="note">{{ $dl->recipient_name }} · <span class="num">{{ $dl->recipient_phone }}</span><br>{{ $dl->address }}</div>
         @if ($dl->courier)<div class="note" style="margin-top:6px">المندوب: <b>{{ $dl->courier->name }}</b></div>@endif
-        <div class="note" style="margin-top:8px">المبلغ اللي تدفعه للمندوب: <b class="num">{{ $f($dl->toCollect()) }}</b> د.ل</div>
+        <div class="note" style="margin-top:8px">المبلغ اللي تدفعه للمندوب: <b class="num">{{ $f($dl->amount) }}</b> د.ل</div>
     </div>
 @else
     <form method="post" action="{{ route('deliv.req.store', ['order' => $o->id, 't' => $t]) }}">@csrf
@@ -27,7 +27,7 @@
                 <span class="note">الباقي <b class="num">{{ $f(max(0, $x->remaining())) }}</b> د.ل</span>
             </label>
         @endforeach
-        @if ($fee > 0)<div class="note" style="margin-top:8px">🛵 أجرة التوصيل: <b class="num">{{ $f($fee) }}</b> د.ل (تدفعها للمندوب)</div>@endif
+
     </div>
     <div class="card">
         <b>📍 بيانات التوصيل</b>
