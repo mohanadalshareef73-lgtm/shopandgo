@@ -66,14 +66,17 @@ class DeliveryController extends Controller
                 $request->merge(['pick' => $hit->id]); // رقم إيصال: يتختار طول
             }
             // 🔢 كود بجزء منه: 6823 يطلع 6823 و 76823 وأي كود فيه الأرقام هذي
-            if (ctype_digit($q) && !$hit) {
+            if (ctype_digit($q)) {
                 $matches = $C()->where('code', 'like', '%' . \App\Support\Search::esc($q) . '%')
                     ->withCount(['orders as open_n' => fn ($o) => $o->where('delivered', false)->where('status', '!=', 'canceld')])
                     ->orderByRaw('CASE WHEN code = ? THEN 0 ELSE 1 END', [$q])->orderByDesc('open_n')->orderBy('code')->limit(15)->get(['id', 'name', 'code', 'phone_1']);
+                if ($hit && !$matches->contains('id', $hit->customer_id) && ($hc = $C()->find($hit->customer_id, ['id', 'name', 'code', 'phone_1']))) {
+                    $matches->prepend($hc); // صاحب الإيصال اللي رقمه نفس البحث
+                }
             }
             $customer = ($request->filled('cid') ? $C()->find((int) $request->cid) : null)
-                ?? ($matches->count() ? $matches->first() : null)
                 ?? ($hit ? $C()->find($hit->customer_id) : null)
+                ?? ($matches->count() ? $matches->first() : null)
                 ?? ($digits && strlen($digits) >= 6 ? $C()->where(fn ($w) => $w->where('phone_1', 'like', '%' . substr($digits, -9))->orWhere('phone_2', 'like', '%' . substr($digits, -9)))->first() : null)
                 ?? (($oh = Order::where('code', 'like', '%' . $q)->first()) ? $C()->find($oh->customer_id) : null);
             if (!$customer && mb_strlen($q) >= 2 && !$matches->count()) {
@@ -504,14 +507,14 @@ class DeliveryController extends Controller
         }
         $d = preg_replace('/\D/', '', $t);
         $ids = Order::where('code', 'like', "%$t%")->limit(20)->pluck('customer_id');
-        $cs = Customer::where(fn ($w) => $w->where('code', 'like', '%' . $t . '%')->orWhere('name', 'like', "%$t%")
+        $cs = Customer::withoutGlobalScope('approved')->where(fn ($w) => $w->where('code', 'like', '%' . $t . '%')->orWhere('name', 'like', "%$t%")
                 ->when(strlen($d) >= 4, fn ($x) => $x->orWhere('phone_1', 'like', "%$d%")->orWhere('phone_2', 'like', "%$d%"))
                 ->orWhereIn('id', $ids))
-            ->orderByRaw('code = ? desc', [$t])->limit(15)->get(['id', 'name', 'code', 'phone_1']);
+            ->orderByRaw('code = ? desc, code like ? desc, length(code)', [$t, '%' . $t . '%'])->limit(25)->get(['id', 'name', 'code', 'phone_1']);
         $ready = (clone $this->readyQuery())->whereIn('customer_id', $cs->pluck('id'))->selectRaw('customer_id, COUNT(*) n')->groupBy('customer_id')->pluck('n', 'customer_id');
         $open = $this->openQuery()->whereIn('customer_id', $cs->pluck('id'))->selectRaw('customer_id, COUNT(*) n')->groupBy('customer_id')->pluck('n', 'customer_id');
         // اللي عنده طلبيات ما تسلمتش فوق
-        $cs = $cs->sortByDesc(fn ($c) => ($c->code === $t ? 100000 : 0) + (int) ($open[$c->id] ?? 0))->values();
+        $cs = $cs->sortByDesc(fn ($c) => ($c->code === $t ? 100000 : 0) + (str_contains((string) $c->code, $t) ? 1000 : 0) + (int) ($open[$c->id] ?? 0))->values();
 
         return response()->json($cs->map(fn ($c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name, 'phone' => $c->phone_1, 'ready' => (int) ($ready[$c->id] ?? 0), 'open' => (int) ($open[$c->id] ?? 0)]));
     }
