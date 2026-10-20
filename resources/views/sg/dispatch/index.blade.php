@@ -96,7 +96,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
                 @if ($d->cart_id)<button type="button" class="btn sm" style="background:#0f8a5f;color:#fff" onclick="collect({{ $d->id }}, {{ (float) $d->amount + 0 }})">✓ تأكيد</button>
                 @else<button type="button" class="btn green sm" onclick="silentAmt({{ $d->id }}, {{ (float) $d->amount + 0 }}, {{ $d->kind === 'deposit' ? 1 : 0 }})">{{ $d->kind === 'deposit' ? '✅ قبض العربون' : '✅ مستلمة' }}</button>@endif
                 <button type="button" class="btn ghost sm" onclick="ra({{ $d->id }}, 'done', 'نفتحو صفحة التسليم باش تدير الدفع بنفسك؟')">💵 بالكاشير</button>
-                @if ($d->kind !== 'deposit' && !$d->cart_id)<button type="button" class="btn ghost sm" style="color:#c62828" data-p="{{ $d->problem }}" onclick="const t=prompt('⚠ شن المشكلة؟ (فاضي = تنحل)',this.dataset.p||'');if(t!==null)postTo(RA+{{ $d->id }},{a:'problem',text:t})">⚠ مشكلة</button>@endif
+                @if (!empty($probs[$d->id]))<button type="button" class="btn sm" style="background:#fde8e8;color:#c62828;font-weight:800" data-p="{{ implode("\n", $probs[$d->id]) }}" onclick="alert('⚠ المشكلة:\n\n'+this.dataset.p)">⚠ مشكلة ({{ count($probs[$d->id]) }})</button>@endif
                 <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
                 @endif
                 <button type="button" class="btn ghost sm" style="color:#c62828" title="حذف" onclick="ra({{ $d->id }}, 'delete', 'نحذفوه نهائي؟ ما يرجعش{{ $d->orders->count() ? ' (الإيصالات ترجع للرف)' : '' }}')">🗑</button>
@@ -106,7 +106,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
             <td class="w">{{ $d->address ?: '—' }}@if ($d->note)<small class="note" style="display:block">{{ \Illuminate\Support\Str::limit($d->note, 90) }}</small>@endif</td>
             <td class="w num">@if ($d->cart_id)<b>🛒 حجز سلة #{{ $d->cart_id }}</b>@else{{ $d->orders->pluck('code')->implode('، ') ?: '—' }}@endif
                 @if ($d->kind !== 'deposit' && !$d->cart_id && $d->orders->count())<small style="display:block;color:#000;font-size:12px">🛍 أكياس: <b>{{ $d->orders->sum(fn ($o) => (int) $o->bags_num) ?: $d->parcels }}</b> · 🗄 الرف: <b>{{ $d->orders->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }}</b></small>@endif
-                @if ($d->status === 'problem' && $d->problem)<small style="display:block;color:#c62828;font-weight:700">⚠ {{ $d->problem }}</small>@endif</td>
+                @foreach ($probs[$d->id] ?? [] as $pr)<small style="display:block;color:#c62828;font-weight:700">{{ $pr }}</small>@endforeach</td>
             <td class="n num"><b>{{ $f($d->amount) }}</b></td>
             <td class="n"><input class="inp numr fe" style="width:64px;height:32px" value="{{ $d->fee + 0 }}" data-id="{{ $d->id }}" onchange="fee(this)" title="سعر التوصيل"></td>
         </tr>

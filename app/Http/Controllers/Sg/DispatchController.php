@@ -68,6 +68,26 @@ class DispatchController extends Controller
             $queue = $queue->filter(fn ($d) => str_contains(mb_strtolower((string) $d->ext_code), mb_strtolower($xq)) || str_contains((string) optional($d->customer)->code, $xq) || str_contains((string) $d->recipient_phone, $xq))->values();
         }
 
+        // ⚠ مشاكل الطلبيات: مشكلة التوصيل + مشاكل الإيصال المفتوحة (نواقص · لم يصل · تالف …)
+        $oids = $queue->flatMap(fn ($d) => $d->orders->pluck('id'))->unique();
+        $iss = $oids->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasTable('order_issues') ? \App\Models\OrderIssue::whereIn('order_id', $oids)->where('status', 'open')->get()->groupBy('order_id') : collect();
+        $probs = $queue->mapWithKeys(function ($d) use ($iss) {
+            $l = [];
+            if ($d->problem) {
+                $l[] = '🛵 ' . $d->problem;
+            }
+            foreach ($d->orders as $o) {
+                if ((int) $o->missing_qty > 0 && in_array($o->missing_action, [null, ''], true)) {
+                    $l[] = '📉 ' . $o->code . ': نواقص ' . (int) $o->missing_qty . ' قطعة';
+                }
+                foreach ($iss[$o->id] ?? [] as $i) {
+                    $l[] = (\App\Models\OrderIssue::TYPES[$i->type][1] ?? '⚠') . ' ' . $o->code . ': ' . (\App\Models\OrderIssue::TYPES[$i->type][0] ?? $i->type) . ($i->qty ? ' ' . $i->qty . ' قطعة' : '') . ($i->note ? ' — ' . $i->note : '');
+                }
+            }
+
+            return [$d->id => $l];
+        });
+
         // 🛒 حجوزات السلات اللي في الطابور: تأكيد الحجز ← ⚡ احجز الان من هني
         $cartIds = $queue->pluck('cart_id')->filter()->unique();
         $carts = $cartIds->isNotEmpty() ? \App\Models\CartQuote::whereIn('id', $cartIds)->get()->keyBy('id') : collect();
@@ -86,7 +106,7 @@ class DispatchController extends Controller
         $bookTo = (string) AppSettings::get('booking_last_phone', $nums[0] ?? '');
 
         return view('sg.dispatch.index', [
-            'nav' => 'dispatch', 'xq' => $xq, 'payments' => \App\Models\PaymentMethod::where('status', true)->orderBy('id')->get(), 'cashId' => AppSettings::cashPaymentId(), 'carts' => $carts, 'reps' => $reps, 'cartOrders' => $cartOrders, 'bookTo' => $bookTo, 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
+            'nav' => 'dispatch', 'xq' => $xq, 'payments' => \App\Models\PaymentMethod::where('status', true)->orderBy('id')->get(), 'cashId' => AppSettings::cashPaymentId(), 'carts' => $carts, 'probs' => $probs, 'reps' => $reps, 'cartOrders' => $cartOrders, 'bookTo' => $bookTo, 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
             'couriers' => User::where('type_id', 4)->where('status', true)->orderBy('name')->get(),
             'counts' => $all->countBy('zone'),
             'batches' => $queue->pluck('batch')->filter()->unique()->sortDesc()->values(),
