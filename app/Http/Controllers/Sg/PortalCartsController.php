@@ -86,9 +86,28 @@ class PortalCartsController extends Controller
             if ($amt <= 0.009) {
                 return back()->with('error', 'الحجز هذا ما عليهش عربون يتقبض — أكده طول');
             }
-            $dl = $cart->customer_id ? \App\Services\CourierService::cartCollect($cart, $amt) : null;
+            if ($cart->customer_id) {
+                $dl = \App\Services\CourierService::cartCollect($cart, $amt);
+            } else {
+                // 👤 بدون حساب: ناخذو بياناته من الحجز (الاسم · الرقم · العنوان) أو من رقم الواتساب
+                $ph = $cart->guest_phone ?? null;
+                if (!$ph) {
+                    $ph = preg_replace('/^218/', '0', preg_replace('/\D/', '', (string) $cart->whatsapp_customer_phone));
+                    if (($ph === '' || strlen($ph) > 13) && ($im = $cart->incomingMessage)) {
+                        $ph = preg_replace('/^218/', '0', preg_replace('/\D/', '', (string) ($im->contact_phone ?: $im->phone)));
+                    }
+                    $ph = strlen((string) $ph) > 13 ? '' : $ph;
+                }
+                if (!$ph) {
+                    return back()->with('error', 'رقم العميل مش واضح — ما نقدروش نبعتوله مندوب. كلمه وأكده يدوي');
+                }
+                $dl = \App\Services\CourierService::cartCollectGuest($cart, $amt, [
+                    'name' => $cart->guest_name ?? (optional($cart->incomingMessage)->name ?: 'عميل'), 'phone' => $ph,
+                    'address' => $cart->guest_address ?? null, 'location_url' => $cart->guest_location ?? null,
+                ]);
+            }
             if (!$dl) {
-                return back()->with('error', 'ما قدرناش نعملوه توصيل (ما عندهش حساب عميل) — أكده ولا كلمه');
+                return back()->with('error', 'ما قدرناش نعملوه توصيل — جرب مرة ثانية');
             }
         }
         $dl->zone = \App\Http\Controllers\Sg\DispatchController::outside($dl->city) ? 'out' : 'in';
