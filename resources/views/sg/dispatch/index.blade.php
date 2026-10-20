@@ -52,7 +52,7 @@ table.t td.w { white-space: normal; min-width: 160px; }
         <tr>
             <td><input type="checkbox" class="qk" name="ids[]" value="{{ $d->id }}" onchange="cq()"></td>
             <td><div class="qa">
-                <button type="button" class="btn green sm" onclick="ra({{ $d->id }}, 'silent', 'تسليم بدون رسالة؟ الباقي ({{ $f($d->amount) }} د.ل) يتسجل مقبوض كاش')">✅ مستلمة</button>
+                <button type="button" class="btn green sm" onclick="ra({{ $d->id }}, 'silent', '{{ $d->kind === 'deposit' ? 'العربون (' . $f($d->amount) . ' د.ل) يتسجل مقبوض كاش على الإيصال، والبضاعة تقعد في الرف؟' : 'تسليم بدون رسالة؟ الباقي (' . $f($d->amount) . ' د.ل) يتسجل مقبوض كاش' }}')">{{ $d->kind === 'deposit' ? '✅ قبض العربون' : '✅ مستلمة' }}</button>
                 <button type="button" class="btn ghost sm" onclick="ra({{ $d->id }}, 'done', 'نفتحو صفحة التسليم باش تدير الدفع بنفسك؟')">💵 بالكاشير</button>
                 <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
             </div></td>

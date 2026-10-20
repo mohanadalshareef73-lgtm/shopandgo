@@ -50,6 +50,13 @@ class DispatchController extends Controller
         // كل التوصيلات المفتوحة — حتى طلبات العملاء من حساباتهم تطلع هني طول
         $all = Delivery::with(['customer', 'orders', 'courier'])->whereIn('status', self::ACTIVE)->latest('id')->get();
         $all->each(fn ($d) => $d->zone = $d->zone ?: (static::outside($d->city) ? 'out' : 'in'));
+        // 💵 تحصيل عربون/حجز جاي من رابط العميل ← يقعد «عربون» تلقائي
+        foreach ($all as $d) {
+            if (($d->deposit_order_id || $d->cart_id) && $d->kind !== 'deposit') {
+                Delivery::whereKey($d->id)->update(['kind' => 'deposit']);
+                $d->kind = 'deposit';
+            }
+        }
         $queue = $all->where('zone', $tab)->values();
 
         return view('sg.dispatch.index', [
@@ -122,7 +129,11 @@ class DispatchController extends Controller
         $cu = $delivery->customer;
         switch ($d['a']) {
             case 'silent':
-                $this->deliverSilent($delivery);
+                try {
+                    $this->deliverSilent($delivery);
+                } catch (\RuntimeException $e) {
+                    return back()->with('error', $e->getMessage());
+                }
 
                 return back()->with('success', '✅ ' . (optional($cu)->name ?: $delivery->recipient_name) . ' مستلمة (بدون رسالة)');
             case 'fee':
@@ -217,7 +228,11 @@ class DispatchController extends Controller
         }
         foreach ($rows as $dl) {
             if ($d['a'] === 'silent') {
-                $this->deliverSilent($dl);
+                try {
+                    $this->deliverSilent($dl);
+                } catch (\RuntimeException $e) {
+                    session()->flash('error', $dl->code . ': ' . $e->getMessage());
+                }
                 continue;
             }
             if ($d['a'] === 'move_out' || $d['a'] === 'move_in') {
@@ -288,11 +303,48 @@ class DispatchController extends Controller
      */
     protected function deliverSilent(Delivery $dl): void
     {
+        if ($dl->cart_id) {
+            throw new \RuntimeException('تحصيل حجز سلة — سلّمه من صفحة المندوبين');
+        }
         DB::transaction(function () use ($dl) {
             $dl->loadMissing('orders', 'courier');
             $cashId = AppSettings::cashPaymentId();
             $who = $dl->courier_name ?: optional($dl->courier)->name;
             $got = 0;
+            if ($dl->kind === 'deposit' || $dl->deposit_order_id) {
+                // 💵 عربون: نسجلو المبلغ دفعة على الإيصال بس — البضاعة ما تتسلمش وتقعد في الرف
+                $o = $dl->deposit_order_id ? Order::find($dl->deposit_order_id) : $dl->orders->first();
+                $amt = round((float) $dl->amount, 2);
+                if ($o && $amt > 0.009) {
+                    if ($dl->courier_id) {
+                        $ph = new \App\Models\PaidHistory;
+                        $ph->customer_id = $o->customer_id;
+                        $ph->order_id = $o->id;
+                        $ph->paid_price = $amt;
+                        $ph->payment_id = $cashId;
+                        $ph->save();
+                        $o->paid_price = (float) $o->paid_price + $amt;
+                        $o->refreshPaymentStatus();
+                        $o->save();
+                    } else {
+                        \App\Services\OrderPaymentService::pay($o, $amt, $cashId, 'عربون كاش (دليفري ' . $dl->code . ($who ? ' · ' . $who : '') . ')');
+                    }
+                }
+                foreach ($dl->orders as $x) {
+                    if (!$x->delivered && (int) $x->delivery_id === (int) $dl->id) {
+                        $x->delivery_id = null;
+                        $x->save();
+                    }
+                }
+                $dl->collected_cash = round($amt + (float) $dl->fee, 2);
+                $dl->status = 'delivered';
+                $dl->delivered_at = now();
+                $dl->save();
+                $dl->log('delivered', 'عربون مقبوض بدون رسالة · ' . TS::fmt($amt) . ' د.ل' . ($who ? ' · ' . $who : ''));
+                Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' دليفري: عربون (' . optional($o)->code . ')', 'log' => ' ' . $dl->code . ' · ' . TS::fmt($amt) . ' د.ل']);
+
+                return;
+            }
             foreach ($dl->orders as $o) {
                 if ($o->delivered) {
                     continue;
