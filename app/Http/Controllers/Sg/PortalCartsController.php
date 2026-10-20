@@ -98,16 +98,23 @@ class PortalCartsController extends Controller
                     }
                     $ph = strlen((string) $ph) > 13 ? '' : $ph;
                 }
-                if (!$ph) {
-                    return back()->with('error', 'رقم العميل مش واضح — ما نقدروش نبعتوله مندوب. كلمه وأكده يدوي');
-                }
                 $dl = \App\Services\CourierService::cartCollectGuest($cart, $amt, [
                     'name' => $cart->guest_name ?? (optional($cart->incomingMessage)->name ?: 'عميل'), 'phone' => $ph,
                     'address' => $cart->guest_address ?? null, 'location_url' => $cart->guest_location ?? null,
                 ]);
             }
             if (!$dl) {
-                return back()->with('error', 'ما قدرناش نعملوه توصيل — جرب مرة ثانية');
+                // 🛟 آخر حل: نعملو التوصيل مباشرة بالبيانات اللي عندنا (حتى لو ناقصة — تكملها من طلبيات دليفري)
+                $cu = $cart->customer;
+                $dl = \App\Models\Delivery::create([
+                    'code' => \App\Models\Delivery::newCode(), 'customer_id' => $cart->customer_id, 'source' => 'customer', 'status' => 'requested',
+                    'recipient_name' => optional($cu)->name ?: ($cart->guest_name ?? (optional($cart->incomingMessage)->name ?: 'عميل')),
+                    'recipient_phone' => optional($cu)->phone_1 ?: ($cart->guest_phone ?? null), 'address' => optional($cu)->address ?: ($cart->guest_address ?? null),
+                    'package_type' => 'تحصيل حجز', 'parcels' => 0, 'amount' => round($amt, 2), 'fee' => (float) \App\Services\AppSettings::get('courier_default_fee', 10),
+                    'fee_payer' => 'customer', 'pay_type' => 'cash', 'cart_id' => $cart->id,
+                    'note' => '💵 تحصيل حجز سلة ' . $cart->retailer_label . ' #' . $cart->id . ' — ما فيش طرد، اقبض المبلغ بس',
+                ]);
+                $dl->log('requested', 'تحصيل حجز سلة #' . $cart->id);
             }
         }
         $dl->zone = \App\Http\Controllers\Sg\DispatchController::outside($dl->city) ? 'out' : 'in';
