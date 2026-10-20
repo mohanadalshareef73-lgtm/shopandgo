@@ -113,6 +113,7 @@ class DispatchController extends Controller
         $bookTo = (string) AppSettings::get('booking_last_phone', $nums[0] ?? '');
 
         return view('sg.dispatch.index', [
+            'recent' => Delivery::with(['customer', 'orders'])->whereIn('status', ['delivered', 'returned', 'cancelled'])->where('updated_at', '>=', now()->subHours(36))->latest('updated_at')->take(40)->get(),
             'nav' => 'dispatch', 'fl' => $fl, 'fc' => $fc, 'xq' => $xq, 'payments' => \App\Models\PaymentMethod::where('status', true)->orderBy('id')->get(), 'cashId' => AppSettings::cashPaymentId(), 'carts' => $carts, 'probs' => $probs, 'reps' => $reps, 'cartOrders' => $cartOrders, 'bookTo' => $bookTo, 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
             'couriers' => User::where('type_id', 4)->where('status', true)->orderBy('name')->get(),
             'counts' => $all->countBy('zone'),
@@ -177,7 +178,7 @@ class DispatchController extends Controller
     /** إجراء على توصيل في الطابور: نوع · تحويل · تغيير المندوب · سلّم · رجّع */
     public function act(Request $request, Delivery $delivery)
     {
-        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle,note,hide,problem,delete', 'text' => 'nullable|string|max:1000', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
+        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle,note,hide,problem,delete,restore', 'text' => 'nullable|string|max:1000', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
         if ($d['a'] === 'delete') {
             if ($delivery->status === 'delivered') {
                 return back()->with('error', 'التوصيل هذا تسلّم وفلوسه تسجلت — ما ينحذفش (استعمل ✓ للإخفاء)');
@@ -208,6 +209,17 @@ class DispatchController extends Controller
             $delivery->save();
 
             return back()->with('success', '✓ تخفى · تلقاه في «تأكيد الحجوزات ← متأكدة»');
+        }
+        if ($d['a'] === 'restore') {
+            try {
+                $msg = $this->restore($delivery);
+            } catch (\Throwable $e) {
+                report($e);
+
+                return back()->with('error', 'ما رجعش: ' . $e->getMessage());
+            }
+
+            return back()->with('success', '↩ ' . $msg);
         }
         abort_unless(in_array($delivery->status, self::ACTIVE, true), 422, 'التوصيل هذا مقفول');
         $cu = $delivery->customer;
@@ -697,6 +709,76 @@ class DispatchController extends Controller
             Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' دليفري: مستلمة (' . ($dl->recipient_name ?: optional($dl->customer)->name) . ')', 'log' => ' ' . $dl->code . ' · ' . $dl->orders->pluck('code')->implode('، ') . ' · ' . TS::fmt($got) . ' د.ل']);
         });
         Cache::forget('sg.badge.ready');
+    }
+
+    /**
+     * ↩ تراجع عن آخر حركة (غلطة): المستلمة ترجع غير مستلمة والفلوس اللي تسجلت وقتها ترجع · المرجّعة/الملغية ترجع للطابور
+     */
+    protected function restore(Delivery $dl): string
+    {
+        if ($dl->cart_id && $dl->status === 'delivered') {
+            throw new \RuntimeException('حجز سلة اتأكد وانعمله إيصال — تراجع عنه من صفحة الإيصال');
+        }
+        $cashId = AppSettings::cashPaymentId();
+        $back = 0;
+        DB::transaction(function () use ($dl, $cashId, &$back) {
+            $dl->loadMissing('orders');
+            $since = ($dl->delivered_at ?: $dl->updated_at ?: now())->copy()->subMinutes(10);
+            if ($dl->status === 'delivered') {
+                $targets = $dl->deposit_order_id ? Order::whereKey($dl->deposit_order_id)->get() : $dl->orders;
+                foreach ($targets as $o) {
+                    foreach (\App\Models\PaidHistory::where('order_id', $o->id)->where('created_at', '>=', $since)->get() as $p) {
+                        $back += (float) $p->paid_price;
+                        if ($dl->courier_id && (int) $p->payment_id === (int) $cashId && !$dl->settlement_id) {
+                            // كاش مع مندوب بحساب: ما دخلش الخزينة — نشيلوه من الإيصال بس
+                            $o->refresh();
+                            $o->paid_price = max(0, round((float) $o->paid_price - (float) $p->paid_price, 2));
+                            $o->refreshPaymentStatus();
+                            $o->save();
+                            $p->delete();
+                        } else {
+                            \App\Services\OrderPaymentService::edit($p, 0, (int) $p->payment_id);
+                        }
+                    }
+                }
+                foreach ($dl->orders as $o) {
+                    $o->refresh();
+                    if ($o->delivered) {
+                        $o->delivered = false;
+                        $o->delivered_at = null;
+                        $o->delivered_time = null;
+                        $o->delivered_by = null;
+                        $o->delivery_type = null;
+                        $o->delivery_name = null;
+                    }
+                    $o->delivery_id = $dl->id;
+                    $o->save();
+                }
+            } else {
+                foreach ($dl->orders as $o) {
+                    $o->refresh();
+                    if ($o->delivered || ($o->delivery_id && (int) $o->delivery_id !== (int) $dl->id && Delivery::whereKey($o->delivery_id)->whereIn('status', self::ACTIVE)->exists())) {
+                        continue; // تسلّمت ولا مع توصيل ثاني
+                    }
+                    $o->delivery_id = $dl->id;
+                    $o->save();
+                }
+            }
+            $dl->status = $dl->courier_id ? 'assigned' : ($dl->courier_name ? 'out' : 'requested');
+            $dl->delivered_at = null;
+            $dl->collected_cash = 0;
+            $dl->collected_bank = 0;
+            if (\Illuminate\Support\Facades\Schema::hasColumn('deliveries', 'kept')) {
+                $dl->kept = false;
+            }
+            $dl->save();
+            $dl->log($dl->status, '↩ تراجع (رجعت للطابور)' . ($back ? ' · رجعت دفعة ' . TS::fmt($back) . ' د.ل' : ''));
+            Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' تراجع دليفري (' . ($dl->recipient_name ?: optional($dl->customer)->name) . ')', 'log' => ' ' . $dl->code . ' · ' . $dl->orders->pluck('code')->implode('، ') . ($back ? ' · رجعت ' . TS::fmt($back) : '')]);
+        });
+        Cache::forget('sg.badge.ready');
+        Cache::forget('sg.badge.courier');
+
+        return ($dl->recipient_name ?: optional($dl->customer)->name) . ' رجع للطابور' . ($back ? ' · ورجعت الدفعة ' . TS::fmt($back) . ' د.ل' : '');
     }
 
     /** إنشاء توصيل لإيصالات زبون (مستقل عن خدمة المندوبين) */

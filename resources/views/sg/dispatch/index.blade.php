@@ -40,6 +40,23 @@ table.t td.w { white-space: normal; min-width: 110px; }
     <a href="?tab=out" class="{{ $tab === 'out' ? 'on' : '' }}">🚚 خارج بنغازي ({{ (int) ($counts['out'] ?? 0) }})</a>
 </div>
 
+@if ($recent->count())
+<details class="card mb" style="padding:10px 14px" @if (request('undo')) open @endif>
+    <summary style="cursor:pointer;font-weight:800">🕘 آخر اللي صار (آخر 36 ساعة) — لو درت غلطة رجّعها من هني <span class="note">({{ $recent->count() }})</span></summary>
+    <table class="t" style="margin-top:8px"><thead><tr><th>الوقت</th><th>الزبون</th><th>الإيصالات</th><th>شن صار</th><th></th></tr></thead><tbody>
+    @foreach ($recent as $r)
+        <tr>
+            <td class="num">{{ $r->updated_at->format('m-d g:i a') }}</td>
+            <td><b class="num">{{ optional($r->customer)->code }}</b> {{ optional($r->customer)->name ?: $r->recipient_name }}</td>
+            <td class="num">{{ $r->cart_id ? 'سلة #' . $r->cart_id : ($r->orders->pluck('code')->implode('، ') ?: '—') }}</td>
+            <td>{{ ['delivered' => '✅ مستلمة / مقبوضة', 'returned' => '↩ رجعت للرف', 'cancelled' => '✕ ملغية'][$r->status] ?? $r->status }}{{ (float) $r->collected_cash > 0 ? ' · ' . $f($r->collected_cash) . ' د.ل' : '' }}</td>
+            <td>@if (!($r->cart_id && $r->status === 'delivered'))<button type="button" class="btn sm" style="background:#262c4a;color:#fff" onclick="ra({{ $r->id }}, 'restore', 'نرجعوها للطابور زي ما كانت؟{{ $r->status === 'delivered' ? ' (الدفعة اللي تسجلت وقتها ترجع)' : '' }}')">↩ رجّعها</button>@else<span class="note">من صفحة الإيصال</span>@endif</td>
+        </tr>
+    @endforeach
+    </tbody></table>
+</details>
+@endif
+
 {{-- الطابور: منو مستلمها · علّم ← كشف / ترحيل / تعيين / رجوع --}}
 <form method="post" action="{{ route('sg.dispatch.bulk') }}" id="bk" class="card tw mb">
     @csrf <input type="hidden" name="a" id="bkA">
