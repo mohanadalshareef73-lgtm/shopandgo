@@ -37,7 +37,7 @@ class TradeController extends Controller
         if (!$this->ready()) {
             return redirect()->route('admin.home')->with('error', 'افتح /system-update مرة وحدة باش تخدم التجارة الخارجية');
         }
-        $tab = in_array($request->tab, ['partners', 'invoices', 'moves'], true) ? $request->tab : 'home';
+        $tab = in_array($request->tab, ['partners', 'invoices', 'moves', 'report'], true) ? $request->tab : 'home';
         $partners = Partner::orderByDesc('is_company')->orderBy('name')->get();
         $invoices = Invoice::with(['shares.partner', 'customer'])->latest('id')->take(100)->get();
         $pid = (int) $request->p;
@@ -47,6 +47,8 @@ class TradeController extends Controller
             'moves' => Move::with(['partner', 'wallet', 'invoice', 'user'])->when($pid, fn ($q) => $q->where('partner_id', $pid))->latest('id')->take(200)->get(),
             'sel' => $pid ? $partners->firstWhere('id', $pid) : null,
             'payments' => PaymentMethod::where('status', true)->orderBy('id')->get(),
+            'report' => $tab === 'report' ? Move::selectRaw('partner_id, type, SUM(partner_change) s, COUNT(*) n')->whereNotNull('partner_id')->groupBy('partner_id', 'type')->get()->groupBy('partner_id') : collect(),
+            'monthly' => $tab === 'report' ? Invoice::where('status', 'closed')->selectRaw("DATE_FORMAT(closed_at, '%Y-%m') m, COUNT(*) n, SUM(profit) p, SUM(cost_lyd + extra_lyd) c, SUM(collected) s")->groupBy('m')->orderByDesc('m')->take(12)->get() : collect(),
             'stats' => [
                 'open' => $invoices->where('status', 'open')->count(),
                 'profit' => (float) Invoice::where('status', 'closed')->sum('profit'),
@@ -92,7 +94,7 @@ class TradeController extends Controller
         $d = $request->validate([
             'kind' => 'nullable|string|max:40', 'source' => 'nullable|string|max:150', 'usd_total' => 'nullable|numeric|min:0', 'rate' => 'nullable|numeric|min:0',
             'cost_lyd' => 'required|numeric|min:0', 'extra_lyd' => 'nullable|numeric|min:0', 'sale_lyd' => 'nullable|numeric|min:0', 'wallet_id' => 'required|integer',
-            'customer_code' => 'nullable|string|max:30', 'note' => 'nullable|string|max:500',
+            'customer_code' => 'nullable|string|max:30', 'note' => 'nullable|string|max:500', 'qty' => 'nullable|integer|min:1',
             's' => 'required|array', 's.*.partner_id' => 'nullable|integer', 's.*.paid' => 'nullable|numeric|min:0', 's.*.source' => 'nullable|string|max:20', 's.*.kind' => 'nullable|string|max:100',
         ]);
         if (!empty($d['customer_code'])) {
@@ -113,7 +115,7 @@ class TradeController extends Controller
 
     public function invoice(Invoice $invoice)
     {
-        $invoice->load(['shares.partner', 'customer']);
+        $invoice->load(['shares.partner', 'customer', 'order']);
 
         return view('sg.trade.invoice', [
             'nav' => 'trade', 'inv' => $invoice, 'wallets' => Wallet::orderBy('id')->get(),
@@ -123,7 +125,7 @@ class TradeController extends Controller
 
     public function invoiceAct(Request $request, Invoice $invoice)
     {
-        $d = $request->validate(['a' => 'required|in:pay,close,sale', 'wallet_id' => 'nullable|integer', 'amount' => 'nullable|numeric|min:0', 'note' => 'nullable|string|max:300']);
+        $d = $request->validate(['a' => 'required|in:pay,close,sale,customer,order', 'wallet_id' => 'nullable|integer', 'amount' => 'nullable|numeric|min:0', 'note' => 'nullable|string|max:300', 'customer_code' => 'nullable|string|max:30']);
         try {
             if ($d['a'] === 'pay') {
                 abort_if($invoice->status === 'closed', 422, 'الفاتورة مقفولة');
@@ -131,9 +133,30 @@ class TradeController extends Controller
 
                 return back()->with('success', '💵 تسجل سداد ' . TS::fmt($d['amount']) . ' د.ل');
             }
+            if ($d['a'] === 'customer') {
+                $c = Customer::withoutGlobalScope('approved')->where('code', trim((string) $d['customer_code']))->first();
+                if (!$c) {
+                    return back()->with('error', 'ما لقيناش عميل بالكود هذا');
+                }
+                $invoice->customer_id = $c->id;
+                $invoice->save();
+                $o = TradeService::makeOrder($invoice->fresh());
+
+                return back()->with('success', '👤 تربطت بالعميل ' . $c->name . ($o ? ' · وتعملتله الطلبية ' . $o->code . ' في حسابه' : ''));
+            }
+            if ($d['a'] === 'order') {
+                $o = TradeService::makeOrder($invoice);
+
+                return back()->with($o ? 'success' : 'error', $o ? '📦 تعملت الطلبية ' . $o->code . ' في حساب العميل' : 'لازم عميل وسعر بيع، ولا الطلبية معمولة من قبل');
+            }
             if ($d['a'] === 'sale') {
                 $invoice->sale_lyd = round((float) $d['amount'], 2);
                 $invoice->save();
+                if ($invoice->order_id && ($o = \App\Models\Order::find($invoice->order_id))) {
+                    $o->total_price = $invoice->sale_lyd;
+                    $o->refreshPaymentStatus();
+                    $o->save();
+                }
 
                 return back()->with('success', '✓ تعدل سعر البيع');
             }

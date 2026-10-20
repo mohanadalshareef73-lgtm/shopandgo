@@ -101,6 +101,7 @@ class TradeService
                 'usd_total' => (float) ($d['usd_total'] ?? 0), 'rate' => (float) ($d['rate'] ?? 0),
                 'cost_lyd' => round((float) ($d['cost_lyd'] ?? 0), 2), 'extra_lyd' => round((float) ($d['extra_lyd'] ?? 0), 2),
                 'sale_lyd' => round((float) ($d['sale_lyd'] ?? 0), 2), 'wallet_id' => $w->id,
+            ] + (\Illuminate\Support\Facades\Schema::hasColumn('trade_invoices', 'qty') ? ['qty' => max(1, (int) ($d['qty'] ?? 1))] : []) + [
                 'customer_id' => $d['customer_id'] ?? null, 'note' => $d['note'] ?? null, 'created_id' => auth()->id(),
             ]);
             foreach ($shares as $s) {
@@ -135,8 +136,63 @@ class TradeService
                 static::move('purchase', $w, -$inv->totalCost(), null, 0, $inv, 'دفع فاتورة ' . $inv->code . ($inv->source ? ' · ' . $inv->source : ''));
             }
 
+            if ($inv->customer_id && (float) $inv->sale_lyd > 0.009) {
+                static::makeOrder($inv);
+            }
+
             return $inv;
         });
+    }
+
+    /** 📦 طلبية للعميل في حسابه (عادي كأنها من الشركة) — مربوطة بالفاتورة وفلوسها تمشي لخزينة التجارة */
+    public static function makeOrder(Invoice $inv): ?\App\Models\Order
+    {
+        if ($inv->order_id || !$inv->customer_id || (float) $inv->sale_lyd <= 0.009 || !\Illuminate\Support\Facades\Schema::hasColumn('orders', 'trade_invoice_id')) {
+            return null;
+        }
+        $src = mb_strtolower((string) $inv->source);
+        $platform = $src !== '' ? \App\Models\Platform::whereRaw('LOWER(name) LIKE ?', ['%' . $src . '%'])->first() : null;
+        $platform = $platform ?: \App\Models\Platform::first();
+        $o = new \App\Models\Order;
+        $o->code = \App\Services\OrderNumber::next();
+        $o->customer_id = $inv->customer_id;
+        $o->platform_id = optional($platform)->id;
+        $o->qty = max(1, (int) ($inv->qty ?? 1));
+        $o->total_price = round((float) $inv->sale_lyd, 2);
+        $o->paid_price = 0;
+        $o->status = 'unpaid';
+        $o->currency = 'dinar';
+        $o->currency_sign = 'د.ل';
+        $o->payment_id = AppSettings::cashPaymentId();
+        $o->note = trim(($inv->kind ? $inv->kind . ' · ' : '') . ($inv->source ?: ''));
+        $o->created_id = auth()->id();
+        $o->trade_invoice_id = $inv->id;
+        $o->save();
+        $inv->order_id = $o->id;
+        $inv->save();
+        \App\Models\Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' طلبية تجارة خارجية (' . $o->code . ')', 'log' => ' ' . $inv->code . ' · ' . TreasuryService::fmt($o->total_price) . ' د.ل']);
+
+        return $o;
+    }
+
+    /** خزينة التجارة المناسبة لطريقة الدفع (كاش ← كاش التجارة · غيره ← مصرف التجارة) */
+    public static function walletFor(int $paymentId): Wallet
+    {
+        $kind = $paymentId === AppSettings::cashPaymentId() ? 'cash' : 'bank';
+
+        return Wallet::where('kind', $kind)->orderBy('id')->first() ?: Wallet::orderBy('id')->firstOrFail();
+    }
+
+    /** 🔁 دفعة على طلبية تجارة من أي مكان في المنظومة (التسليم، الإيصال…) — تدخل خزينة التجارة بدل خزينة الشركة */
+    public static function orderPaid(\App\Models\Order $o, float $amt, int $paymentId, string $label): void
+    {
+        $inv = Invoice::find($o->trade_invoice_id);
+        if (!$inv) {
+            return;
+        }
+        static::move('customer_pay', static::walletFor($paymentId), $amt, null, 0, $inv, trim($label . ' · ' . $o->code));
+        $inv->collected = round((float) $inv->collected + $amt, 2);
+        $inv->save();
     }
 
     /** 💵 سداد من العميل (دفعات) يدخل خزينة التجارة */
@@ -146,6 +202,22 @@ class TradeService
             static::move('customer_pay', $w, $amt, null, 0, $inv, trim('سداد العميل · ' . $inv->code . ($note ? ' · ' . $note : '')));
             $inv->collected = round((float) $inv->collected + $amt, 2);
             $inv->save();
+            $o = $inv->order_id ? \App\Models\Order::find($inv->order_id) : null;
+            if ($o) {
+                // يتسجل على طلبية العميل (يشوفها في حسابه) — بدون خزينة الشركة
+                $ph = new \App\Models\PaidHistory;
+                $ph->customer_id = $o->customer_id;
+                $ph->order_id = $o->id;
+                $ph->paid_price = $amt;
+                $ph->payment_id = $w->kind === 'cash' ? AppSettings::cashPaymentId() : (\App\Models\PaymentMethod::where('id', '!=', AppSettings::cashPaymentId())->where('status', true)->value('id') ?: AppSettings::cashPaymentId());
+                if (\Illuminate\Support\Facades\Schema::hasColumn('paid_histories', 'note')) {
+                    $ph->note = 'تجارة خارجية · ' . $w->name;
+                }
+                $ph->save();
+                $o->paid_price = round((float) $o->paid_price + $amt, 2);
+                $o->refreshPaymentStatus();
+                $o->save();
+            }
         });
     }
 

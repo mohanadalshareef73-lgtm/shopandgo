@@ -28,7 +28,11 @@ class OrderPaymentService
         $order->refreshPaymentStatus();
         $order->save();
 
-        TreasuryService::deposit($amount, $order->currency ?: 'dinar', $paymentId, 'order', $order->id, $label . ' ' . $order->code);
+        if (!empty($order->trade_invoice_id)) {
+            TradeService::orderPaid($order, $amount, $paymentId, $label); // 🌍 طلبية تجارة خارجية: الفلوس لخزينة التجارة
+        } else {
+            TreasuryService::deposit($amount, $order->currency ?: 'dinar', $paymentId, 'order', $order->id, $label . ' ' . $order->code);
+        }
         CustomerNotify::inbox($order->customer, '✅ استلمنا منك ' . TreasuryService::fmt($amount) . ' ' . ($order->currency_sign ?: 'د.ل') . ' على الإيصال ' . $order->code . ' · المتبقي ' . TreasuryService::fmt(max(0, $order->remaining())) . ' ' . ($order->currency_sign ?: 'د.ل'), $order, 'payment');
 
         Log::create([
@@ -47,7 +51,15 @@ class OrderPaymentService
         $oldPid = (int) $p->payment_id;
         $cur = $order->currency ?: 'dinar';
         $amount = round(max(0, $amount), 2);
-        if ($oldPid === $paymentId) {
+        if (!empty($order->trade_invoice_id)) {
+            // 🌍 طلبية تجارة خارجية: التعديل على خزينة التجارة
+            if ($old > 0.009) {
+                TradeService::orderPaid($order, -$old, $oldPid, 'تعديل دفعة');
+            }
+            if ($amount > 0.009) {
+                TradeService::orderPaid($order, $amount, $paymentId, 'تعديل دفعة');
+            }
+        } elseif ($oldPid === $paymentId) {
             $d = round($amount - $old, 2);
             if ($d > 0.009) {
                 TreasuryService::deposit($d, $cur, $paymentId, 'order', $order->id, 'تعديل دفعة ' . $order->code . ' (+' . $d . ')');

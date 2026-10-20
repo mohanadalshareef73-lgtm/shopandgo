@@ -21,7 +21,7 @@ table.t td.w { white-space: normal; }
 </div>
 
 <div class="tt">
-    @foreach (['home' => '🏠 الملخص', 'partners' => '👥 الشركاء', 'invoices' => '🧾 الفواتير', 'moves' => '📜 سجل الحركة'] as $k => $lb)<a href="?tab={{ $k }}" class="{{ $tab === $k ? 'on' : '' }}">{{ $lb }}</a>@endforeach
+    @foreach (['home' => '🏠 الملخص', 'partners' => '👥 الشركاء', 'invoices' => '🧾 الفواتير', 'moves' => '📜 سجل الحركة', 'report' => '📊 الأرباح والخسائر'] as $k => $lb)<a href="?tab={{ $k }}" class="{{ $tab === $k ? 'on' : '' }}">{{ $lb }}</a>@endforeach
 </div>
 
 <div class="tk">
@@ -124,6 +124,35 @@ table.t td.w { white-space: normal; }
 </div>
 @endif
 
+@if ($tab === 'report')
+<div class="card tw mb">
+    <div class="tw-h"><h3>📊 كل شريك</h3></div>
+    <div class="scroll-x"><table class="t"><thead><tr><th>الشريك</th><th class="n">إيداع</th><th class="n">سحب</th><th class="n">من خزينة الشركة</th><th class="n">لمالية الشركة</th><th class="n">في فواتير مفتوحة</th><th class="n">أرباح</th><th class="n">خسائر</th><th class="n">الصافي</th><th class="n">الرصيد</th></tr></thead><tbody>
+    @foreach ($partners as $p)
+        @php $r = ($report[$p->id] ?? collect())->keyBy('type'); $g = fn ($t) => (float) optional($r->get($t))->s; $open = (float) $p->shares()->whereHas('invoice', fn ($q) => $q->where('status', 'open'))->sum('paid'); @endphp
+        <tr><td><b>{{ $p->name }}</b>{{ $p->is_company ? ' 🏢' : '' }}</td>
+            <td class="n num">{{ $f($g('deposit')) }}</td><td class="n num">{{ $f(abs($g('withdraw'))) }}</td>
+            <td class="n num">{{ $f($g('company_in')) }}</td><td class="n num">{{ $f(abs($g('to_company'))) }}</td>
+            <td class="n num">{{ $f($open) }}</td>
+            <td class="n num pl">{{ $f($g('profit')) }}</td><td class="n num mn">{{ $f(abs($g('loss'))) }}</td>
+            <td class="n num {{ $g('profit') + $g('loss') < 0 ? 'mn' : 'pl' }}"><b>{{ $f($g('profit') + $g('loss')) }}</b></td>
+            <td class="n num"><b>{{ $f($p->balance) }}</b></td></tr>
+    @endforeach
+    </tbody></table></div>
+    @if ($company)<div class="note" style="padding:10px 14px">🏢 ربح Shop & Go الصافي: <b class="num">{{ $f((float) optional(($report[$company->id] ?? collect())->firstWhere('type', 'profit'))->s + (float) optional(($report[$company->id] ?? collect())->firstWhere('type', 'loss'))->s) }}</b> د.ل · رصيدها في التجارة <b class="num">{{ $f($company->balance) }}</b> — تقدر تدرجه لمالية الشركة من «🏠 الملخص».</div>@endif
+</div>
+<div class="card tw mb">
+    <div class="tw-h"><h3>📅 حسب الشهر (فواتير مقفولة)</h3></div>
+    <table class="t"><thead><tr><th>الشهر</th><th class="n">فواتير</th><th class="n">التكلفة</th><th class="n">سدد العملاء</th><th class="n">الربح</th></tr></thead><tbody>
+    @forelse ($monthly as $m)
+        <tr><td class="num">{{ $m->m }}</td><td class="n num">{{ $m->n }}</td><td class="n num">{{ $f($m->c) }}</td><td class="n num">{{ $f($m->s) }}</td><td class="n num {{ $m->p < 0 ? 'mn' : 'pl' }}"><b>{{ $f($m->p) }}</b></td></tr>
+    @empty
+        <tr><td colspan="5"><div class="empty">ما فيش فواتير مقفولة</div></td></tr>
+    @endforelse
+    </tbody></table>
+</div>
+@endif
+
 {{-- ➕ فاتورة شراء --}}
 <div class="modal-bg" id="mInv"><div class="modal" style="max-width:820px;width:100%">
     <h3>🧾 فاتورة شراء جديدة</h3>
@@ -137,6 +166,7 @@ table.t td.w { white-space: normal; }
             <div><label class="l">تكلفة الفاتورة بالدينار *</label><input name="cost_lyd" id="iCost" class="inp numr" value="{{ old('cost_lyd') }}" required oninput="sum()"></div>
             <div><label class="l">مصاريف إضافية (شحن/جمارك) د.ل</label><input name="extra_lyd" id="iExtra" class="inp numr" value="{{ old('extra_lyd', 0) }}" oninput="sum()"></div>
             <div><label class="l">سعر البيع للعميل د.ل</label><input name="sale_lyd" class="inp numr" value="{{ old('sale_lyd') }}"></div>
+            <div><label class="l">عدد القطع</label><input name="qty" class="inp numr" value="{{ old('qty', 1) }}"></div>
             <div><label class="l">تندفع من</label><select name="wallet_id" class="inp">@foreach ($wallets as $w)<option value="{{ $w->id }}">{{ $w->name }} ({{ $f($w->balance) }})</option>@endforeach</select></div>
         </div>
         <h4 style="margin:12px 0 6px">👥 الشركاء وكم دفع كل واحد <span class="note" id="sumN"></span></h4>

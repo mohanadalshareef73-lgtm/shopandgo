@@ -24,6 +24,15 @@
     <div class="card"><div class="l">{{ $inv->status === 'closed' ? '📈 الربح' : '📈 الربح المتوقع' }}</div><div class="v num {{ $est < 0 ? 'mn' : 'pl' }}">{{ $f($est) }}</div></div>
 </div>
 
+<div class="card mb" style="padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <b>👤 العميل:</b>
+    @if ($inv->customer)<span>{{ $inv->customer->name }} · كود <b class="num">{{ $inv->customer->code }}</b></span>@else<span class="note">ما فيش</span>@endif
+    @if ($inv->order)<a class="chip u" href="{{ route('sg.orders.show', $inv->order) }}">📦 طلبيته في حسابه: {{ $inv->order->code }} · باقي {{ $f(max(0, $inv->order->remaining())) }}</a>
+    @elseif ($inv->customer && $inv->status !== 'closed')<form method="post" action="{{ route('sg.trade.invoice.act', $inv) }}">@csrf<input type="hidden" name="a" value="order"><button class="btn sm">📦 اعمل طلبية في حسابه</button></form>@endif
+    @if (!$inv->order && $inv->status !== 'closed')<form method="post" action="{{ route('sg.trade.invoice.act', $inv) }}" class="fm" style="margin-inline-start:auto">@csrf<input type="hidden" name="a" value="customer"><input name="customer_code" class="inp numr" style="width:120px" placeholder="كود العميل" required><button class="btn ghost sm">ربط</button></form>@endif
+</div>
+@if ($inv->order)<div class="note mb">💡 العميل يقدر يسدد عادي من «التسليم» ولا الإيصال — الفلوس تدخل خزينة التجارة أوتوماتيك وتتحسب هني.</div>@endif
+
 @if ($inv->status !== 'closed')
 <div class="card mb" style="padding:14px">
     <form method="post" action="{{ route('sg.trade.invoice.act', $inv) }}" class="fm">@csrf<input type="hidden" name="a" value="pay">
