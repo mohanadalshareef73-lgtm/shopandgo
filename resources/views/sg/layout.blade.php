@@ -99,7 +99,7 @@
         ['cust', 'العملاء', route('sg.clients'), 'customer-list'],
         ['signup', 'طلبات التسجيل', route('sg.signups'), 'customer-create', $signupBadge ?? 0],
         ['cart', 'السلات', route('sg.carts'), 'cart-list'],
-        ['pcart', 'تأكيد الحجوزات', route('sg.pcarts'), 'cart-list', \App\Support\Fast::hasColumn('cart_quotes', 'portal_status') ? \Illuminate\Support\Facades\Cache::remember('sg.badge.pcart', 30, fn () => \App\Models\CartQuote::where('portal_status', 'ordered')->where(fn ($w) => $w->whereNotIn('id', \App\Models\Delivery::whereNotNull('cart_id')->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->pluck('cart_id')))->count()) : 0],
+        ['pcart', 'تأكيد الحجوزات', route('sg.pcarts'), 'cart-list', \App\Support\Fast::hasColumn('cart_quotes', 'portal_status') ? \Illuminate\Support\Facades\Cache::remember('sg.badge.pcart', 30, fn () => \App\Models\CartQuote::where('portal_status', 'ordered')->where(fn ($w) => $w->whereNotIn('id', \App\Models\Delivery::whereNotNull('cart_id')->whereNotNull('zone')->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->pluck('cart_id')))->count()) : 0],
         ['bqueue', 'قائمة الحجز', route('sg.bqueue'), 'cart-list', \App\Support\Fast::hasColumn('cart_quotes', 'booked_done_at') ? \Illuminate\Support\Facades\Cache::remember('sg.badge.bqueue', 30, fn () => \App\Models\CartQuote::whereNotNull('customer_id')->where('portal_status', 'confirmed')->whereNull('booked_done_at')->count()) : 0],
         ['fin', 'المالية', route('sg.finance'), 'treasury-list'],
         ['exp', 'المصروفات', route('sg.expenses'), 'purchase-list'],

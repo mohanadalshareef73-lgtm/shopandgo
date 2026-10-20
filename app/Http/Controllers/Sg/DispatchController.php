@@ -48,7 +48,8 @@ class DispatchController extends Controller
             return redirect()->route('sg.couriers')->with('error', 'لازم تفتح /system-update مرة وحدة باش تخدم صفحة طلبيات دليفري');
         }
         // كل التوصيلات المفتوحة — حتى طلبات العملاء من حساباتهم تطلع هني طول
-        $all = Delivery::with(['customer', 'orders', 'courier'])->whereIn('status', self::ACTIVE)->latest('id')->get();
+        $all = Delivery::with(['customer', 'orders', 'courier'])->whereIn('status', self::ACTIVE)->latest('id')->get()
+            ->reject(fn ($d) => $d->cart_id && !$d->zone)->values(); // حجز سلة: يطلع بس بعد «ارسال دليفري»
         $all->each(fn ($d) => $d->zone = $d->zone ?: (static::outside($d->city) ? 'out' : 'in'));
         // 💵 تحصيل عربون/حجز جاي من رابط العميل ← يقعد «عربون» تلقائي
         foreach ($all as $d) {

@@ -32,7 +32,7 @@ class PortalCartsController extends Controller
     {
         $this->middleware('permission:cart-list', ['only' => ['index', 'receipt', 'booking', 'download']]);
         // الموظف العادي (يشوف السلات) يقدر يأكد ويحجز ويبعت للرقم زادة
-        $this->middleware('permission:cart-edit|cart-list', ['only' => ['decide', 'office', 'bookNow']]);
+        $this->middleware('permission:cart-edit|cart-list', ['only' => ['decide', 'office', 'bookNow', 'toDelivery']]);
         $this->middleware('permission:cart-edit', ['only' => ['resend']]);
     }
 
@@ -60,12 +60,12 @@ class PortalCartsController extends Controller
         $rows = CartQuote::with('customer')->where($this->cartScope())
             // بحث بكود العميل أو اسمه أو رقمه أو رقم السلة: يطلع كل سلاته حتى اللي حسبها وما أكدهاش
             ->when($t !== '', fn ($q) => $q->where(fn ($w) => $w->where('id', ctype_digit($t) ? (int) $t : 0)->orWhereHas('customer', fn ($c) => \App\Support\Search::customer($c, $t))->when(\Illuminate\Support\Facades\Schema::hasColumn('cart_quotes', 'guest_phone'), fn ($x) => $x->orWhere('guest_phone', 'like', '%' . $t . '%')->orWhere('guest_name', 'like', '%' . $t . '%')))->where('status', 'succeeded'),
-                fn ($q) => $q->when($tab === 'all', fn ($x) => $x->whereIn('portal_status', ['ordered', 'confirmed', 'rejected']), fn ($x) => $x->where('portal_status', $tab)->when($tab === 'ordered' && !request()->filled('pay'), fn ($y) => $y->where(fn ($w) => $w->whereNotIn('id', \App\Models\Delivery::whereNotNull('cart_id')->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->pluck('cart_id'))))))
+                fn ($q) => $q->when($tab === 'all', fn ($x) => $x->whereIn('portal_status', ['ordered', 'confirmed', 'rejected']), fn ($x) => $x->where('portal_status', $tab)->when($tab === 'ordered' && !request()->filled('pay'), fn ($y) => $y->where(fn ($w) => $w->whereNotIn('id', \App\Models\Delivery::whereNotNull('cart_id')->whereNotNull('zone')->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->pluck('cart_id'))))))
             ->when($request->filled('pay'), fn ($q) => $q->where('pay_method', $request->pay))
             ->orderByRaw('ordered_at IS NULL')->latest('ordered_at')->latest('id')->paginate(30)->withQueryString();
 
         return view('sg.carts.portal', ['nav' => 'pcart', 'rows' => $rows, 'tab' => $t !== '' && $tab !== 'draft' ? 'search' : $tab, 'payments' => \App\Models\PaymentMethod::where('status', true)->get(),
-            'counts' => CartQuote::where($this->cartScope())->where(fn ($w) => $w->where('portal_status', '!=', 'ordered')->orWhereNotIn('id', \App\Models\Delivery::whereNotNull('cart_id')->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->pluck('cart_id')))->selectRaw('portal_status, COUNT(*) n')->groupBy('portal_status')->pluck('n', 'portal_status')->put('draft', $this->draftQuery()->count())]);
+            'counts' => CartQuote::where($this->cartScope())->where(fn ($w) => $w->where('portal_status', '!=', 'ordered')->orWhereNotIn('id', \App\Models\Delivery::whereNotNull('cart_id')->whereNotNull('zone')->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->pluck('cart_id')))->selectRaw('portal_status, COUNT(*) n')->groupBy('portal_status')->pluck('n', 'portal_status')->put('draft', $this->draftQuery()->count())]);
     }
 
     /** سلات انحسبت وما تأكدتش (من الحساب أو من الواتساب) — آخر 7 أيام، مش متجاهلة ومش متحولة لإيصال */
@@ -74,6 +74,31 @@ class PortalCartsController extends Controller
         return CartQuote::where('status', 'succeeded')->where('created_at', '>=', now()->subDays(7))
             ->where(fn ($w) => $w->whereNull('portal_status')->orWhere('portal_status', 'draft'))
             ->when(\Illuminate\Support\Facades\Schema::hasColumn('cart_quotes', 'order_id'), fn ($q) => $q->whereNull('order_id'));
+    }
+
+    /** 🛵 ارسال دليفري: الحجز (كاش مندوب) يمشي لصفحة «طلبيات دليفري» ببياناته — المندوب يقبض العربون */
+    public function toDelivery(CartQuote $cart)
+    {
+        $active = ['requested', 'assigned', 'out', 'problem'];
+        $dl = \App\Models\Delivery::where('cart_id', $cart->id)->whereIn('status', $active)->latest('id')->first();
+        if (!$dl) {
+            $amt = (float) ($cart->courier_pay ?? 0);
+            if ($amt <= 0.009) {
+                return back()->with('error', 'الحجز هذا ما عليهش عربون يتقبض — أكده طول');
+            }
+            $dl = $cart->customer_id ? \App\Services\CourierService::cartCollect($cart, $amt) : null;
+            if (!$dl) {
+                return back()->with('error', 'ما قدرناش نعملوه توصيل (ما عندهش حساب عميل) — أكده ولا كلمه');
+            }
+        }
+        $dl->zone = \App\Http\Controllers\Sg\DispatchController::outside($dl->city) ? 'out' : 'in';
+        $dl->kind = 'deposit';
+        $dl->note = trim(($dl->note ? $dl->note . ' · ' : '') . 'من تأكيد الحجوزات');
+        $dl->save();
+        $dl->log($dl->status, 'ارسال دليفري من تأكيد الحجوزات · سلة #' . $cart->id);
+        \Illuminate\Support\Facades\Cache::forget('sg.badge.pcart');
+
+        return back()->with('success', '🛵 الحجز #' . $cart->id . ' مشى لطلبيات دليفري');
     }
 
     public function decide(Request $request, CartQuote $cart, SheinQuotationPdf $pdf)

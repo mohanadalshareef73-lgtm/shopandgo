@@ -378,6 +378,7 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::get('booking-queue', [$C . 'PortalCartsController', 'queue'])->name('bqueue');
         Route::post('booking-queue/{cart}', [$C . 'PortalCartsController', 'queueDone'])->name('bqueue.done');
         Route::post('portal-carts/{cart}/decide', [$C . 'PortalCartsController', 'decide'])->name('pcarts.decide');
+        Route::post('portal-carts/{cart}/to-delivery', [$C . 'PortalCartsController', 'toDelivery'])->name('pcarts.delivery');
         Route::get('portal-carts/{cart}/receipt', [$C . 'PortalCartsController', 'receipt'])->name('pcarts.receipt');
         Route::get('portal-carts/{cart}/booking', [$C . 'PortalCartsController', 'booking'])->name('pcarts.booking');
         Route::get('portal-carts/{cart}/download', [$C . 'PortalCartsController', 'download'])->name('pcarts.download');
