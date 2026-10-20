@@ -158,7 +158,7 @@ class MessageService
     }
 
     /** أنواع الرسائل اللي يبقى فيها رابط المنظومة */
-    public const LINK_TYPES = ['new', 'ship_registered', 'arrived', 'ship_arrived', 'ship_address'];
+    public const LINK_TYPES = ['new', 'ship_registered', 'arrived', 'ship_arrived', 'ship_address', 'deposit_link'];
 
     /** يشيل أسطر رابط المنظومة (والسطر اللي قبلها لو كان «اضغط هنا 👇») من نص الرسالة */
     public static function stripLinks(string $text, string $host = 'shopandgo.ly'): string
