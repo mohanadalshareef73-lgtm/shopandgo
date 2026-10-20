@@ -26,6 +26,11 @@
 table.t tr.picked td { background: #f5f9ff; }
 .om .om-btn { font-weight: 700; border: 1.5px solid var(--line); min-width: 104px; }
 .om .menu { min-width: 220px; padding: 6px; }
+/* خانة الأزرار: الأزرار كلها تبان، والقائمة تنفتح تحتهم ما تغطيش عليهم */
+table.t td.oacts { white-space: normal; min-width: 250px; vertical-align: top; }
+td.oacts > .btn, td.oacts > div { display: inline-flex; margin: 0 0 6px 4px !important; vertical-align: top; }
+td.oacts .om { display: block !important; width: 100%; }
+td.oacts .om > .menu { position: static; margin-top: 6px; box-shadow: none; border: 1px solid var(--line); }
 .om .menu a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-size: 14.5px; border-radius: 10px; }
 .om .menu a i { font-style: normal; width: 22px; text-align: center; font-size: 16px; }
 .om .menu a small { margin-inline-start: auto; color: var(--ink-3); font-size: 11.5px; }
@@ -108,7 +113,7 @@ table.t tr.picked td { background: #f5f9ff; }
                         <div>الرف: @if ($o->storage_num)<span class="shelf">{{ $o->storage_num }}</span>@else<b>—</b>@endif</div>
                         <div>وصل: <b class="num">{{ $rc !== null ? $rc . ' من ' . $o->qty : '—' }}</b></div>
                         <div>سعر الشحن: <b class="num">{{ $o->ship_price > 0 ? $f($o->ship_price) : '—' }}</b></div></td>
-                    <td>@if (!$o->delivered && !$o->arrived && $st !== 'cx' && $o->customer && !$o->trip_details && !$o->storage_num && !($o->ship_price > 0) && !($o->weight ?? null))<button type="button" class="btn sm" style="background:#e8590c;color:#fff;margin-bottom:6px;white-space:nowrap" onclick="openDep({{ json_encode(['id' => $o->id, 'code' => $o->code, 'name' => optional($o->customer)->name, 'ccode' => optional($o->customer)->code, 'rem' => round($rem, 2), 'def' => $rem > 0.009 ? (max(0, min(round($rem, 2), ceil(($o->total_price - $o->discount) * $depPct / 100) - (float) $o->paid_price)) ?: round($rem, 2)) : 0]) }})">🛵 عربون مع مندوب</button>@endif
+                    <td class="oacts">@if (!$o->delivered && !$o->arrived && $st !== 'cx' && $o->customer && !$o->trip_details && !$o->storage_num && !($o->ship_price > 0) && !($o->weight ?? null))<button type="button" class="btn sm" style="background:#e8590c;color:#fff;margin-bottom:6px;white-space:nowrap" onclick="openDep({{ json_encode(['id' => $o->id, 'code' => $o->code, 'name' => optional($o->customer)->name, 'ccode' => optional($o->customer)->code, 'rem' => round($rem, 2), 'def' => $rem > 0.009 ? (max(0, min(round($rem, 2), ceil(($o->total_price - $o->discount) * $depPct / 100) - (float) $o->paid_price)) ?: round($rem, 2)) : 0]) }})">🛵 عربون مع مندوب</button>@endif
                     @php $canDel = !$o->delivered && $st !== 'cx' && $o->customer_id && !$o->delivery_id; $dJs = json_encode(['id' => $o->id, 'code' => $o->code, 'name' => optional($o->customer)->name, 'ccode' => optional($o->customer)->code]); @endphp
                     @php $missN = ((int) $o->missing_qty > 0 && !$o->missing_action ? 1 : 0) + (int) ($soldN[$o->id] ?? 0) + (isset($openIss[$o->id]) ? $openIss[$o->id]->where('type', 'missing')->count() : 0); @endphp
                     @if ($st !== 'cx')<button type="button" class="btn ghost sm" style="margin-bottom:6px;white-space:nowrap;{{ $missN ? 'color:#b3261e;border-color:#f3b8b2' : '' }}" data-miss="{{ $o->id }}" data-miss-code="{{ $o->code }}">{{ $missN ? '📉 نواقص (' . $missN . ')' : '📉 النواقص' }}</button>@endif
