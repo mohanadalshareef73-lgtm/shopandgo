@@ -61,7 +61,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
                 <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
             </div></td>
             <td><b>{{ $who ?: '— ما تعيّنش' }}</b>@if (!$d->courier_id && $d->courier_name)<small class="note" style="display:block">بدون حساب</small>@endif<small class="note num" style="display:block">{{ optional($d->assigned_at)->format('m-d g:i a') }}</small></td>
-            <td class="w"><b class="num">{{ optional($d->customer)->code }}</b> {{ optional($d->customer)->name ?: $d->recipient_name }}<small class="note num" style="display:block">{{ $d->recipient_phone }}</small></td>
+            <td class="w"><b class="num">{{ optional($d->customer)->code }}</b> {{ optional($d->customer)->name ?: $d->recipient_name }}<small class="note num" style="display:block">{{ $d->recipient_phone }}</small>@if ($d->bank_receipt)<a class="chip u" target="_blank" href="{{ asset('storage/' . $d->bank_receipt) }}">📎 دافع تحويل</a>@endif</td>
             <td class="w">{{ $d->address ?: '—' }}</td>
             <td class="w num">{{ $d->orders->pluck('code')->implode('، ') ?: '—' }}<small class="note" style="display:block">📍 {{ $d->orders->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }} · {{ $d->parcels }} طرد</small></td>
             <td class="n num"><b>{{ $f($d->amount) }}</b></td>
