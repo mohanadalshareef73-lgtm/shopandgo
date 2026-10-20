@@ -58,7 +58,7 @@
         </div></td>
         <td>@canany(['cart-edit', 'cart-list'])
             {{-- 1) التأكيد: ينعمل الإيصال ويوصل العميل التأكيد ورابط الإيصال --}}
-            @if ($ct->portal_status === 'ordered' && ($ct->customer_id || $ct->guest_phone || $ct->pay_method === 'cash_courier'))
+            @if ($ct->portal_status === 'ordered')
             <form method="post" action="{{ route('sg.pcarts.decide', $ct) }}" style="margin-bottom:6px" onsubmit="return confirm({{ json_encode($ct->customer_id ? 'نأكدو الحجز؟ ينعمل الإيصال ويوصل العميل التأكيد' : 'نأكدو الحجز؟ ينفتحله حساب (لو ما عندهش) وينعمل الإيصال ويوصله على الواتساب') }})">@csrf
                 <input type="hidden" name="send_whatsapp" value="1">
                 <button name="do" value="confirm" class="btn green" style="font-size:15px;padding:9px 16px">✓ تأكيد الحجز</button>

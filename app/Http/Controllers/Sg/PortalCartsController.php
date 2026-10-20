@@ -22,8 +22,9 @@ class PortalCartsController extends Controller
     {
         $hasG = \Illuminate\Support\Facades\Schema::hasColumn('cart_quotes', 'guest_phone');
 
+        // أي حجز «ينتظر التأكيد» يطلع (نفس الرقم اللي في القائمة) — حتى لو بدون حساب عميل
         return fn ($w) => $w->whereNotNull('customer_id')
-            ->orWhere(fn ($g) => $g->where('pay_method', 'cash_courier')->where('portal_status', 'ordered'))
+            ->orWhere('portal_status', 'ordered')
             ->when($hasG, fn ($x) => $x->orWhere(fn ($g) => $g->whereNotNull('guest_phone')->whereIn('portal_status', ['ordered', 'confirmed', 'rejected'])));
     }
 
