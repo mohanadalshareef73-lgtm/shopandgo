@@ -464,7 +464,7 @@ class CartsController extends Controller
             return back()->with('warning', 'وصلنا طلبك من قبل ✓ — نأكدولك قريب');
         }
         $rules = ['qty' => 'nullable|array', 'qty.*' => 'integer|min:0|max:999', 'pay_method' => 'required|in:transfer,cash_courier', 'courier_pay' => 'nullable|numeric|min:0',
-            'receipt' => ($guest || $this->trusted() || (float) $request->input('courier_pay', 1) <= 0 ? 'nullable' : 'required_if:pay_method,transfer|nullable') . '|file|mimes:jpg,jpeg,png,webp,heic,pdf|max:10240',
+            'receipt' => ($this->trusted() || (float) $request->input('courier_pay', 1) <= 0 ? 'nullable' : 'required_if:pay_method,transfer|nullable') . '|file|mimes:jpg,jpeg,png,webp,heic,pdf|max:10240',
             'receipt_ref' => 'nullable|string|max:60'];
         if ($guest) {
             $request->merge(['g_phone' => \App\Http\Controllers\Portal\SignupController::normalizePhone((string) $request->input('g_phone'))]);

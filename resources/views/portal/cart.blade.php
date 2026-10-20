@@ -118,7 +118,7 @@ body { background: var(--bgx); }
             <input name="courier_pay" id="cpIn" class="inp num" inputmode="decimal" style="font-size:20px;font-weight:800">
             <div id="cpErr" class="flash e" style="margin:8px 0 0;display:none"></div>
             <div id="rcBox" style="display:none;margin-top:10px">
-                <label style="display:block;font-weight:700;margin-bottom:6px">🧾 صورة إيصال التحويل أو ملف PDF @if (!empty($guest))<span class="note">(اختياري — تقدر تبعتها بعدين على الواتساب)</span>@else<span style="color:#b3261e">*</span>@endif</label>
+                <label style="display:block;font-weight:700;margin-bottom:6px">🧾 صورة إيصال التحويل أو ملف PDF @if (false)<span class="note"></span>@else<span style="color:#b3261e">*</span>@endif</label>
                 <input type="file" name="receipt" id="rcIn" accept="image/*,application/pdf" class="inp">
             </div>
             <div id="feeNote" class="flash s" style="margin:8px 0 0;line-height:1.9"></div>
@@ -130,7 +130,7 @@ body { background: var(--bgx); }
           const fmt = v => (Math.round(v * 100) / 100).toLocaleString('en-US');
           const upd = () => { const m = (document.querySelector('input[name=pay_method]:checked') || {}).value, cour = m === 'cash_courier', tr = m === 'transfer';
             const tot = parseFloat(String((document.getElementById('tt') || {}).textContent || '0').replace(/,/g, '')) || 0, min = Math.ceil(tot * PCT / 100);
-            document.getElementById('bankBox').style.display = tr ? '' : 'none'; document.getElementById('rcBox').style.display = tr ? '' : 'none'; rc.required = !GUEST && tr && (parseFloat(inp.value) || 0) > 0;
+            document.getElementById('bankBox').style.display = tr ? '' : 'none'; document.getElementById('rcBox').style.display = tr ? '' : 'none'; rc.required = tr && (parseFloat(inp.value) || 0) > 0;
             const ga = document.getElementById('gAddrBox'); if (ga) { ga.style.display = cour ? 'flex' : 'none'; document.getElementById('gAddr').required = cour; }
             if (tot !== lastTot) { if (!inp.value || parseFloat(inp.value) > tot) inp.value = Math.round(tot); lastTot = tot; }
             const pay = Math.min(parseFloat(inp.value) || 0, tot), low = pay + 0.009 < min;
