@@ -63,7 +63,7 @@ table.t td.w { white-space: normal; min-width: 160px; }
             <td class="num">{{ $d->orders->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }}</td>
             <td class="n num">{{ $d->parcels }}</td>
             <td class="n num"><b>{{ $f($d->amount) }}</b></td>
-            <td class="n num">{{ $f($d->fee) }}</td>
+            <td class="n"><input class="inp numr fe" style="width:64px;height:32px" value="{{ $d->fee + 0 }}" data-id="{{ $d->id }}" onchange="fee(this)" title="سعر التوصيل"></td>
         </tr>
     @empty
         <tr><td colspan="12"><div class="empty">ما فيش شي في الطابور</div></td></tr>
@@ -78,7 +78,7 @@ table.t td.w { white-space: normal; min-width: 160px; }
     <div class="tw-h"><h3>📦 جاهز في الرف <span class="h-note">{{ $ready->count() }} زبون</span></h3>
         <input type="search" class="inp" style="margin-inline-start:auto;width:220px;height:38px" placeholder="🔍 كود / اسم / هاتف" value="{{ $q }}" onkeydown="if(event.key==='Enter'){event.preventDefault();location='?tab={{ $tab }}&q='+encodeURIComponent(this.value)}">
     </div>
-    <div class="scroll-x"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.pk').forEach(x=>x.checked=this.checked);cnt()"></th><th>الكود</th><th>الزبون</th><th>الهاتف</th><th>العنوان</th><th>الإيصالات</th><th>التخزين</th><th class="n">طرود</th><th class="n">الباقي مع الشحن</th><th>النوع</th></tr></thead><tbody>
+    <div class="scroll-x"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.pk').forEach(x=>x.checked=this.checked);cnt()"></th><th>الكود</th><th>الزبون</th><th>الهاتف</th><th>العنوان</th><th>الإيصالات</th><th>التخزين</th><th class="n">طرود</th><th class="n">الباقي مع الشحن</th><th class="n">توصيل</th><th>النوع</th></tr></thead><tbody>
     @forelse ($ready as $cid => $os)
         @php $c = $os->first()->customer; @endphp
         @continue(!$c)
@@ -92,10 +92,11 @@ table.t td.w { white-space: normal; min-width: 160px; }
             <td class="num">{{ $os->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }}</td>
             <td class="n num">{{ max(1, $os->sum(fn ($o) => $o->bags_num ?: 1)) }}</td>
             <td class="n num"><b>{{ $f($os->sum(fn ($o) => max(0, $o->remaining()))) }}</b></td>
+            <td class="n"><input name="fee_c[{{ $cid }}]" class="inp numr fc" style="width:64px;height:32px" value="{{ $defFee + 0 }}"></td>
             <td><select name="kind[{{ $cid }}]" class="inp" style="height:32px;width:auto"><option value="order">📦 طلبية</option><option value="deposit">💵 عربون</option></select></td>
         </tr>
     @empty
-        <tr><td colspan="10"><div class="empty">ما فيش طلبيات جاهزة{{ $q !== '' ? ' بالبحث هذا' : '' }}</div></td></tr>
+        <tr><td colspan="11"><div class="empty">ما فيش طلبيات جاهزة{{ $q !== '' ? ' بالبحث هذا' : '' }}</div></td></tr>
     @endforelse
     </tbody></table></div>
     <div class="abar">
@@ -104,7 +105,7 @@ table.t td.w { white-space: normal; min-width: 160px; }
         <select name="courier_id" class="inp"><option value="">— مندوب بحساب —</option>@foreach ($couriers as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach</select>
         <span class="note">ولا</span>
         <input name="courier_name" class="inp" style="width:160px" placeholder="اكتب اسم المندوب">
-        <label class="note">توصيل <input name="fee" class="inp numr" style="width:70px" value="{{ $defFee + 0 }}"> د.ل</label>
+        <label class="note">توصيل للكل <input name="fee" class="inp numr" style="width:70px" value="{{ $defFee + 0 }}" oninput="document.querySelectorAll('.fc').forEach(x=>x.value=this.value)"> د.ل</label>
         <button class="btn green" style="margin-inline-start:auto">✓ تعيين وطباعة الكشف</button>
     </div>
 </form>
@@ -116,5 +117,7 @@ function sel(){return [...document.querySelectorAll('.qk:checked')].map(x=>x.val
 function bk(a){if(!sel().length){alert('علّم على الزبائن الأول');return}document.getElementById('bkA').value=a;document.getElementById('bk').submit()}
 function pdfSel(){const s=sel();if(!s.length){alert('علّم على الزبائن الأول');return}window.open(PDF+'?tab={{ $tab }}&ids='+s.join(','),'_blank')}
 function ra(id,a,q){if(q&&!confirm(q))return;const f=document.getElementById('rowAct');f.action=RA+id;document.getElementById('raA').value=a;f.submit()}
+function fee(i){const fd=new FormData();fd.set('a','fee');fd.set('fee',i.value||0);fd.set('_token',document.querySelector('meta[name=csrf-token]').content);
+  fetch(RA+i.dataset.id,{method:'POST',body:fd,headers:{'Accept':'application/json'},credentials:'same-origin'}).then(r=>{i.style.borderColor=r.ok?'#0f8a5f':'#c62828'}).catch(()=>{i.style.borderColor='#c62828'})}
 function cnt(){document.getElementById('nsel').textContent=document.querySelectorAll('.pk:checked').length}</script>
 @endsection

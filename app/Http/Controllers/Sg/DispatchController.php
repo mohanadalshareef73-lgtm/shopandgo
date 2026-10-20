@@ -68,7 +68,7 @@ class DispatchController extends Controller
             'c' => 'required|array|min:1', 'c.*' => 'integer',
             'kind' => 'nullable|array', 'kind.*' => 'in:order,deposit',
             'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100',
-            'zone' => 'required|in:in,out', 'fee' => 'nullable|numeric|min:0',
+            'zone' => 'required|in:in,out', 'fee' => 'nullable|numeric|min:0', 'fee_c' => 'nullable|array', 'fee_c.*' => 'nullable|numeric|min:0',
         ]);
         $courier = !empty($d['courier_id']) ? User::where('type_id', 4)->find($d['courier_id']) : null;
         $name = trim((string) ($d['courier_name'] ?? ''));
@@ -84,7 +84,7 @@ class DispatchController extends Controller
                 if (!$cu || $orders->isEmpty()) {
                     continue;
                 }
-                $dl = $this->make($cu, $orders, (float) ($d['fee'] ?? 0), $d['zone'] === 'out' ? 'خارج بنغازي' : null, $courier);
+                $dl = $this->make($cu, $orders, (float) ($d['fee_c'][$cid] ?? $d['fee'] ?? 0), $d['zone'] === 'out' ? 'خارج بنغازي' : null, $courier);
                 $dl->courier_name = $courier ? null : ($name !== '' ? $name : null);
                 $dl->kind = ($d['kind'][$cid] ?? 'order') === 'deposit' ? 'deposit' : 'order';
                 $dl->zone = $d['zone'];
@@ -117,10 +117,17 @@ class DispatchController extends Controller
     /** إجراء على توصيل في الطابور: نوع · تحويل · تغيير المندوب · سلّم · رجّع */
     public function act(Request $request, Delivery $delivery)
     {
-        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100']);
+        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
         abort_unless(in_array($delivery->status, self::ACTIVE, true), 422, 'التوصيل هذا مقفول');
         $cu = $delivery->customer;
         switch ($d['a']) {
+            case 'fee':
+                $old = (float) $delivery->fee;
+                $delivery->fee = round((float) ($d['fee'] ?? 0), 2);
+                $delivery->save();
+                $delivery->log($delivery->status, 'سعر التوصيل: ' . TS::fmt($old) . ' ← ' . TS::fmt($delivery->fee));
+
+                return $request->expectsJson() ? response()->json(['ok' => true, 'fee' => $delivery->fee]) : back()->with('success', '✓ تغير سعر التوصيل');
             case 'kind':
                 $delivery->kind = $delivery->kind === 'deposit' ? 'order' : 'deposit';
                 $delivery->save();
