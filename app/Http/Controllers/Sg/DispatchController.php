@@ -48,8 +48,7 @@ class DispatchController extends Controller
             return redirect()->route('sg.couriers')->with('error', 'لازم تفتح /system-update مرة وحدة باش تخدم صفحة طلبيات دليفري');
         }
         // كل التوصيلات المفتوحة — حتى طلبات العملاء من حساباتهم تطلع هني طول
-        $all = Delivery::with(['customer', 'orders', 'courier'])->whereIn('status', self::ACTIVE)->latest('id')->get()
-            ->reject(fn ($d) => $d->cart_id && !$d->zone)->values(); // حجز سلة: يطلع بس بعد «ارسال دليفري»
+        $all = Delivery::with(['customer', 'orders', 'courier'])->whereIn('status', self::ACTIVE)->latest('id')->get();
         $all->each(fn ($d) => $d->zone = $d->zone ?: (static::outside($d->city) ? 'out' : 'in'));
         // 💵 تحصيل عربون/حجز جاي من رابط العميل ← يقعد «عربون» تلقائي
         foreach ($all as $d) {
@@ -63,11 +62,12 @@ class DispatchController extends Controller
         // 🛒 حجوزات السلات اللي في الطابور: تأكيد الحجز ← ⚡ احجز الان من هني
         $cartIds = $queue->pluck('cart_id')->filter()->unique();
         $carts = $cartIds->isNotEmpty() ? \App\Models\CartQuote::whereIn('id', $cartIds)->get()->keyBy('id') : collect();
+        $cartOrders = $carts->pluck('order_id')->filter()->isNotEmpty() ? Order::whereIn('id', $carts->pluck('order_id')->filter())->pluck('code', 'id') : collect();
         $nums = (array) AppSettings::get('booking_numbers', []);
         $bookTo = (string) AppSettings::get('booking_last_phone', $nums[0] ?? '');
 
         return view('sg.dispatch.index', [
-            'nav' => 'dispatch', 'carts' => $carts, 'bookTo' => $bookTo, 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
+            'nav' => 'dispatch', 'carts' => $carts, 'cartOrders' => $cartOrders, 'bookTo' => $bookTo, 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
             'couriers' => User::where('type_id', 4)->where('status', true)->orderBy('name')->get(),
             'counts' => $all->countBy('zone'),
             'batches' => $queue->pluck('batch')->filter()->unique()->sortDesc()->values(),
@@ -131,10 +131,43 @@ class DispatchController extends Controller
     /** إجراء على توصيل في الطابور: نوع · تحويل · تغيير المندوب · سلّم · رجّع */
     public function act(Request $request, Delivery $delivery)
     {
-        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
+        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect', 'amount' => 'nullable|numeric|min:0', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
         abort_unless(in_array($delivery->status, self::ACTIVE, true), 422, 'التوصيل هذا مقفول');
         $cu = $delivery->customer;
         switch ($d['a']) {
+            case 'collect':
+                // ✓ تأكيد: المندوب قبض ← نتأكدو من القيمة (لو تغيرت نعدلوها) ← ينعمل الإيصال ويوصل العميل
+                if (!$delivery->cart_id) {
+                    try {
+                        if ($request->filled('amount')) {
+                            $delivery->amount = round((float) $request->amount, 2);
+                            $delivery->save();
+                        }
+                        $this->deliverSilent($delivery);
+                    } catch (\RuntimeException $e) {
+                        return back()->with('error', $e->getMessage());
+                    }
+
+                    return back()->with('success', '✅ تأكد');
+                }
+                try {
+                    if ($request->filled('amount')) {
+                        $delivery->amount = round((float) $request->amount, 2);
+                        $delivery->save();
+                    }
+                    $dl = $delivery->fresh(['orders', 'courier', 'customer']);
+                    \App\Services\CourierService::markDelivered($dl, $dl->toCollect(), 0, 'تأكيد من طلبيات دليفري' . ($dl->courier_name ? ' · ' . $dl->courier_name : ''));
+                } catch (\Throwable $e) {
+                    report($e);
+
+                    return back()->with('error', 'ما تمش: ' . $e->getMessage());
+                }
+                Cache::forget('sg.badge.pcart');
+                $cart = \App\Models\CartQuote::find($delivery->cart_id);
+                $o = $cart && $cart->order_id ? Order::find($cart->order_id) : null;
+                $r = back()->with('success', '✅ تأكد الحجز #' . $delivery->cart_id . ($o ? ' · الإيصال ' . $o->code . ' انعمل ووصل العميل' : ''));
+
+                return $o ? $r->with('print_url', route('order.invoice', $o->code)) : $r;
             case 'silent':
                 try {
                     $this->deliverSilent($delivery);

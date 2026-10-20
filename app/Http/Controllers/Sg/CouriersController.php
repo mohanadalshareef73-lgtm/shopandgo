@@ -35,6 +35,9 @@ class CouriersController extends Controller
         // 🚚 طلبيات خارج بنغازي: ما تمشيش للمندوب أوتوماتيك — لروحها في واجهة
         $outside = $requests->filter(fn ($r) => CourierService::outsideBenghazi($r->city))->values();
         $requests = $requests->reject(fn ($r) => CourierService::outsideBenghazi($r->city))->values();
+        // 🛵 طلبات العملاء (داخل وخارج بنغازي) صارت في «طلبيات دليفري»
+        $requests = collect();
+        $outside = collect();
         $problems = Delivery::with(['customer', 'courier'])->where('status', 'problem')->latest()->get();
         $sel = $request->filled('id') ? $couriers->firstWhere('id', (int) $request->id) : null;
         $focus = $request->filled('d') ? Delivery::with(['orders', 'customer', 'courier', 'events.user'])->find($request->d) : null;

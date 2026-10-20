@@ -60,12 +60,12 @@ class PortalCartsController extends Controller
         $rows = CartQuote::with('customer')->where($this->cartScope())
             // بحث بكود العميل أو اسمه أو رقمه أو رقم السلة: يطلع كل سلاته حتى اللي حسبها وما أكدهاش
             ->when($t !== '', fn ($q) => $q->where(fn ($w) => $w->where('id', ctype_digit($t) ? (int) $t : 0)->orWhereHas('customer', fn ($c) => \App\Support\Search::customer($c, $t))->when(\Illuminate\Support\Facades\Schema::hasColumn('cart_quotes', 'guest_phone'), fn ($x) => $x->orWhere('guest_phone', 'like', '%' . $t . '%')->orWhere('guest_name', 'like', '%' . $t . '%')))->where('status', 'succeeded'),
-                fn ($q) => $q->when($tab === 'all', fn ($x) => $x->whereIn('portal_status', ['ordered', 'confirmed', 'rejected']), fn ($x) => $x->where('portal_status', $tab)->when($tab === 'ordered' && !request()->filled('pay'), fn ($y) => $y->where(fn ($w) => $w->whereNotIn('id', \App\Models\Delivery::whereNotNull('cart_id')->whereNotNull('zone')->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->pluck('cart_id'))))))
+                fn ($q) => $q->when($tab === 'all', fn ($x) => $x->whereIn('portal_status', ['ordered', 'confirmed', 'rejected']), fn ($x) => $x->where('portal_status', $tab)->when($tab === 'ordered' && !request()->filled('pay'), fn ($y) => $y->where(fn ($w) => $w->whereNotIn('id', \App\Models\Delivery::whereNotNull('cart_id')->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->pluck('cart_id'))))))
             ->when($request->filled('pay'), fn ($q) => $q->where('pay_method', $request->pay))
             ->orderByRaw('ordered_at IS NULL')->latest('ordered_at')->latest('id')->paginate(30)->withQueryString();
 
         return view('sg.carts.portal', ['nav' => 'pcart', 'rows' => $rows, 'tab' => $t !== '' && $tab !== 'draft' ? 'search' : $tab, 'payments' => \App\Models\PaymentMethod::where('status', true)->get(),
-            'counts' => CartQuote::where($this->cartScope())->where(fn ($w) => $w->where('portal_status', '!=', 'ordered')->orWhereNotIn('id', \App\Models\Delivery::whereNotNull('cart_id')->whereNotNull('zone')->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->pluck('cart_id')))->selectRaw('portal_status, COUNT(*) n')->groupBy('portal_status')->pluck('n', 'portal_status')->put('draft', $this->draftQuery()->count())]);
+            'counts' => CartQuote::where($this->cartScope())->where(fn ($w) => $w->where('portal_status', '!=', 'ordered')->orWhereNotIn('id', \App\Models\Delivery::whereNotNull('cart_id')->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->pluck('cart_id')))->selectRaw('portal_status, COUNT(*) n')->groupBy('portal_status')->pluck('n', 'portal_status')->put('draft', $this->draftQuery()->count())]);
     }
 
     /** سلات انحسبت وما تأكدتش (من الحساب أو من الواتساب) — آخر 7 أيام، مش متجاهلة ومش متحولة لإيصال */
