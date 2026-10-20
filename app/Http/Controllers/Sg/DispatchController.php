@@ -66,7 +66,7 @@ class DispatchController extends Controller
         // 🛵 فرز: استلمها مندوب · مازال
         $taken = fn ($d) => $d->courier_id || $d->courier_name;
         $fc = ['all' => $queue->count(), 'taken' => $queue->filter($taken)->count(), 'wait' => $queue->reject($taken)->count()];
-        $fl = in_array($request->f, ['taken', 'wait'], true) ? $request->f : 'all';
+        $fl = in_array($request->f, ['taken', 'all', 'wait'], true) ? $request->f : (trim((string) $request->xq) !== '' ? 'all' : 'wait'); // الافتراضي: اللي مازال ما خذاهاش مندوب
         if ($fl !== 'all') {
             $queue = ($fl === 'taken' ? $queue->filter($taken) : $queue->reject($taken))->values();
         }

@@ -47,7 +47,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
         @foreach ($batches as $bt)<a class="btn ghost sm" target="_blank" href="{{ route('sg.dispatch.pdf', ['batch' => $bt]) }}">📄 {{ $bt }}</a>@endforeach
     </div>
     <div class="qbar" style="background:#fff">
-        @foreach (['all' => 'الكل', 'wait' => '⏳ مازال ما استلمهاش مندوب', 'taken' => '🛵 استلمها مندوب'] as $k => $lb)
+        @foreach (['wait' => '⏳ مازال ما استلمهاش مندوب', 'taken' => '🛵 استلمها مندوب', 'all' => 'الكل'] as $k => $lb)
             <a class="btn sm {{ $fl === $k ? '' : 'ghost' }}" href="?tab={{ $tab }}&f={{ $k }}">{{ $lb }} <b class="num">({{ $fc[$k] }})</b></a>
         @endforeach
     </div>
