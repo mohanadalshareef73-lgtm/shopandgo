@@ -95,7 +95,6 @@
         ['shein', 'بطاقات SHEIN', route('sg.shein'), 'shein-card-list'],
         ['del', 'التسليم', route('sg.delivery'), 'delivery-list', $readyCount],
         ['courier', 'المندوبين', route('sg.couriers'), 'courier-list', $courierBadge],
-        ['dispatch', 'طلبيات دليفري', \Illuminate\Support\Facades\Route::has('sg.dispatch') ? route('sg.dispatch') : '#', 'courier-list'],
         ['cust', 'العملاء', route('sg.clients'), 'customer-list'],
         ['signup', 'طلبات التسجيل', route('sg.signups'), 'customer-create', $signupBadge ?? 0],
         ['cart', 'السلات', route('sg.carts'), 'cart-list'],
