@@ -106,7 +106,7 @@
 {{-- ===================== تفاصيل الطلبية ===================== --}}
 @elseif ($tab === 'detail')
     @php $d = $sel; [$cc, $cl] = $chip[$d->status] ?? ['c-new', $d->statusLabel()]; $open = $d->isOpen(); $s = request('s'); @endphp
-    <div class="back"><a class="icb" href="?tab=orders"><svg width="20" height="20"><use href="#i-back"/></svg></a><h1>طلبية <span class="num">{{ $d->code }}</span></h1><span class="chip {{ $cc }}"><i></i>{{ $cl }}</span></div>
+    <div class="back"><a class="icb" href="?tab=orders"><svg width="20" height="20"><use href="#i-back"/></svg></a><h1>طلبية <span class="num">{{ $d->code }}</span> <small class="num" style="font-size:12px;font-weight:600;opacity:.75">🕒 {{ optional($d->created_at)->format('m-d g:i a') }}</small></h1><span class="chip {{ $cc }}"><i></i>{{ $cl }}</span></div>
     <div class="card mb">
         <div class="cust"><div class="av" style="background:var(--s7-bg);color:var(--s7)">{{ mb_substr($d->recipient_name, 0, 1) }}</div><div class="x"><b>{{ $d->recipient_name }} @if (optional($d->customer)->code) <span style="background:#262c4a;color:#fff;border-radius:6px;padding:1px 7px;font-family:InterNum;font-size:.85em;font-weight:800">{{ $d->customer->code }}</span>@endif</b><span>{{ $d->recipient_phone }}{{ $d->recipient_phone2 ? ' · ' . $d->recipient_phone2 : '' }}</span></div>
             <a class="call" style="background:var(--wa-bg);color:var(--wa)" href="https://wa.me/{{ $wa($d->recipient_phone) }}" target="_blank"><svg width="21" height="21"><use href="#i-wa"/></svg></a>
