@@ -51,7 +51,7 @@
                     <div style="margin-top:6px">@if ($isPdf)<iframe src="{{ route('sg.pcarts.receipt', $ct) }}" style="width:260px;height:340px;border:1px solid var(--line);border-radius:8px"></iframe>@else<a href="{{ route('sg.pcarts.receipt', $ct) }}" target="_blank"><img src="{{ route('sg.pcarts.receipt', $ct) }}" style="max-width:260px;max-height:360px;border-radius:8px;border:1px solid var(--line)" loading="lazy"></a>@endif
                     <div class="note">اضغط على الصورة تكبر · لو مطابقة اضغط «تأكيد الحجز»</div></div>
                 </details>@endif @endif</td>
-        <td><div style="display:flex;gap:6px;flex-wrap:wrap">
+        <td><div style="display:flex;gap:6px;flex-wrap:wrap"><form method="post" action="{{ route('sg.pcarts.note', $ct) }}" style="margin:0" onsubmit="const t=prompt('📝 الملاحظة اللي تبي تبعتها للعميل على الواتساب:');if(!t||!t.trim())return false;this.text.value=t;return true">@csrf<input type="hidden" name="text"><button class="btn ghost sm">📝 ملاحظة</button></form>
             <button type="button" class="btn ghost sm" onclick="navigator.clipboard.writeText({{ json_encode($ct->source_url) }});this.textContent='✓ تنسخ'">⧉ نسخ الرابط</button>
             @if ($rep)<a class="btn ghost sm" href="{{ route('sg.pcarts.download', $ct) }}">⬇ تحميل PDF</a>
             <a class="btn ghost sm" style="color:#e8590c" href="{{ route('sg.pcarts.booking', $ct) }}" target="_blank">📄 PDF التكرار 🔁</a>@endif

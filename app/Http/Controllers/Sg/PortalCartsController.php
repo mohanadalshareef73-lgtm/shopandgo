@@ -32,7 +32,7 @@ class PortalCartsController extends Controller
     {
         $this->middleware('permission:cart-list', ['only' => ['index', 'receipt', 'booking', 'download']]);
         // الموظف العادي (يشوف السلات) يقدر يأكد ويحجز ويبعت للرقم زادة
-        $this->middleware('permission:cart-edit|cart-list', ['only' => ['decide', 'office', 'bookNow', 'toDelivery']]);
+        $this->middleware('permission:cart-edit|cart-list', ['only' => ['decide', 'office', 'bookNow', 'toDelivery', 'note']]);
         $this->middleware('permission:cart-edit', ['only' => ['resend']]);
     }
 
@@ -74,6 +74,30 @@ class PortalCartsController extends Controller
         return CartQuote::where('status', 'succeeded')->where('created_at', '>=', now()->subDays(7))
             ->where(fn ($w) => $w->whereNull('portal_status')->orWhere('portal_status', 'draft'))
             ->when(\Illuminate\Support\Facades\Schema::hasColumn('cart_quotes', 'order_id'), fn ($q) => $q->whereNull('order_id'));
+    }
+
+    /** 📝 ملاحظة للعميل على الواتساب (بخصوص حجزه) */
+    public function note(Request $request, CartQuote $cart)
+    {
+        $d = $request->validate(['text' => 'required|string|max:1000']);
+        $c = $cart->customer;
+        $ph = optional($c)->phone_1 ?: ($cart->guest_phone ?? null);
+        if (!$ph) {
+            $ph = preg_replace('/^218/', '0', preg_replace('/\D/', '', (string) $cart->whatsapp_customer_phone));
+            if (($ph === '' || strlen($ph) > 13) && ($im = $cart->incomingMessage)) {
+                $ph = preg_replace('/^218/', '0', preg_replace('/\D/', '', (string) ($im->contact_phone ?: $im->phone)));
+            }
+            $ph = strlen((string) $ph) > 13 ? '' : $ph;
+        }
+        if (!$ph) {
+            return back()->with('error', 'رقم العميل مش واضح — ما نقدروش نبعتوله');
+        }
+        $name = optional($c)->name ?: ($cart->guest_name ?? '');
+        $text = trim(($name ? $name . ' 👋' . "\n" : '') . '📝 بخصوص طلبك (سلة ' . $cart->retailer_label . ' #' . $cart->id . "):\n\n" . trim($d['text']));
+        $ok = \App\Services\MessageService::sendText('cart_note', $text, [$ph], $c);
+        \App\Models\Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' ملاحظة لحجز #' . $cart->id, 'log' => ' ' . $ph . ' · ' . mb_substr($d['text'], 0, 200)]);
+
+        return back()->with($ok ? 'success' : 'error', $ok ? '📝 انبعتت الملاحظة للعميل' : 'الرسالة ما وصلتش (الواتساب)');
     }
 
     /** 🛵 ارسال دليفري: الحجز (كاش مندوب) يمشي لصفحة «طلبيات دليفري» ببياناته — المندوب يقبض العربون */
