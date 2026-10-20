@@ -97,6 +97,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
                 @else<button type="button" class="btn green sm" onclick="silentAmt({{ $d->id }}, {{ (float) $d->amount + 0 }}, {{ $d->kind === 'deposit' ? 1 : 0 }})">{{ $d->kind === 'deposit' ? '✅ قبض العربون' : '✅ مستلمة' }}</button>@endif
                 <button type="button" class="btn ghost sm" onclick="ra({{ $d->id }}, 'done', 'نفتحو صفحة التسليم باش تدير الدفع بنفسك؟')">💵 بالكاشير</button>
                 @if (!empty($probs[$d->id]))<button type="button" class="btn sm" style="background:#fde8e8;color:#c62828;font-weight:800" data-p="{{ implode("\n", $probs[$d->id]) }}" onclick="alert('⚠ المشكلة:\n\n'+this.dataset.p)">⚠ مشكلة ({{ count($probs[$d->id]) }})</button>@endif
+                @if ($d->kind === 'deposit')<a class="btn ghost sm" target="_blank" href="{{ route('sg.dispatch.receipt', $d) }}">🧾 إيصال</a>@endif
                 <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
                 @endif
                 <button type="button" class="btn ghost sm" style="color:#c62828" title="حذف" onclick="ra({{ $d->id }}, 'delete', 'نحذفوه نهائي؟ ما يرجعش{{ $d->orders->count() ? ' (الإيصالات ترجع للرف)' : '' }}')">🗑</button>
