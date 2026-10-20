@@ -46,6 +46,11 @@ table.t td.w { white-space: normal; min-width: 110px; }
     <div class="tw-h"><h3>{{ $tab === 'out' ? '🚚 طابور خارج بنغازي' : '🛵 طلبيات مع المناديب' }} <span class="h-note">{{ $queue->count() }} زبون · {{ $f($queue->sum('amount')) }} د.ل + توصيل {{ $f($queue->sum('fee')) }}</span></h3>
         @foreach ($batches as $bt)<a class="btn ghost sm" target="_blank" href="{{ route('sg.dispatch.pdf', ['batch' => $bt]) }}">📄 {{ $bt }}</a>@endforeach
     </div>
+    <div class="qbar" style="background:#fff">
+        @foreach (['all' => 'الكل', 'wait' => '⏳ مازال ما استلمهاش مندوب', 'taken' => '🛵 استلمها مندوب'] as $k => $lb)
+            <a class="btn sm {{ $fl === $k ? '' : 'ghost' }}" href="?tab={{ $tab }}&f={{ $k }}">{{ $lb }} <b class="num">({{ $fc[$k] }})</b></a>
+        @endforeach
+    </div>
     @if ($tab === 'out')
     <div class="qbar" style="background:#fff4e5">
         <input type="search" class="inp" style="width:220px" placeholder="🔍 كود شركة التوصيل / كود العميل" value="{{ $xq }}" onkeydown="if(event.key==='Enter'){event.preventDefault();location='?tab=out&xq='+encodeURIComponent(this.value)}">
@@ -63,8 +68,8 @@ table.t td.w { white-space: normal; min-width: 110px; }
         <button type="button" class="btn ghost sm" onclick="bk('{{ $tab === 'out' ? 'move_in' : 'move_out' }}')">{{ $tab === 'out' ? '🛵 ترحيل للمندوب' : '🚚 ترحيل خارج بنغازي' }}</button>
         <span class="sep"></span>
         <select name="courier_id" class="inp"><option value="">— مندوب —</option>@foreach ($couriers as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach</select>
-        <input name="courier_name" class="inp" style="width:120px" placeholder="ولا اكتب اسم">
-        <button type="button" class="btn ghost sm" onclick="bk('courier')">⇄ عطيهم له</button>
+        <input name="courier_name" class="inp" style="width:150px" placeholder="✍ اسم المندوب">
+        <button type="button" class="btn sm" style="background:#262c4a;color:#fff" onclick="bk('courier')">🛵 استلمها المندوب</button>
         <button type="button" class="btn ghost sm" style="color:var(--down)" onclick="if(confirm('نرجعو المختارين للمحل والرف؟'))bk('back')">↩ للرف</button>
     </div>
     @endif

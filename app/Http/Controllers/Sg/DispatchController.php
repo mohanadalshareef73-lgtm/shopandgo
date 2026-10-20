@@ -63,6 +63,13 @@ class DispatchController extends Controller
         }
         $queue = $all->where('zone', $tab)->values();
         // 🔍 خارج بنغازي: بحث بكود شركة التوصيل
+        // 🛵 فرز: استلمها مندوب · مازال
+        $taken = fn ($d) => $d->courier_id || $d->courier_name;
+        $fc = ['all' => $queue->count(), 'taken' => $queue->filter($taken)->count(), 'wait' => $queue->reject($taken)->count()];
+        $fl = in_array($request->f, ['taken', 'wait'], true) ? $request->f : 'all';
+        if ($fl !== 'all') {
+            $queue = ($fl === 'taken' ? $queue->filter($taken) : $queue->reject($taken))->values();
+        }
         $xq = trim((string) $request->xq);
         if ($xq !== '') {
             $queue = $queue->filter(fn ($d) => str_contains(mb_strtolower((string) $d->ext_code), mb_strtolower($xq)) || str_contains((string) optional($d->customer)->code, $xq) || str_contains((string) $d->recipient_phone, $xq))->values();
@@ -106,7 +113,7 @@ class DispatchController extends Controller
         $bookTo = (string) AppSettings::get('booking_last_phone', $nums[0] ?? '');
 
         return view('sg.dispatch.index', [
-            'nav' => 'dispatch', 'xq' => $xq, 'payments' => \App\Models\PaymentMethod::where('status', true)->orderBy('id')->get(), 'cashId' => AppSettings::cashPaymentId(), 'carts' => $carts, 'probs' => $probs, 'reps' => $reps, 'cartOrders' => $cartOrders, 'bookTo' => $bookTo, 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
+            'nav' => 'dispatch', 'fl' => $fl, 'fc' => $fc, 'xq' => $xq, 'payments' => \App\Models\PaymentMethod::where('status', true)->orderBy('id')->get(), 'cashId' => AppSettings::cashPaymentId(), 'carts' => $carts, 'probs' => $probs, 'reps' => $reps, 'cartOrders' => $cartOrders, 'bookTo' => $bookTo, 'q' => $q, 'tab' => $tab, 'ready' => $ready, 'queue' => $queue,
             'couriers' => User::where('type_id', 4)->where('status', true)->orderBy('name')->get(),
             'counts' => $all->countBy('zone'),
             'batches' => $queue->pluck('batch')->filter()->unique()->sortDesc()->values(),
