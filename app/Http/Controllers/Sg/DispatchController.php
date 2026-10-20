@@ -445,24 +445,9 @@ class DispatchController extends Controller
         $delivery->loadMissing('customer', 'courier', 'orders');
         $cart = $delivery->cart_id ? \App\Models\CartQuote::find($delivery->cart_id) : null;
         $order = $delivery->deposit_order_id ? Order::find($delivery->deposit_order_id) : $delivery->orders->first();
-        $temp = storage_path('app/mpdf-temp');
-        if (!is_dir($temp)) {
-            mkdir($temp, 0700, true);
-        }
-        $fontDirs = (new \Mpdf\Config\ConfigVariables())->getDefaults()['fontDir'];
-        $fontData = (new \Mpdf\Config\FontVariables())->getDefaults()['fontdata'];
-        $pdf = new \Mpdf\Mpdf(['mode' => 'utf-8', 'format' => 'A4', 'orientation' => 'P',
-            'fontDir' => array_merge($fontDirs, [resource_path('fonts/somar')]),
-            'fontdata' => array_merge($fontData, ['somar' => ['R' => 'Somar-Regular.ttf', 'B' => 'Somar-Bold.ttf', 'useOTL' => 0xFF, 'useKashida' => 75]]),
-            'tempDir' => $temp, 'default_font' => 'somar', 'default_font_size' => 13,
-            'margin_top' => 12, 'margin_bottom' => 12, 'margin_left' => 14, 'margin_right' => 14, 'autoScriptToLang' => true, 'autoLangToFont' => false]);
-        $pdf->SetDirectionality('rtl');
-        $pdf->SetTitle('إيصال عربون ' . $delivery->code);
-        $pdf->WriteHTML(view('pdf.deposit-receipt', ['d' => $delivery, 'cart' => $cart, 'order' => $order, 'f' => fn ($n) => TS::fmt($n)])->render());
 
-        return response($pdf->Output('', \Mpdf\Output\Destination::STRING_RETURN), 200, [
-            'Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline; filename="deposit-' . preg_replace('/[^A-Za-z0-9_-]/', '', (string) $delivery->code) . '.pdf"',
-        ]);
+        // نفس شكل فاتورة الشركة (A4 · اللوقو · الملاحظات والعنوان من إعدادات الفاتورة)
+        return view('sg.dispatch.receipt', ['d' => $delivery, 'cart' => $cart, 'order' => $order, 'invoice' => \App\Models\Invoice::first(), 'f' => fn ($n) => TS::fmt($n)]);
     }
 
     /** 📄 كشف الطلعة PDF: كل عمود بيان والزبائن تحت بعض */
