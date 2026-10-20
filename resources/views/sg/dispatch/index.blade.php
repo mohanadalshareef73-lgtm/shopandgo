@@ -96,13 +96,16 @@ table.t td.w { white-space: normal; min-width: 110px; }
                 @if ($d->cart_id)<button type="button" class="btn sm" style="background:#0f8a5f;color:#fff" onclick="collect({{ $d->id }}, {{ (float) $d->amount + 0 }})">✓ تأكيد</button>
                 @else<button type="button" class="btn green sm" onclick="silentAmt({{ $d->id }}, {{ (float) $d->amount + 0 }}, {{ $d->kind === 'deposit' ? 1 : 0 }})">{{ $d->kind === 'deposit' ? '✅ قبض العربون' : '✅ مستلمة' }}</button>@endif
                 <button type="button" class="btn ghost sm" onclick="ra({{ $d->id }}, 'done', 'نفتحو صفحة التسليم باش تدير الدفع بنفسك؟')">💵 بالكاشير</button>
+                @if ($d->kind !== 'deposit' && !$d->cart_id)<button type="button" class="btn ghost sm" style="color:#c62828" data-p="{{ $d->problem }}" onclick="const t=prompt('⚠ شن المشكلة؟ (فاضي = تنحل)',this.dataset.p||'');if(t!==null)postTo(RA+{{ $d->id }},{a:'problem',text:t})">⚠ مشكلة</button>@endif
                 <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
                 @endif
             </div></td>
             <td><b>{{ $who ?: '— ما تعيّنش' }}</b>@if (!$d->courier_id && $d->courier_name)<small class="note" style="display:block">بدون حساب</small>@endif</td>
             <td class="w"><b class="num">{{ optional($d->customer)->code }}</b> {{ optional($d->customer)->name ?: $d->recipient_name }}<small class="note num" style="display:block">{{ $ph($d->recipient_phone) }}</small>@if ($d->bank_receipt)<a class="chip u" target="_blank" href="{{ asset('storage/' . $d->bank_receipt) }}">📎 دافع تحويل</a>@endif</td>
             <td class="w">{{ $d->address ?: '—' }}@if ($d->note)<small class="note" style="display:block">{{ \Illuminate\Support\Str::limit($d->note, 90) }}</small>@endif</td>
-            <td class="w num">@if ($d->cart_id)<b>🛒 حجز سلة #{{ $d->cart_id }}</b>@else{{ $d->orders->pluck('code')->implode('، ') ?: '—' }}@endif<small class="num" style="display:block;color:#000;font-size:11.5px">🕒 {{ optional($d->created_at)->format('Y-m-d g:i a') }}</small><small class="note" style="display:block">📍 {{ $d->orders->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }} · {{ $d->parcels }} طرد</small></td>
+            <td class="w num">@if ($d->cart_id)<b>🛒 حجز سلة #{{ $d->cart_id }}</b>@else{{ $d->orders->pluck('code')->implode('، ') ?: '—' }}@endif
+                @if ($d->kind !== 'deposit' && !$d->cart_id && $d->orders->count())<small style="display:block;color:#000;font-size:12px">🛍 أكياس: <b>{{ $d->orders->sum(fn ($o) => (int) $o->bags_num) ?: $d->parcels }}</b> · 🗄 الرف: <b>{{ $d->orders->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }}</b></small>@endif
+                @if ($d->status === 'problem' && $d->problem)<small style="display:block;color:#c62828;font-weight:700">⚠ {{ $d->problem }}</small>@endif</td>
             <td class="n num"><b>{{ $f($d->amount) }}</b></td>
             <td class="n"><input class="inp numr fe" style="width:64px;height:32px" value="{{ $d->fee + 0 }}" data-id="{{ $d->id }}" onchange="fee(this)" title="سعر التوصيل"></td>
         </tr>

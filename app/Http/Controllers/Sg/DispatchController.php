@@ -150,7 +150,7 @@ class DispatchController extends Controller
     /** إجراء على توصيل في الطابور: نوع · تحويل · تغيير المندوب · سلّم · رجّع */
     public function act(Request $request, Delivery $delivery)
     {
-        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle,note,hide', 'text' => 'nullable|string|max:1000', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
+        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle,note,hide,problem', 'text' => 'nullable|string|max:1000', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
         if ($d['a'] === 'hide') {
             $delivery->kept = false;
             $delivery->save();
@@ -160,6 +160,15 @@ class DispatchController extends Controller
         abort_unless(in_array($delivery->status, self::ACTIVE, true), 422, 'التوصيل هذا مقفول');
         $cu = $delivery->customer;
         switch ($d['a']) {
+            case 'problem':
+                // ⚠ مشكلة في الطلبية (فاضي = تنحل)
+                $txt = trim((string) ($d['text'] ?? ''));
+                $delivery->problem = $txt !== '' ? $txt : null;
+                $delivery->status = $txt !== '' ? 'problem' : ($delivery->courier_id || $delivery->courier_name ? 'out' : 'requested');
+                $delivery->save();
+                $delivery->log($delivery->status, $txt !== '' ? '⚠ مشكلة: ' . $txt : 'المشكلة انحلت');
+
+                return back()->with('success', $txt !== '' ? '⚠ تسجلت المشكلة' : '✓ المشكلة انحلت');
             case 'note':
                 $txt = trim((string) ($d['text'] ?? ''));
                 $ph = optional($cu)->phone_1 ?: $delivery->recipient_phone;
