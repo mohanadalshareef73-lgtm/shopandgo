@@ -9,6 +9,7 @@ return new class extends Migration
 {
     public function up()
     {
+        return; // ↩ اتراجعنا: صفحة طلبيات دليفري رجعت — ما نلغوش شي
         if (!Schema::hasTable('deliveries') || !Schema::hasColumn('deliveries', 'batch')) {
             return;
         }

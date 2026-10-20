@@ -304,7 +304,11 @@ class DispatchController extends Controller
     protected function deliverSilent(Delivery $dl): void
     {
         if ($dl->cart_id) {
-            throw new \RuntimeException('تحصيل حجز سلة — سلّمه من صفحة المندوبين');
+            // 🛒 عربون حجز سلة: المندوب قبض ← الحجز يتأكد ويوصل العميل إيصاله (نفس نظام المندوبين)
+            \App\Services\CourierService::markDelivered($dl->fresh(['orders', 'courier', 'customer']), $dl->toCollect(), 0, 'قبض من طلبيات دليفري' . ($dl->courier_name ? ' · ' . $dl->courier_name : ''));
+            Cache::forget('sg.badge.pcart');
+
+            return;
         }
         DB::transaction(function () use ($dl) {
             $dl->loadMissing('orders', 'courier');
