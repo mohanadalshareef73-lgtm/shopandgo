@@ -959,6 +959,32 @@ class OrderController extends Controller
                 OrderItem::where('order_id', $order->id)->delete();
             }
 
+            // 💵 تعديل المدفوع من صفحة التعديل: الزيادة دفعة جديدة · النقص يتخصم من آخر الدفعات (الخزينة تتعدل بالفرق)
+            if ($request->filled('paid_new') && is_numeric($request->paid_new)) {
+                $order = $order->fresh();
+                $diff = round((float) $request->paid_new - (float) $order->paid_price, 2);
+                if ($diff > 0.009) {
+                    $pid = (int) ($request->paid_method ?: \App\Services\AppSettings::cashPaymentId());
+                    \App\Services\OrderPaymentService::pay($order, $diff, $pid, 'تعديل المدفوع');
+                } elseif ($diff < -0.009) {
+                    $left = -$diff;
+                    foreach (\App\Models\PaidHistory::where('order_id', $order->id)->latest('id')->get() as $p) {
+                        if ($left <= 0.009) {
+                            break;
+                        }
+                        $cut = round(min($left, (float) $p->paid_price), 2);
+                        \App\Services\OrderPaymentService::edit($p, round((float) $p->paid_price - $cut, 2), (int) $p->payment_id);
+                        $left -= $cut;
+                    }
+                    if ($left > 0.009) { // مدفوع قديم بدون سجل دفعات
+                        $order = $order->fresh();
+                        $order->paid_price = max(0, round((float) $order->paid_price - $left, 2));
+                        $order->refreshPaymentStatus();
+                        $order->save();
+                    }
+                }
+            }
+
             $log = new Log;
             $log->user_id = auth()->user()->id;
             $log->type = "order";

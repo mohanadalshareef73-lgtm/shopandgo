@@ -38,6 +38,7 @@
 
         <div class="fg"><label class="l">الوزن بالكيلو (إختياري)</label><input type="number" step="any" name="kilo" value="{{ $order->kilo }}" class="inp numr"></div>
         <div class="fg"><label class="l">رقم التخزين (إختياري)</label><input type="number" name="storage_num" value="{{ $order->storage_num }}" class="inp numr"></div>
+        <div class="fg"><label class="l">💵 المدفوع</label><div style="display:flex;gap:6px"><input type="number" step="any" min="0" name="paid_new" value="{{ (float) $order->paid_price + 0 }}" class="inp numr" style="flex:1"><select name="paid_method" class="inp" style="width:auto" title="لو زاد المدفوع: الفرق يدخل هني">@foreach (\App\Models\PaymentMethod::where('status', true)->orderBy('id')->get() as $pm)<option value="{{ $pm->id }}" @selected($pm->id == \App\Services\AppSettings::cashPaymentId())>{{ $pm->name }}</option>@endforeach</select></div><div class="note" style="font-size:12px">لو زدته: الفرق يدخل الخزينة · لو نقصته: يتخصم من آخر الدفعات</div></div>
         <div class="fg"><label class="l">ملاحظات (إختياري)</label><textarea name="note" class="inp">{{ $order->note }}</textarea></div>
     </div>
 
