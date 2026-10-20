@@ -117,10 +117,14 @@ class DispatchController extends Controller
     /** إجراء على توصيل في الطابور: نوع · تحويل · تغيير المندوب · سلّم · رجّع */
     public function act(Request $request, Delivery $delivery)
     {
-        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
+        $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
         abort_unless(in_array($delivery->status, self::ACTIVE, true), 422, 'التوصيل هذا مقفول');
         $cu = $delivery->customer;
         switch ($d['a']) {
+            case 'silent':
+                $this->deliverSilent($delivery);
+
+                return back()->with('success', '✅ ' . (optional($cu)->name ?: $delivery->recipient_name) . ' مستلمة (بدون رسالة)');
             case 'fee':
                 $old = (float) $delivery->fee;
                 $delivery->fee = round((float) ($d['fee'] ?? 0), 2);
@@ -203,7 +207,7 @@ class DispatchController extends Controller
     /** ☑ إجراء على المختارين: ترحيل · تعيين مندوب · رجوع للرف */
     public function bulk(Request $request)
     {
-        $d = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer', 'a' => 'required|in:move_out,move_in,courier,back',
+        $d = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer', 'a' => 'required|in:move_out,move_in,courier,back,silent',
             'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100']);
         $rows = Delivery::with('orders')->whereIn('id', $d['ids'])->whereIn('status', self::ACTIVE)->get();
         $c = !empty($d['courier_id']) ? User::where('type_id', 4)->find($d['courier_id']) : null;
@@ -212,6 +216,10 @@ class DispatchController extends Controller
             return back()->with('error', 'اختار مندوب ولا اكتب اسمه');
         }
         foreach ($rows as $dl) {
+            if ($d['a'] === 'silent') {
+                $this->deliverSilent($dl);
+                continue;
+            }
             if ($d['a'] === 'move_out' || $d['a'] === 'move_in') {
                 $dl->zone = $d['a'] === 'move_out' ? 'out' : 'in';
                 $dl->save();
@@ -237,7 +245,7 @@ class DispatchController extends Controller
         }
         Cache::forget('sg.badge.ready');
 
-        return back()->with('success', '✓ ' . $rows->count() . ' ' . ['move_out' => 'ترحلوا لخارج بنغازي', 'move_in' => 'ترحلوا للمندوب', 'courier' => 'مع ' . ($c ? $c->name : $n), 'back' => 'رجعوا للرف'][$d['a']]);
+        return back()->with('success', '✓ ' . $rows->count() . ' ' . ['move_out' => 'ترحلوا لخارج بنغازي', 'move_in' => 'ترحلوا للمندوب', 'courier' => 'مع ' . ($c ? $c->name : $n), 'back' => 'رجعوا للرف', 'silent' => 'مستلمين (بدون رسالة)'][$d['a']]);
     }
 
     /** 📄 كشف الطلعة PDF: كل عمود بيان والزبائن تحت بعض */
@@ -272,6 +280,57 @@ class DispatchController extends Controller
         return response($pdf->Output('', \Mpdf\Output\Destination::STRING_RETURN), 200, [
             'Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline; filename="dispatch-' . preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($request->batch ?: now()->format('md'))) . '.pdf"',
         ]);
+    }
+
+    /**
+     * ✅ تسليم بدون رسالة للعميل: الباقي يتسجل مقبوض كاش والإيصالات تصير مستلمة.
+     * مندوب بحساب: الكاش يقعد عليه لين إقفال حسابه (زي العادة) · مندوب بالاسم: الكاش يدخل الخزينة طول.
+     */
+    protected function deliverSilent(Delivery $dl): void
+    {
+        DB::transaction(function () use ($dl) {
+            $dl->loadMissing('orders', 'courier');
+            $cashId = AppSettings::cashPaymentId();
+            $who = $dl->courier_name ?: optional($dl->courier)->name;
+            $got = 0;
+            foreach ($dl->orders as $o) {
+                if ($o->delivered) {
+                    continue;
+                }
+                $need = round(max(0, $o->remaining()), 2);
+                if ($need > 0.009) {
+                    if ($dl->courier_id) {
+                        $ph = new \App\Models\PaidHistory;
+                        $ph->customer_id = $o->customer_id;
+                        $ph->order_id = $o->id;
+                        $ph->paid_price = $need;
+                        $ph->payment_id = $cashId;
+                        $ph->save();
+                        $o->paid_price = (float) $o->paid_price + $need;
+                        $o->refreshPaymentStatus();
+                    } else {
+                        \App\Services\OrderPaymentService::pay($o, $need, $cashId, 'كاش (دليفري ' . $dl->code . ($who ? ' · ' . $who : '') . ')');
+                        $o->refresh();
+                    }
+                    $got += $need;
+                }
+                $o->delivered = true;
+                $o->delivered_at = now()->toDateString();
+                $o->delivered_time = now();
+                $o->delivered_by = $dl->courier_id ?: auth()->id();
+                $o->delivery_type = 'توصيل عن طريق مندوب';
+                $o->delivery_name = $who;
+                $o->delivery_id = $dl->id;
+                $o->save();
+            }
+            $dl->collected_cash = round($got + (float) $dl->fee, 2);
+            $dl->status = 'delivered';
+            $dl->delivered_at = now();
+            $dl->save();
+            $dl->log('delivered', 'تسليم بدون رسالة · قبض ' . TS::fmt($got) . ' د.ل' . ($who ? ' · ' . $who : ''));
+            Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' دليفري: مستلمة (' . ($dl->recipient_name ?: optional($dl->customer)->name) . ')', 'log' => ' ' . $dl->code . ' · ' . $dl->orders->pluck('code')->implode('، ') . ' · ' . TS::fmt($got) . ' د.ل']);
+        });
+        Cache::forget('sg.badge.ready');
     }
 
     /** إنشاء توصيل لإيصالات زبون (مستقل عن خدمة المندوبين) */

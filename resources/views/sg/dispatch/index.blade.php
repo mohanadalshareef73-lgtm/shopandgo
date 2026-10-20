@@ -37,6 +37,7 @@ table.t td.w { white-space: normal; min-width: 160px; }
     <div class="qbar">
         <b>المختار: <span id="nq" class="num">0</span></b>
         <button type="button" class="btn sm" onclick="pdfSel()">📄 كشف PDF للمختار</button>
+        <button type="button" class="btn green sm" onclick="if(confirm('المختارين مستلمين بدون رسالة؟ الباقي يتسجل مقبوض كاش'))bk('silent')">✅ مستلمة (بدون رسالة)</button>
         <button type="button" class="btn ghost sm" onclick="bk('{{ $tab === 'out' ? 'move_in' : 'move_out' }}')">{{ $tab === 'out' ? '🛵 ترحيل للمندوب' : '🚚 ترحيل خارج بنغازي' }}</button>
         <span class="sep"></span>
         <select name="courier_id" class="inp"><option value="">— مندوب —</option>@foreach ($couriers as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach</select>
@@ -51,7 +52,8 @@ table.t td.w { white-space: normal; min-width: 160px; }
         <tr>
             <td><input type="checkbox" class="qk" name="ids[]" value="{{ $d->id }}" onchange="cq()"></td>
             <td><div class="qa">
-                <button type="button" class="btn green sm" onclick="ra({{ $d->id }}, 'done', 'وصلته؟ نكملو الدفع والتسليم')">✓ وصلت</button>
+                <button type="button" class="btn green sm" onclick="ra({{ $d->id }}, 'silent', 'تسليم بدون رسالة؟ الباقي ({{ $f($d->amount) }} د.ل) يتسجل مقبوض كاش')">✅ مستلمة</button>
+                <button type="button" class="btn ghost sm" onclick="ra({{ $d->id }}, 'done', 'نفتحو صفحة التسليم باش تدير الدفع بنفسك؟')">💵 بالكاشير</button>
                 <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
             </div></td>
             <td><b>{{ $who ?: '— ما تعيّنش' }}</b>@if (!$d->courier_id && $d->courier_name)<small class="note" style="display:block">بدون حساب</small>@endif<small class="note num" style="display:block">{{ optional($d->assigned_at)->format('m-d g:i a') }}</small></td>
