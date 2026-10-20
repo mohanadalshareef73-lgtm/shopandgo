@@ -50,7 +50,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
         <button type="button" class="btn ghost sm" style="color:var(--down)" onclick="if(confirm('نرجعو المختارين للمحل والرف؟'))bk('back')">↩ للرف</button>
     </div>
     @endif
-    <div class="scroll-x"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.qk').forEach(x=>x.checked=this.checked);cq()"></th><th>إجراء</th><th>مع</th><th>الزبون</th><th>العنوان</th><th>الإيصالات · التخزين</th><th class="n">الباقي</th><th class="n">توصيل</th></tr></thead><tbody>
+    <div class="scroll-x"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.qk').forEach(x=>x.checked=this.checked);cq()"></th><th>إجراء</th><th>الطلب · مع</th><th>الزبون</th><th>العنوان</th><th>الإيصالات · التخزين</th><th class="n">الباقي</th><th class="n">توصيل</th></tr></thead><tbody>
     @forelse ($queue as $d)
         @php $who = $d->courier_name ?: optional($d->courier)->name; @endphp
         <tr>
@@ -60,7 +60,7 @@ table.t td.w { white-space: normal; min-width: 110px; }
                 <button type="button" class="btn ghost sm" onclick="ra({{ $d->id }}, 'done', 'نفتحو صفحة التسليم باش تدير الدفع بنفسك؟')">💵 بالكاشير</button>
                 <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
             </div></td>
-            <td><b>{{ $who ?: '— ما تعيّنش' }}</b>@if (!$d->courier_id && $d->courier_name)<small class="note" style="display:block">بدون حساب</small>@endif<small class="note num" style="display:block">{{ optional($d->assigned_at)->format('m-d g:i a') }}</small></td>
+            <td><small class="chip w num" style="display:inline-block;margin-bottom:4px" title="وقت طلب الدليفري">🕒 {{ optional($d->created_at)->format('m-d g:i a') }}</small><br><b>{{ $who ?: '— ما تعيّنش' }}</b>@if (!$d->courier_id && $d->courier_name)<small class="note" style="display:block">بدون حساب</small>@endif@if ($d->assigned_at)<small class="note num" style="display:block">تعيّن {{ optional($d->assigned_at)->format('m-d g:i a') }}</small>@endif</td>
             <td class="w"><b class="num">{{ optional($d->customer)->code }}</b> {{ optional($d->customer)->name ?: $d->recipient_name }}<small class="note num" style="display:block">{{ $d->recipient_phone }}</small>@if ($d->bank_receipt)<a class="chip u" target="_blank" href="{{ asset('storage/' . $d->bank_receipt) }}">📎 دافع تحويل</a>@endif</td>
             <td class="w">{{ $d->address ?: '—' }}@if ($d->note)<small class="note" style="display:block">{{ \Illuminate\Support\Str::limit($d->note, 90) }}</small>@endif</td>
             <td class="w num">@if ($d->cart_id)<b>🛒 حجز سلة #{{ $d->cart_id }}</b>@else{{ $d->orders->pluck('code')->implode('، ') ?: '—' }}@endif<small class="note" style="display:block">📍 {{ $d->orders->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }} · {{ $d->parcels }} طرد</small></td>
