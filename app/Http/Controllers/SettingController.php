@@ -226,6 +226,9 @@ class SettingController extends Controller
     public function clearCacheAndCookies(Request $request)
     {
         // Clear Laravel cache (routes, config, views, etc.)
+        if (function_exists('opcache_reset')) {
+            @opcache_reset(); // ملفات PHP الجديدة تشتغل طول (مش النسخة القديمة من الذاكرة)
+        }
         Artisan::call('cache:clear');
         Artisan::call('config:clear');
         Artisan::call('route:clear');
