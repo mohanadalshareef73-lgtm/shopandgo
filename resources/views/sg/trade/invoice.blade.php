@@ -96,11 +96,10 @@
             <div><label class="l">ملاحظات</label><input name="note" class="inp" value="{{ $inv->note }}"></div>
         </div>
         <h4 style="margin:12px 0 6px">🛍 المنتجات <button type="button" class="btn ghost sm" onclick="addItem('itE')">+ منتج</button></h4>
-        <table class="t"><thead><tr><th>اسم المنتج</th><th>العدد</th><th>السعر د.ل</th></tr></thead><tbody id="itE">
-            @php $its = (array) ($inv->items ?? []); @endphp
-            @foreach (array_pad($its, max(count($its), 2), []) as $ii => $it)<tr><td><input name="items[{{ $ii }}][name]" class="inp" value="{{ $it['name'] ?? '' }}"></td><td><input name="items[{{ $ii }}][qty]" class="inp numr" style="width:70px" value="{{ $it['qty'] ?? 1 }}"></td><td><input name="items[{{ $ii }}][price]" class="inp numr" style="width:110px" value="{{ isset($it['price']) ? $it['price'] + 0 : '' }}"></td></tr>@endforeach
+        @php $its = (array) ($inv->items ?? []); @endphp
+        <table class="t" style="{{ count($its) ? '' : 'display:none' }}"><thead><tr><th>اسم المنتج</th><th>العدد</th><th>السعر د.ل</th><th></th></tr></thead><tbody id="itE">
+            @foreach ($its as $ii => $it)<tr><td><input name="items[{{ $ii }}][name]" class="inp" value="{{ $it['name'] ?? '' }}"></td><td><input name="items[{{ $ii }}][qty]" class="inp numr iq" style="width:70px" value="{{ $it['qty'] ?? 1 }}" oninput="sumQty(this)"></td><td><input name="items[{{ $ii }}][price]" class="inp numr" style="width:110px" value="{{ isset($it['price']) ? $it['price'] + 0 : '' }}"></td><td><button type="button" class="btn ghost sm" style="color:#c62828" onclick="const f=this.closest('form');this.closest('tr').remove();sumQty(f)">✕</button></td></tr>@endforeach
         </tbody></table>
-        <div class="note">اسم فاضي = يتشال</div>
         <h4 style="margin:12px 0 6px">👥 الشركاء <span class="note">— فرق الدفع يتعدل في رصيده · فاضي = يتشال</span></h4>
         <table class="t"><thead><tr><th>الشريك</th><th>دفع د.ل</th><th>نسبة الربح %</th></tr></thead><tbody>
         @foreach ($partners as $k => $p)
@@ -115,5 +114,9 @@
     </form>
 </div></div>
 @endif
-<script>let itN=50;function addItem(id){const b=document.getElementById(id);const r=document.createElement('tr');r.innerHTML='<td><input name="items['+itN+'][name]" class="inp"></td><td><input name="items['+itN+'][qty]" class="inp numr" style="width:70px" value="1"></td><td><input name="items['+itN+'][price]" class="inp numr" style="width:110px"></td>';itN++;b.appendChild(r)}</script>
+<script>let itN=50;
+// 🛍 المنتجات: ما تطلعش لين تضغط «+ منتج» · كمية كل منتج تنجمع في خانة الكمية
+function addItem(id){const b=document.getElementById(id);b.closest('table').style.display='';const r=document.createElement('tr');r.innerHTML='<td><input name="items['+itN+'][name]" class="inp" placeholder="اسم المنتج"></td><td><input name="items['+itN+'][qty]" class="inp numr iq" style="width:70px" value="1" oninput="sumQty(this)"></td><td><input name="items['+itN+'][price]" class="inp numr" style="width:110px"></td><td><button type="button" class="btn ghost sm" style="color:#c62828" onclick="const f=this.closest(\'form\');this.closest(\'tr\').remove();sumQty(f)">✕</button></td>';itN++;b.appendChild(r);r.querySelector('input').focus();sumQty(b)}
+function sumQty(el){const f=el.closest?el.closest('form'):el;if(!f)return;const q=f.querySelectorAll('.iq');if(!q.length)return;let t=0;q.forEach(i=>t+=parseInt(i.value)||0);const m=f.querySelector('input[name=qty]');if(m)m.value=Math.max(1,t)}
+</script>
 @endsection

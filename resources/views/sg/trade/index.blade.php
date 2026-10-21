@@ -221,9 +221,7 @@ table.t td.w { white-space: normal; }
             <input type="hidden" name="kind" value="{{ old('kind') }}">
         </div>
         <h4 style="margin:12px 0 6px">🛍 المنتجات <span class="note">(اختياري — تنزل في طلبية العميل)</span> <button type="button" class="btn ghost sm" onclick="addItem('itB')">+ منتج</button></h4>
-        <table class="t"><thead><tr><th>اسم المنتج</th><th>العدد</th><th>السعر د.ل</th></tr></thead><tbody id="itB">
-            @for ($ii = 0; $ii < 3; $ii++)<tr><td><input name="items[{{ $ii }}][name]" class="inp"></td><td><input name="items[{{ $ii }}][qty]" class="inp numr" style="width:70px" value="1"></td><td><input name="items[{{ $ii }}][price]" class="inp numr" style="width:110px"></td></tr>@endfor
-        </tbody></table>
+        <table class="t" style="display:none"><thead><tr><th>اسم المنتج</th><th>العدد</th><th>السعر د.ل</th><th></th></tr></thead><tbody id="itB"></tbody></table>
         <h4 style="margin:12px 0 6px">👥 الشركاء <span class="note">— اللي ما دفعش خليه فاضي وحطله نسبة بس · لو رصيده ما يكفيش يقعد عليه دين</span> <span class="note" id="sumN"></span></h4>
         <table class="t shr"><thead><tr><th>الشريك</th><th>دفع د.ل</th><th>نسبة الربح %</th><th>من وين</th><th>نوع الخصم (للشركة)</th></tr></thead><tbody>
         @foreach ($partners->where('active', true)->values() as $k => $p)
@@ -252,5 +250,9 @@ function sum(){let s=0,pc=0;document.querySelectorAll('.sp').forEach(i=>s+=parse
   const n=document.getElementById('sumN');n.textContent='· دفعوا '+s.toLocaleString('en-US')+(pc?' · النسب '+pc+'%'+(Math.abs(pc-100)<0.01?' ✓':' (لازم 100%)'):' · الربح على قد اللي دفعه كل واحد');n.style.color=pc&&Math.abs(pc-100)>0.01?'#c62828':'#0f8a5f'}
 @if ($errors->any() || old('cost_lyd'))document.addEventListener('DOMContentLoaded',()=>{const b=document.querySelector('[data-modal=mInv]');b&&b.click()});@endif
 </script>
-<script>let itN=50;function addItem(id){const b=document.getElementById(id);const r=document.createElement('tr');r.innerHTML='<td><input name="items['+itN+'][name]" class="inp"></td><td><input name="items['+itN+'][qty]" class="inp numr" style="width:70px" value="1"></td><td><input name="items['+itN+'][price]" class="inp numr" style="width:110px"></td>';itN++;b.appendChild(r)}</script>
+<script>let itN=50;
+// 🛍 المنتجات: ما تطلعش لين تضغط «+ منتج» · كمية كل منتج تنجمع في خانة الكمية
+function addItem(id){const b=document.getElementById(id);b.closest('table').style.display='';const r=document.createElement('tr');r.innerHTML='<td><input name="items['+itN+'][name]" class="inp" placeholder="اسم المنتج"></td><td><input name="items['+itN+'][qty]" class="inp numr iq" style="width:70px" value="1" oninput="sumQty(this)"></td><td><input name="items['+itN+'][price]" class="inp numr" style="width:110px"></td><td><button type="button" class="btn ghost sm" style="color:#c62828" onclick="const f=this.closest(\'form\');this.closest(\'tr\').remove();sumQty(f)">✕</button></td>';itN++;b.appendChild(r);r.querySelector('input').focus();sumQty(b)}
+function sumQty(el){const f=el.closest?el.closest('form'):el;if(!f)return;const q=f.querySelectorAll('.iq');if(!q.length)return;let t=0;q.forEach(i=>t+=parseInt(i.value)||0);const m=f.querySelector('input[name=qty]');if(m)m.value=Math.max(1,t)}
+</script>
 @endsection
