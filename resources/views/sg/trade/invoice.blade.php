@@ -13,7 +13,7 @@
 <div class="top">
     <div><h1>🧾 {{ $inv->code }} @if ($inv->status === 'closed')<span class="chip u">مقفولة</span>@else<span class="chip w">مفتوحة</span>@endif</h1>
         <div class="sub">{{ $inv->kind }}{{ $inv->source ? ' · ' . $inv->source : '' }} · {{ $inv->created_at->format('Y-m-d') }}{{ $inv->customer ? ' · العميل ' . $inv->customer->name . ' (' . $inv->customer->code . ')' : (!empty($inv->customer_name) ? ' · العميل ' . $inv->customer_name : '') }}</div></div>
-    <div class="acts"><a class="btn ghost" href="{{ route('sg.trade', ['tab' => 'invoices']) }}">↩ الفواتير</a><button class="sg-burger">☰</button></div>
+    <div class="acts">@if ($inv->status !== 'closed')<button class="btn" data-modal="mEditInv">✏️ تعديل الفاتورة</button>@endif<a class="btn ghost" href="{{ route('sg.trade', ['tab' => 'invoices']) }}">↩ الفواتير</a><button class="sg-burger">☰</button></div>
 </div>
 <div class="tk">
     <div class="card"><div class="l">💲 بالدولار</div><div class="v num">{{ $inv->usd_total ? $f($inv->usd_total) : '—' }}</div><div class="note">سعر الصرف {{ $inv->rate ?: '—' }}</div></div>
@@ -72,4 +72,33 @@
     @endforeach
     </tbody></table>
 </div>
+@if ($inv->status !== 'closed')
+<div class="modal-bg" id="mEditInv"><div class="modal" style="max-width:780px;width:100%">
+    <h3>✏️ تعديل {{ $inv->code }}</h3>
+    <form method="post" action="{{ route('sg.trade.invoice.update', $inv) }}">@csrf
+        <div class="grid g3">
+            <div><label class="l">👤 اسم العميل</label><input name="customer_name" class="inp" value="{{ $inv->customer_name ?? '' }}"></div>
+            <div><label class="l">🌐 الموقع</label><input name="source" class="inp" value="{{ $inv->source }}"></div>
+            <div><label class="l">📦 الكمية</label><input name="qty" class="inp numr" value="{{ $inv->qty ?? 1 }}"></div>
+            <div><label class="l">💲 الدولار</label><input name="usd_total" class="inp numr" value="{{ (float) $inv->usd_total + 0 }}"></div>
+            <div><label class="l">🇱🇾 دفعت بالليبي *</label><input name="cost_lyd" class="inp numr" value="{{ (float) $inv->cost_lyd + 0 }}" required></div>
+            <div><label class="l">💱 سعر الصرف (فاضي = تلقائي)</label><input name="rate" class="inp numr" value=""></div>
+            <div><label class="l">➕ مصاريف إضافية</label><input name="extra_lyd" class="inp numr" value="{{ (float) $inv->extra_lyd + 0 }}"></div>
+            <div><label class="l">🏷 سعر البيع</label><input name="sale_lyd" class="inp numr" value="{{ (float) $inv->sale_lyd + 0 }}"></div>
+            <div><label class="l">ملاحظات</label><input name="note" class="inp" value="{{ $inv->note }}"></div>
+        </div>
+        <h4 style="margin:12px 0 6px">👥 الشركاء <span class="note">— فرق الدفع يتعدل في رصيده · فاضي = يتشال</span></h4>
+        <table class="t"><thead><tr><th>الشريك</th><th>دفع د.ل</th><th>نسبة الربح %</th></tr></thead><tbody>
+        @foreach ($partners as $k => $p)
+            @php $sh = $inv->shares->firstWhere('partner_id', $p->id); @endphp
+            <tr><td><input type="hidden" name="s[{{ $k }}][partner_id]" value="{{ $p->id }}"><b>{{ $p->name }}</b><small class="note" style="display:block">رصيده {{ $f($p->balance) }}</small></td>
+                <td><input name="s[{{ $k }}][paid]" class="inp numr" style="width:120px" value="{{ $sh ? (float) $sh->paid + 0 : '' }}"></td>
+                <td><input name="s[{{ $k }}][pct]" class="inp numr" style="width:90px" value="{{ $sh && $sh->pct !== null ? $sh->pct + 0 : '' }}" placeholder="تلقائي"></td></tr>
+        @endforeach
+        </tbody></table>
+        <div class="note" style="margin-top:6px">⚠ تغيير «دفعت بالليبي» يتعدل في خزينة التجارة بالفرق</div>
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn green">💾 حفظ</button><button type="button" class="btn ghost" data-close>إلغاء</button></div>
+    </form>
+</div></div>
+@endif
 @endsection

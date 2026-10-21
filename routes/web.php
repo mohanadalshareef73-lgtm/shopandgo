@@ -426,6 +426,8 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::get('daily-close', [$C . 'DailyCloseController', 'index'])->name('daily');
         Route::get('trade', [$C . 'TradeController', 'index'])->name('trade');
         Route::post('trade/partner', [$C . 'TradeController', 'partner'])->name('trade.partner');
+        Route::post('trade/partner/{partner}', [$C . 'TradeController', 'partnerUpdate'])->name('trade.partner.update');
+        Route::post('trade/invoices/{invoice}/edit', [$C . 'TradeController', 'invoiceUpdate'])->name('trade.invoice.update');
         Route::post('trade/money', [$C . 'TradeController', 'money'])->name('trade.money');
         Route::post('trade/invoices', [$C . 'TradeController', 'invoiceStore'])->name('trade.invoice.store');
         Route::get('trade/invoices/{invoice}', [$C . 'TradeController', 'invoice'])->name('trade.invoice');

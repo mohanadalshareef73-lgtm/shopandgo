@@ -156,6 +156,82 @@ class TradeService
         });
     }
 
+    /** ✏️ تعديل فاتورة مفتوحة: فرق التكلفة يتعدل في الخزينة، وفرق دفع كل شريك في رصيده */
+    public static function editInvoice(Invoice $inv, array $d, array $shares): Invoice
+    {
+        return DB::transaction(function () use ($inv, $d, $shares) {
+            $inv = Invoice::with('shares')->lockForUpdate()->findOrFail($inv->id);
+            if ($inv->status === 'closed') {
+                throw new RuntimeException('الفاتورة مقفولة — ما تتعدلش');
+            }
+            $oldCost = $inv->totalCost();
+            $usd = (float) ($d['usd_total'] ?? 0);
+            $cost = round((float) ($d['cost_lyd'] ?? 0), 2);
+            $inv->fill([
+                'source' => $d['source'] ?? null, 'usd_total' => $usd, 'cost_lyd' => $cost, 'extra_lyd' => round((float) ($d['extra_lyd'] ?? 0), 2),
+                'rate' => (float) ($d['rate'] ?? 0) ?: ($usd > 0 && $cost > 0 ? round($cost / $usd, 4) : 0),
+                'sale_lyd' => round((float) ($d['sale_lyd'] ?? 0), 2), 'note' => $d['note'] ?? null,
+            ]);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('trade_invoices', 'qty')) {
+                $inv->qty = max(1, (int) ($d['qty'] ?? 1));
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('trade_invoices', 'customer_name')) {
+                $inv->customer_name = $d['customer_name'] ?? null;
+            }
+            $inv->save();
+            $diff = round($inv->totalCost() - $oldCost, 2);
+            if (abs($diff) > 0.009 && $inv->wallet_id) {
+                static::move('adjust', Wallet::find($inv->wallet_id), -$diff, null, 0, $inv, 'تعديل تكلفة الفاتورة ' . TreasuryService::fmt($oldCost) . ' ← ' . TreasuryService::fmt($inv->totalCost()), true);
+            }
+            $hasPct = \Illuminate\Support\Facades\Schema::hasColumn('trade_shares', 'pct');
+            foreach ($shares as $row) {
+                if (empty($row['partner_id'])) {
+                    continue;
+                }
+                $p = Partner::findOrFail($row['partner_id']);
+                $amt = round(max(0, (float) ($row['paid'] ?? 0)), 2);
+                $pct = isset($row['pct']) && $row['pct'] !== '' && $row['pct'] !== null ? round((float) $row['pct'], 2) : null;
+                $sh = $inv->shares->firstWhere('partner_id', $p->id);
+                $old = $sh ? (float) $sh->paid : 0;
+                $dp = round($amt - $old, 2);
+                if (abs($dp) > 0.009) {
+                    static::move('invest', null, 0, $p, -$dp, $inv, 'تعديل مساهمته في ' . $inv->code . ' ' . TreasuryService::fmt($old) . ' ← ' . TreasuryService::fmt($amt));
+                }
+                if ($sh) {
+                    if ($amt <= 0.009 && !$pct) {
+                        $sh->delete();
+                        continue;
+                    }
+                    $sh->paid = $amt;
+                    if ($hasPct) {
+                        $sh->pct = $pct;
+                    }
+                    $sh->save();
+                } elseif ($amt > 0.009 || $pct) {
+                    Share::create(['invoice_id' => $inv->id, 'partner_id' => $p->id, 'paid' => $amt, 'source' => $amt > 0.009 ? 'من رصيده' : 'نسبة بدون دفع'] + ($hasPct ? ['pct' => $pct] : []));
+                }
+            }
+            if ($inv->order_id && ($o = \App\Models\Order::find($inv->order_id))) {
+                $o->total_price = $inv->sale_lyd;
+                $o->refreshPaymentStatus();
+                $o->save();
+            }
+
+            return $inv->fresh();
+        });
+    }
+
+    /** ✏️ تعديل رصيد شريك يدوي (الفرق يتسجل في سجله) */
+    public static function setBalance(Partner $p, float $new, ?string $note = null): void
+    {
+        DB::transaction(function () use ($p, $new, $note) {
+            $d = round($new - (float) $p->fresh()->balance, 2);
+            if (abs($d) > 0.009) {
+                static::move('adjust', null, 0, $p, $d, null, trim('تعديل رصيد يدوي' . ($note ? ' · ' . $note : '')));
+            }
+        });
+    }
+
     /** وزن كل شريك في الربح: النسبة المكتوبة، ولا على قد اللي دفعه */
     public static function weights(Invoice $inv): array
     {

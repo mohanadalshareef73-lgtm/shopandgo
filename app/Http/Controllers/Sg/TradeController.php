@@ -119,7 +119,7 @@ class TradeController extends Controller
         $invoice->load(['shares.partner', 'customer', 'order']);
 
         return view('sg.trade.invoice', [
-            'nav' => 'trade', 'inv' => $invoice, 'wallets' => Wallet::orderBy('id')->get(),
+            'nav' => 'trade', 'inv' => $invoice, 'wallets' => Wallet::orderBy('id')->get(), 'partners' => Partner::where('active', true)->orderByDesc('is_company')->orderBy('name')->get(),
             'moves' => Move::with(['partner', 'wallet', 'user'])->where('invoice_id', $invoice->id)->oldest('id')->get(),
         ]);
     }
@@ -177,5 +177,34 @@ class TradeController extends Controller
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
+    }
+
+    public function invoiceUpdate(Request $request, Invoice $invoice)
+    {
+        $d = $request->validate([
+            'source' => 'nullable|string|max:150', 'usd_total' => 'nullable|numeric|min:0', 'rate' => 'nullable|numeric|min:0', 'cost_lyd' => 'required|numeric|min:0',
+            'extra_lyd' => 'nullable|numeric|min:0', 'sale_lyd' => 'nullable|numeric|min:0', 'qty' => 'nullable|integer|min:1', 'customer_name' => 'nullable|string|max:120', 'note' => 'nullable|string|max:500',
+            's' => 'nullable|array', 's.*.partner_id' => 'nullable|integer', 's.*.paid' => 'nullable|numeric|min:0', 's.*.pct' => 'nullable|numeric|min:0|max:100',
+        ]);
+        try {
+            TradeService::editInvoice($invoice, $d, $d['s'] ?? []);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', '✏️ تعدلت الفاتورة');
+    }
+
+    public function partnerUpdate(Request $request, Partner $partner)
+    {
+        $d = $request->validate(['name' => 'required|string|max:100', 'phone' => 'nullable|string|max:30', 'balance' => 'nullable|numeric', 'note' => 'nullable|string|max:200']);
+        $partner->name = $d['name'];
+        $partner->phone = $d['phone'] ?? null;
+        $partner->save();
+        if ($request->filled('balance')) {
+            TradeService::setBalance($partner, (float) $d['balance'], $d['note'] ?? null);
+        }
+
+        return back()->with('success', '✏️ تعدل ' . $partner->name);
     }
 }

@@ -70,7 +70,17 @@ table.t td.w { white-space: normal; }
             <td class="n num"><b>{{ $f($p->balance) }}</b></td>
             <td class="n num">{{ $f($p->shares()->sum('paid')) }}</td>
             <td class="n num {{ $p->shares()->sum('profit') < 0 ? 'mn' : 'pl' }}">{{ $f($p->shares()->sum('profit')) }}</td>
-            <td><a class="btn ghost sm" href="?tab=moves&p={{ $p->id }}">📜 سجله</a></td></tr>
+            <td><a class="btn ghost sm" href="?tab=moves&p={{ $p->id }}">📜 سجله</a> <button type="button" class="btn ghost sm" data-modal="mP{{ $p->id }}">✏️ تعديل</button>
+                <div class="modal-bg" id="mP{{ $p->id }}"><div class="modal">
+                    <h3>✏️ {{ $p->name }}</h3>
+                    <form method="post" action="{{ route('sg.trade.partner.update', $p) }}">@csrf
+                        <div class="f"><label class="l">الاسم</label><input name="name" class="inp" value="{{ $p->name }}" required></div>
+                        <div class="f"><label class="l">الهاتف</label><input name="phone" class="inp numr" value="{{ $p->phone }}"></div>
+                        <div class="f"><label class="l">💰 الرصيد (يتسجل الفرق في سجله)</label><input name="balance" class="inp numr" value="{{ (float) $p->balance + 0 }}"></div>
+                        <div class="f"><label class="l">سبب التعديل</label><input name="note" class="inp" placeholder="مثلاً: تصحيح"></div>
+                        <div style="display:flex;gap:8px;margin-top:10px"><button class="btn green">💾 حفظ</button><button type="button" class="btn ghost" data-close>إلغاء</button></div>
+                    </form>
+                </div></div></td></tr>
     @endforeach
     </tbody></table>
 </div>
