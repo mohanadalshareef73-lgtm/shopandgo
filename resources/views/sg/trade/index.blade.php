@@ -206,7 +206,8 @@ table.t td.w { white-space: normal; }
     <form method="post" action="{{ route('sg.trade.invoice.store') }}" id="invF">@csrf
         <div class="grid g3">
             <div><label class="l">👤 اسم العميل</label><input name="customer_name" class="inp" value="{{ old('customer_name') }}"></div>
-            <div><label class="l">🔢 كود العميل (لو عنده حساب)</label><input name="customer_code" class="inp numr" value="{{ old('customer_code') }}"></div>
+            <div><label class="l">🔢 كود العميل (لو عنده حساب)</label><input name="customer_code" class="inp numr" value="{{ old('customer_code') }}">
+                <label class="note" style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" name="to_account" value="1" @checked(old('to_account', '1'))> 📦 تنزل الفاتورة في حساب العميل</label></div>
             <div><label class="l">🌐 الموقع</label><input name="source" class="inp" value="{{ old('source') }}" placeholder="Amazon · Shein · …"></div>
             <div><label class="l">💲 الإجمالي بالدولار</label><input name="usd_total" id="iUsd" class="inp numr" value="{{ old('usd_total') }}" oninput="calc()"></div>
             <div><label class="l">🇱🇾 دفعت بالليبي كم</label><input name="cost_lyd" id="iCost" class="inp numr" value="{{ old('cost_lyd') }}" oninput="calc()" placeholder="ولا يتحسب: $ × سعر الصرف"></div>

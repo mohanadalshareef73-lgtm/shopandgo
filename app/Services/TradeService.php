@@ -140,8 +140,8 @@ class TradeService
             if ($inv->totalCost() > 0.009) {
                 static::move('purchase', $w, -$inv->totalCost(), null, 0, $inv, 'دفع فاتورة ' . $inv->code . ($inv->source ? ' · ' . $inv->source : ''), true);
             }
-            if ($inv->customer_id && (float) $inv->sale_lyd > 0.009) {
-                static::makeOrder($inv);
+            if ($inv->customer_id && (float) $inv->sale_lyd > 0.009 && !empty($d['to_account'])) {
+                static::makeOrder($inv); // 📦 اختياري: تنزل طلبية في حساب العميل
             }
             // 💵 مدفوع من العميل وقت الطلب (دولار ولا دينار)
             $cp = round((float) ($d['cust_paid'] ?? 0), 2);
