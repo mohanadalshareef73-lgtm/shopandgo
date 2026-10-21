@@ -13,7 +13,7 @@
 <div class="top">
     <div><h1>🧾 {{ $inv->code }} @if ($inv->status === 'closed')<span class="chip u">مقفولة</span>@else<span class="chip w">مفتوحة</span>@endif</h1>
         <div class="sub">{{ $inv->kind }}{{ $inv->source ? ' · ' . $inv->source : '' }} · {{ $inv->created_at->format('Y-m-d') }}{{ $inv->customer ? ' · العميل ' . $inv->customer->name . ' (' . $inv->customer->code . ')' : (!empty($inv->customer_name) ? ' · العميل ' . $inv->customer_name : '') }}</div></div>
-    <div class="acts">@if ($inv->status !== 'closed')<button class="btn" data-modal="mEditInv">✏️ تعديل الفاتورة</button>@endif<a class="btn ghost" href="{{ route('sg.trade', ['tab' => 'invoices']) }}">↩ الفواتير</a><button class="sg-burger">☰</button></div>
+    <div class="acts">@if ($inv->status !== 'closed')<button class="btn" data-modal="mEditInv">✏️ تعديل الفاتورة</button><form method="post" action="{{ route('sg.trade.invoice.delete', $inv) }}" style="display:inline" data-confirm="نحذفو الفاتورة {{ $inv->code }} نهائي؟ كل حركاتها ترجع (الخزينة وأرصدة الشركاء وخزينة الشركة) وطلبية العميل تتلغى">@csrf<button class="btn ghost" style="color:#c62828">🗑 حذف</button></form>@endif<a class="btn ghost" href="{{ route('sg.trade', ['tab' => 'invoices']) }}">↩ الفواتير</a><button class="sg-burger">☰</button></div>
 </div>
 <div class="tk">
     <div class="card"><div class="l">💲 بالدولار</div><div class="v num">{{ $inv->usd_total ? $f($inv->usd_total) : '—' }}</div><div class="note">سعر الصرف {{ $inv->rate ?: '—' }}</div></div>
@@ -24,6 +24,14 @@
     <div class="card"><div class="l">{{ $inv->status === 'closed' ? '📈 الربح' : '📈 الربح المتوقع' }}</div><div class="v num {{ $est < 0 ? 'mn' : 'pl' }}">{{ $f($est) }}</div></div>
 </div>
 
+@if (!empty($inv->items))
+<div class="card tw mb">
+    <div class="tw-h"><h3>🛍 المنتجات <span class="h-note">{{ count($inv->items) }} صنف</span></h3></div>
+    <table class="t"><thead><tr><th>المنتج</th><th class="n">العدد</th><th class="n">السعر</th></tr></thead><tbody>
+    @foreach ($inv->items as $it)<tr><td>{{ $it['name'] ?? '' }}</td><td class="n num">{{ $it['qty'] ?? 1 }}</td><td class="n num">{{ $f($it['price'] ?? 0) }}</td></tr>@endforeach
+    </tbody></table>
+</div>
+@endif
 <div class="card mb" style="padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <b>👤 العميل:</b>
     @if ($inv->customer)<span>{{ $inv->customer->name }} · كود <b class="num">{{ $inv->customer->code }}</b></span>@else<span class="note">ما فيش</span>@endif
@@ -87,6 +95,12 @@
             <div><label class="l">🏷 سعر البيع</label><input name="sale_lyd" class="inp numr" value="{{ (float) $inv->sale_lyd + 0 }}"></div>
             <div><label class="l">ملاحظات</label><input name="note" class="inp" value="{{ $inv->note }}"></div>
         </div>
+        <h4 style="margin:12px 0 6px">🛍 المنتجات <button type="button" class="btn ghost sm" onclick="addItem('itE')">+ منتج</button></h4>
+        <table class="t"><thead><tr><th>اسم المنتج</th><th>العدد</th><th>السعر د.ل</th></tr></thead><tbody id="itE">
+            @php $its = (array) ($inv->items ?? []); @endphp
+            @foreach (array_pad($its, max(count($its), 2), []) as $ii => $it)<tr><td><input name="items[{{ $ii }}][name]" class="inp" value="{{ $it['name'] ?? '' }}"></td><td><input name="items[{{ $ii }}][qty]" class="inp numr" style="width:70px" value="{{ $it['qty'] ?? 1 }}"></td><td><input name="items[{{ $ii }}][price]" class="inp numr" style="width:110px" value="{{ isset($it['price']) ? $it['price'] + 0 : '' }}"></td></tr>@endforeach
+        </tbody></table>
+        <div class="note">اسم فاضي = يتشال</div>
         <h4 style="margin:12px 0 6px">👥 الشركاء <span class="note">— فرق الدفع يتعدل في رصيده · فاضي = يتشال</span></h4>
         <table class="t"><thead><tr><th>الشريك</th><th>دفع د.ل</th><th>نسبة الربح %</th></tr></thead><tbody>
         @foreach ($partners as $k => $p)
@@ -101,4 +115,5 @@
     </form>
 </div></div>
 @endif
+<script>let itN=50;function addItem(id){const b=document.getElementById(id);const r=document.createElement('tr');r.innerHTML='<td><input name="items['+itN+'][name]" class="inp"></td><td><input name="items['+itN+'][qty]" class="inp numr" style="width:70px" value="1"></td><td><input name="items['+itN+'][price]" class="inp numr" style="width:110px"></td>';itN++;b.appendChild(r)}</script>
 @endsection

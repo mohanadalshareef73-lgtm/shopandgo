@@ -97,7 +97,7 @@ class TradeController extends Controller
             'cost_lyd' => 'nullable|numeric|min:0', 'extra_lyd' => 'nullable|numeric|min:0', 'sale_lyd' => 'nullable|numeric|min:0', 'wallet_id' => 'required|integer',
             'customer_code' => 'nullable|string|max:30', 'note' => 'nullable|string|max:500', 'qty' => 'nullable|integer|min:1',
             's' => 'required|array', 's.*.partner_id' => 'nullable|integer', 's.*.paid' => 'nullable|numeric|min:0', 's.*.source' => 'nullable|string|max:20', 's.*.kind' => 'nullable|string|max:100', 's.*.pct' => 'nullable|numeric|min:0|max:100',
-            'customer_name' => 'nullable|string|max:120', 'cust_paid' => 'nullable|numeric|min:0', 'cust_cur' => 'nullable|in:lyd,usd', 'sale_cur' => 'nullable|in:lyd,usd',
+            'customer_name' => 'nullable|string|max:120', 'cust_paid' => 'nullable|numeric|min:0', 'cust_cur' => 'nullable|in:lyd,usd', 'items' => 'nullable|array', 'items.*.name' => 'nullable|string|max:190', 'items.*.qty' => 'nullable|integer|min:1', 'items.*.price' => 'nullable|numeric|min:0', 'sale_cur' => 'nullable|in:lyd,usd',
         ]);
         if (!empty($d['customer_code'])) {
             $c = Customer::withoutGlobalScope('approved')->where('code', trim($d['customer_code']))->first();
@@ -119,6 +119,8 @@ class TradeController extends Controller
         } catch (\RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
+
+        TradeService::setItems($inv, (array) ($d['items'] ?? []));
 
         return redirect()->route('sg.trade.invoice', $inv)->with('success', '🧾 تعملت الفاتورة ' . $inv->code);
     }
@@ -194,14 +196,28 @@ class TradeController extends Controller
             'source' => 'nullable|string|max:150', 'usd_total' => 'nullable|numeric|min:0', 'rate' => 'nullable|numeric|min:0', 'cost_lyd' => 'required|numeric|min:0',
             'extra_lyd' => 'nullable|numeric|min:0', 'sale_lyd' => 'nullable|numeric|min:0', 'qty' => 'nullable|integer|min:1', 'customer_name' => 'nullable|string|max:120', 'note' => 'nullable|string|max:500',
             's' => 'nullable|array', 's.*.partner_id' => 'nullable|integer', 's.*.paid' => 'nullable|numeric|min:0', 's.*.pct' => 'nullable|numeric|min:0|max:100',
+            'items' => 'nullable|array', 'items.*.name' => 'nullable|string|max:190', 'items.*.qty' => 'nullable|integer|min:1', 'items.*.price' => 'nullable|numeric|min:0',
         ]);
         try {
-            TradeService::editInvoice($invoice, $d, $d['s'] ?? []);
+            $inv2 = TradeService::editInvoice($invoice, $d, $d['s'] ?? []);
+            TradeService::setItems($inv2, (array) ($d['items'] ?? []));
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
 
         return back()->with('success', '✏️ تعدلت الفاتورة');
+    }
+
+    public function invoiceDelete(Invoice $invoice)
+    {
+        try {
+            $code = $invoice->code;
+            TradeService::deleteInvoice($invoice);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('sg.trade', ['tab' => 'invoices'])->with('success', '🗑 انحذفت الفاتورة ' . $code . ' ورجعت كل حركاتها');
     }
 
     public function partnerUpdate(Request $request, Partner $partner)

@@ -10,7 +10,7 @@ class Invoice extends Model
 
     protected $guarded = ['id'];
 
-    protected $casts = ['closed_at' => 'datetime'];
+    protected $casts = ['closed_at' => 'datetime', 'items' => 'array'];
 
     public function shares()
     {

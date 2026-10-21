@@ -232,6 +232,74 @@ class TradeService
         });
     }
 
+    /** 🛍 أسماء المنتجات: تتحفظ على الفاتورة، ولو للعميل طلبية تنزل أصنافها فيها */
+    public static function setItems(Invoice $inv, array $rows): void
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('trade_invoices', 'items')) {
+            return;
+        }
+        $items = [];
+        foreach ($rows as $r) {
+            $n = trim((string) ($r['name'] ?? ''));
+            if ($n === '') {
+                continue;
+            }
+            $items[] = ['name' => mb_substr($n, 0, 190), 'qty' => max(1, (int) ($r['qty'] ?? 1)), 'price' => round((float) ($r['price'] ?? 0), 2)];
+        }
+        $inv->items = $items ?: null;
+        $inv->save();
+        if ($inv->order_id && \Illuminate\Support\Facades\Schema::hasTable('order_items')) {
+            \App\Models\OrderItem::where('order_id', $inv->order_id)->delete();
+            foreach ($items as $it) {
+                \App\Models\OrderItem::create(['order_id' => $inv->order_id, 'name' => $it['name'], 'quantity' => $it['qty'], 'price' => $it['price']]);
+            }
+        }
+    }
+
+    /**
+     * 🗑 حذف فاتورة: كل حركاتها ترجع (الخزينة والأرصدة) · اللي طلع من خزينة الشركة يرجعلها · طلبية العميل تتلغى.
+     * ما تنحذفش لو مقفولة ولا العميل دافع عليها.
+     */
+    public static function deleteInvoice(Invoice $inv): void
+    {
+        DB::transaction(function () use ($inv) {
+            $inv = Invoice::lockForUpdate()->findOrFail($inv->id);
+            if ($inv->status === 'closed') {
+                throw new RuntimeException('الفاتورة مقفولة والربح تقسم — ما تنحذفش');
+            }
+            if ((float) $inv->collected > 0.009) {
+                throw new RuntimeException('العميل دافع ' . TreasuryService::fmt($inv->collected) . ' على الفاتورة — رجّعله الأول');
+            }
+            foreach (Move::where('invoice_id', $inv->id)->orderByDesc('id')->get() as $m) {
+                if ($m->wallet_id && abs((float) $m->wallet_change) > 0.009 && ($w = Wallet::lockForUpdate()->find($m->wallet_id))) {
+                    $w->balance = round((float) $w->balance - (float) $m->wallet_change, 2);
+                    $w->save();
+                }
+                if ($m->partner_id && abs((float) $m->partner_change) > 0.009 && ($p = Partner::lockForUpdate()->find($m->partner_id))) {
+                    $p->balance = round((float) $p->balance - (float) $m->partner_change, 2);
+                    $p->save();
+                }
+                if ($m->type === 'company_in') {
+                    // اللي طلع من خزينة الشركة يرجعلها
+                    foreach (\App\Models\TreasuryHistory::where('type', 'trade')->where('procedure_id', $m->id)->where('status', 'pull')->get() as $th) {
+                        TreasuryService::deposit((float) $th->price, $th->currency ?: 'dinar', (int) $th->payment_id, 'trade', $m->id, 'رجوع (حذف فاتورة تجارة ' . $inv->code . ')');
+                    }
+                }
+                $m->delete();
+            }
+            Share::where('invoice_id', $inv->id)->delete();
+            if ($inv->order_id && ($o = \App\Models\Order::find($inv->order_id))) {
+                if ((float) $o->paid_price <= 0.009 && !$o->delivered) {
+                    $o->status = 'canceld';
+                    $o->note = trim(($o->note ? $o->note . ' · ' : '') . 'تلغت (حذف فاتورة تجارة ' . $inv->code . ')');
+                    $o->save();
+                }
+            }
+            \App\Models\Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' حذف فاتورة تجارة (' . $inv->code . ')', 'log' => ' ' . ($inv->source ?: '') . ' · ' . TreasuryService::fmt($inv->totalCost())]);
+            $inv->delete();
+        });
+    }
+
     /** وزن كل شريك في الربح: النسبة المكتوبة، ولا على قد اللي دفعه */
     public static function weights(Invoice $inv): array
     {
