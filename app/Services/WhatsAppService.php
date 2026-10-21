@@ -273,8 +273,9 @@ class WhatsAppService
             $u = $ss['uuid'];
             $found = false;
             // /sessions/{uuid}/groups هو الأقرب (ما رجعش 404 بس كان بطيء) فنجربوه أول ونستنوه أكثر
-            $paths = ["/sessions/{$u}/groups", "/sessions/{$u}/groups?limit=500", "/groups?session_uuid={$u}", "/sessions/{$u}/chats"];
-            $pref = \Illuminate\Support\Facades\Cache::get('wa_groups_path');
+            // ✅ الطريقة الرسمية من Whatsy: GET /api/groups?session_uuid=…
+            $paths = ["/groups?session_uuid={$u}", "/sessions/{$u}/groups", "/sessions/{$u}/groups?limit=500", "/sessions/{$u}/chats"];
+            $pref = \Illuminate\Support\Facades\Cache::get('wa_groups_path2');
             if (is_string($pref)) {
                 array_unshift($paths, str_replace('{u}', $u, $pref));
             }
@@ -319,7 +320,7 @@ class WhatsAppService
                 };
                 $walk($r->json());
                 if ($n) {
-                    \Illuminate\Support\Facades\Cache::forever('wa_groups_path', str_replace($u, '{u}', $path));
+                    \Illuminate\Support\Facades\Cache::forever('wa_groups_path2', str_replace($u, '{u}', $path));
                     $found = true;
                     break;
                 }
@@ -354,12 +355,13 @@ class WhatsAppService
             $base += ['file_base64' => base64_encode((string) file_get_contents($file)), 'file_name' => $fileName ?: basename($file)];
         }
         $variants = [
+            ['whatsapp_group_id' => $bare . '@g.us'], // ✅ الطريقة الرسمية من Whatsy: POST /api/message {whatsapp_group_id}
             ['phone' => [$bare . '@g.us']],
             ['phone' => [$bare . '@g']],
             ['phone' => [$bare]],
             ['phone' => $bare . '@g.us'],
         ];
-        $pref = \Illuminate\Support\Facades\Cache::get('wa_group_variant2');
+        $pref = \Illuminate\Support\Facades\Cache::get('wa_group_variant3');
         if (is_int($pref) && isset($variants[$pref])) {
             $variants = [$pref => $variants[$pref]] + $variants;
         }
@@ -368,7 +370,7 @@ class WhatsAppService
             try {
                 $r = $this->send($base + $v, $session, $file ? 60 : 30);
                 if ($r->successful()) {
-                    \Illuminate\Support\Facades\Cache::forever('wa_group_variant2', $i);
+                    \Illuminate\Support\Facades\Cache::forever('wa_group_variant3', $i);
                     \Illuminate\Support\Facades\Cache::put('wa_group_last', 'ok · صيغة ' . ($i + 1), now()->addDay());
 
                     return true;
