@@ -41,6 +41,26 @@
 </div>
 @if ($inv->order)<div class="note mb">💡 العميل يقدر يسدد عادي من «التسليم» ولا الإيصال — الفلوس تدخل خزينة التجارة أوتوماتيك وتتحسب هني.</div>@endif
 
+@if ($tc && $inv->status !== 'closed')
+@php $dueL = max(0, (float) $inv->sale_lyd - (float) $inv->collected); $rt = (float) $inv->rate ?: 0; @endphp
+<form method="post" action="{{ route('sg.trade.invoice.act', $inv) }}" class="card mb" style="padding:14px" id="chF">@csrf<input type="hidden" name="a" value="charge"><input type="hidden" name="mode" id="chM">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><b>💳 من حساب العميل · {{ $tc->name }}</b>
+        <span class="chip {{ $tc->usd < 0 ? 'd' : 'u' }} num">رصيده $ {{ $f($tc->usd) }}</span><span class="chip {{ $tc->lyd < 0 ? 'd' : 'u' }} num">رصيده د.ل {{ $f($tc->lyd) }}</span>
+        <a class="note" href="{{ route('sg.trade', ['tab' => 'customers', 'c' => $tc->id]) }}">📜 حسابه</a></div>
+    <div class="fm">
+        <div><label class="l">المبلغ د.ل</label><input name="amount" id="chA" class="inp numr" style="width:130px" value="{{ $dueL + 0 }}" oninput="chC()"></div>
+        <div><label class="l">سعر الصرف</label><input name="rate" id="chR" class="inp numr" style="width:100px" value="{{ $rt + 0 }}" oninput="chC()"></div>
+        <div><label class="l">= بالدولار</label><div class="inp numr" id="chU" style="width:120px;font-weight:800;display:flex;align-items:center">—</div></div>
+        <button type="button" class="btn" style="background:#1c45a3;color:#fff" onclick="chGo('usd')">💲 اخصم من رصيده الدولار</button>
+        <button type="button" class="btn ghost" onclick="chGo('lyd')">اخصم من رصيده الدينار</button>
+        <button type="button" class="btn ghost" style="color:#c62828" onclick="chGo('debt')">🧾 خليها عليه دين</button>
+    </div>
+</form>
+<script>function chC(){const a=parseFloat(document.getElementById('chA').value)||0,r=parseFloat(document.getElementById('chR').value)||0;document.getElementById('chU').textContent=r?(Math.round(a/r*100)/100).toLocaleString('en-US')+' $':'—'}chC();
+function chGo(m){const a=document.getElementById('chA').value,u=document.getElementById('chU').textContent;if(!(parseFloat(a)>0))return alert('اكتب المبلغ');
+ if(!confirm(m==='usd'?'نخصمو '+u+' من رصيده الدولار ('+a+' د.ل)؟':(m==='debt'?'نخليو '+a+' د.ل دين عليه؟':'نخصمو '+a+' د.ل من رصيده الدينار؟')))return;document.getElementById('chM').value=m;document.getElementById('chF').submit()}</script>
+@endif
+
 @if ($inv->status !== 'closed')
 <div class="card mb" style="padding:14px">
     <form method="post" action="{{ route('sg.trade.invoice.act', $inv) }}" class="fm">@csrf<input type="hidden" name="a" value="pay">

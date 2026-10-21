@@ -21,11 +21,11 @@ table.t td.w { white-space: normal; }
 </div>
 
 <div class="tt">
-    @foreach (['home' => '🏠 الملخص', 'partners' => '👥 الشركاء', 'invoices' => '🧾 الفواتير', 'moves' => '📜 سجل الحركة', 'report' => '📊 الأرباح والخسائر'] as $k => $lb)<a href="?tab={{ $k }}" class="{{ $tab === $k ? 'on' : '' }}">{{ $lb }}</a>@endforeach
+    @foreach (['home' => '🏠 الملخص', 'partners' => '👥 الشركاء', 'invoices' => '🧾 الفواتير', 'customers' => '👤 العملاء', 'moves' => '📜 سجل الحركة', 'report' => '📊 الأرباح والخسائر'] as $k => $lb)<a href="?tab={{ $k }}" class="{{ $tab === $k ? 'on' : '' }}">{{ $lb }}</a>@endforeach
 </div>
 
 <div class="tk">
-    @foreach ($wallets as $w)<div class="card"><div class="l">{{ $w->name }} <form method="post" action="{{ route('sg.trade.wallet.update', $w) }}" style="display:inline" onsubmit="const v=prompt('✏️ الرصيد الصحيح لـ{{ $w->name }}؟',{{ (float) $w->balance + 0 }});if(v===null||v.trim()===''||isNaN(parseFloat(v)))return false;this.balance.value=parseFloat(v);return confirm('نعدلو الرصيد لـ '+v+'؟ الفرق يتسجل في سجل الحركة')">@csrf<input type="hidden" name="balance"><button class="btn ghost sm" style="padding:0 6px;min-height:0;height:22px" title="تعديل الرصيد">✏️</button></form></div><div class="v num">{{ $f($w->balance) }}</div></div>@endforeach
+    @foreach ($wallets as $w)<div class="card"><div class="l">{{ $w->name }} <form method="post" action="{{ route('sg.trade.wallet.update', $w) }}" style="display:inline" onsubmit="const v=prompt('✏️ الرصيد الصحيح لـ{{ $w->name }}؟',{{ (float) $w->balance + 0 }});if(v===null||v.trim()===''||isNaN(parseFloat(v)))return false;this.balance.value=parseFloat(v);return confirm('نعدلو الرصيد لـ '+v+'؟ الفرق يتسجل في سجل الحركة')">@csrf<input type="hidden" name="balance"><button class="btn ghost sm" style="padding:0 6px;min-height:0;height:22px" title="تعديل الرصيد">✏️</button></form></div><div class="v num">{{ $f($w->balance) }}{{ $w->kind === 'usd' ? ' $' : '' }}</div></div>@endforeach
     <div class="card"><div class="l">🏢 رصيد Shop & Go</div><div class="v num">{{ $f(optional($company)->balance) }}</div></div>
     <div class="card"><div class="l">🧾 فواتير مفتوحة</div><div class="v num">{{ $stats['open'] }}</div></div>
     <div class="card"><div class="l">⏳ على العملاء</div><div class="v num">{{ $f($stats['due']) }}</div></div>
@@ -132,6 +132,40 @@ table.t td.w { white-space: normal; }
     @endforelse
     </tbody></table></div>
 </div>
+@endif
+
+@if ($tab === 'customers')
+<div class="card tw mb">
+    <div class="tw-h"><h3>👤 عملاء التجارة <span class="h-note">رصيد موجب = فلوسه عندنا · سالب = دين عليه</span></h3>
+        <form method="post" action="{{ route('sg.trade.tcustomer') }}" class="fm" style="margin-inline-start:auto">@csrf<input type="hidden" name="a" value="add"><input name="name" class="inp" placeholder="اسم عميل جديد" required><input name="phone" class="inp" style="width:130px" placeholder="الهاتف"><button class="btn sm">+ عميل</button></form>
+    </div>
+    <div class="scroll-x"><table class="t"><thead><tr><th>العميل</th><th class="n">رصيد $</th><th class="n">رصيد د.ل</th><th>إيداع</th><th></th></tr></thead><tbody>
+    @forelse ($tcustomers as $c)
+        <tr><td><b>{{ $c->name }}</b><small class="note" style="display:block">{{ $c->phone }}</small></td>
+            <td class="n num {{ $c->usd < 0 ? 'mn' : 'pl' }}"><b>{{ $f($c->usd) }}</b></td><td class="n num {{ $c->lyd < 0 ? 'mn' : 'pl' }}"><b>{{ $f($c->lyd) }}</b></td>
+            <td><form method="post" action="{{ route('sg.trade.tcustomer') }}" class="fm">@csrf<input type="hidden" name="a" value="deposit"><input type="hidden" name="id" value="{{ $c->id }}"><input name="amount" class="inp numr" style="width:100px" placeholder="المبلغ" required><select name="cur" class="inp"><option value="usd">$</option><option value="lyd">د.ل</option></select><button class="btn sm">➕</button></form></td>
+            <td><a class="btn ghost sm" href="?tab=customers&c={{ $c->id }}">📜 حسابه</a></td></tr>
+    @empty
+        <tr><td colspan="5"><div class="empty">ما فيش عملاء — يتزادوا وحدهم من الفواتير، ولا زيدهم من هني</div></td></tr>
+    @endforelse
+    </tbody></table></div>
+</div>
+@if ($tcSel)
+<div class="card tw mb">
+    <div class="tw-h"><h3>📜 حساب {{ $tcSel->name }} · <span class="num">{{ $f($tcSel->usd) }} $</span> · <span class="num">{{ $f($tcSel->lyd) }} د.ل</span></h3>
+        <form method="post" action="{{ route('sg.trade.tcustomer') }}" class="fm" style="margin-inline-start:auto" onsubmit="return confirm('نعدلو الرصيد؟ الفرق يتسجل')">@csrf<input type="hidden" name="a" value="set"><input type="hidden" name="id" value="{{ $tcSel->id }}"><input name="amount" class="inp numr" style="width:100px" placeholder="الرصيد الصحيح" required><select name="cur" class="inp"><option value="usd">$</option><option value="lyd">د.ل</option></select><button class="btn ghost sm">✏️ تعديل الرصيد</button></form>
+    </div>
+    <table class="t"><thead><tr><th>الوقت</th><th>الحركة</th><th>الفاتورة</th><th class="n">المبلغ</th><th class="n">الرصيد بعد</th><th>ملاحظة</th></tr></thead><tbody>
+    @forelse ($tcSel->moves as $m)
+        <tr><td class="num">{{ $m->created_at->format('m-d g:i a') }}</td><td>{{ \App\Models\Trade\CMove::TYPES[$m->type] ?? $m->type }}</td>
+            <td>@if ($m->invoice)<a href="{{ route('sg.trade.invoice', $m->invoice) }}" class="num">{{ $m->invoice->code }}</a>@else—@endif</td>
+            <td class="n num {{ $m->amount < 0 ? 'mn' : 'pl' }}">{{ $f($m->amount) }} {{ $m->cur === 'usd' ? '$' : 'د.ل' }}</td><td class="n num">{{ $f($m->after) }} {{ $m->cur === 'usd' ? '$' : 'د.ل' }}</td><td class="note">{{ $m->note }}</td></tr>
+    @empty
+        <tr><td colspan="6"><div class="empty">ما فيش حركات</div></td></tr>
+    @endforelse
+    </tbody></table>
+</div>
+@endif
 @endif
 
 @if ($tab === 'report')

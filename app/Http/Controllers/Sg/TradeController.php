@@ -37,7 +37,7 @@ class TradeController extends Controller
         if (!$this->ready()) {
             return redirect()->route('admin.home')->with('error', 'افتح /system-update مرة وحدة باش تخدم التجارة الخارجية');
         }
-        $tab = in_array($request->tab, ['partners', 'invoices', 'moves', 'report'], true) ? $request->tab : 'home';
+        $tab = in_array($request->tab, ['partners', 'invoices', 'moves', 'report', 'customers'], true) ? $request->tab : 'home';
         $partners = Partner::orderByDesc('is_company')->orderBy('name')->get();
         $invoices = Invoice::with(['shares.partner', 'customer'])->latest('id')->take(100)->get();
         $pid = (int) $request->p;
@@ -47,6 +47,8 @@ class TradeController extends Controller
             'moves' => Move::with(['partner', 'wallet', 'invoice', 'user'])->when($pid, fn ($q) => $q->where('partner_id', $pid))->latest('id')->take(200)->get(),
             'sel' => $pid ? $partners->firstWhere('id', $pid) : null,
             'payments' => PaymentMethod::where('status', true)->orderBy('id')->get(),
+            'tcustomers' => $tab === 'customers' && Schema::hasTable('trade_customers') ? \App\Models\Trade\Customer::orderBy('name')->get() : collect(),
+            'tcSel' => $tab === 'customers' && $request->filled('c') && Schema::hasTable('trade_customers') ? \App\Models\Trade\Customer::with('moves.invoice')->find((int) $request->c) : null,
             'allInv' => $tab === 'report' ? Invoice::with(['shares.partner', 'customer'])->latest('id')->take(200)->get() : collect(),
             'report' => $tab === 'report' ? Move::selectRaw('partner_id, type, SUM(partner_change) s, COUNT(*) n')->whereNotNull('partner_id')->groupBy('partner_id', 'type')->get()->groupBy('partner_id') : collect(),
             'monthly' => $tab === 'report' ? Invoice::where('status', 'closed')->selectRaw("DATE_FORMAT(closed_at, '%Y-%m') m, COUNT(*) n, SUM(profit) p, SUM(cost_lyd + extra_lyd) c, SUM(collected) s")->groupBy('m')->orderByDesc('m')->take(12)->get() : collect(),
@@ -128,22 +130,30 @@ class TradeController extends Controller
     public function invoice(Invoice $invoice)
     {
         $invoice->load(['shares.partner', 'customer', 'order']);
+        $tc = TradeService::tcustomer($invoice);
 
         return view('sg.trade.invoice', [
-            'nav' => 'trade', 'inv' => $invoice, 'wallets' => Wallet::orderBy('id')->get(), 'partners' => Partner::where('active', true)->orderByDesc('is_company')->orderBy('name')->get(),
+            'nav' => 'trade', 'inv' => $invoice, 'tc' => $tc, 'wallets' => Wallet::orderBy('id')->get(), 'partners' => Partner::where('active', true)->orderByDesc('is_company')->orderBy('name')->get(),
             'moves' => Move::with(['partner', 'wallet', 'user'])->where('invoice_id', $invoice->id)->oldest('id')->get(),
         ]);
     }
 
     public function invoiceAct(Request $request, Invoice $invoice)
     {
-        $d = $request->validate(['a' => 'required|in:pay,close,sale,customer,order,pct', 'pct' => 'nullable|array', 'pct.*' => 'nullable|numeric|min:0|max:100', 'wallet_id' => 'nullable|integer', 'amount' => 'nullable|numeric|min:0', 'note' => 'nullable|string|max:300', 'customer_code' => 'nullable|string|max:30']);
+        $d = $request->validate(['a' => 'required|in:pay,close,sale,customer,order,pct,charge', 'mode' => 'nullable|in:usd,lyd,debt', 'rate' => 'nullable|numeric|min:0', 'pct' => 'nullable|array', 'pct.*' => 'nullable|numeric|min:0|max:100', 'wallet_id' => 'nullable|integer', 'amount' => 'nullable|numeric|min:0', 'note' => 'nullable|string|max:300', 'customer_code' => 'nullable|string|max:30']);
         try {
             if ($d['a'] === 'pay') {
                 abort_if($invoice->status === 'closed', 422, 'الفاتورة مقفولة');
                 TradeService::customerPay($invoice, Wallet::findOrFail((int) $d['wallet_id']), round((float) $d['amount'], 2), $d['note'] ?? null);
 
                 return back()->with('success', '💵 تسجل سداد ' . TS::fmt($d['amount']) . ' د.ل');
+            }
+            if ($d['a'] === 'charge') {
+                abort_if($invoice->status === 'closed', 422, 'الفاتورة مقفولة');
+                $r = TradeService::chargeCustomer($invoice, round((float) $d['amount'], 2), $d['mode'] ?? 'lyd', (float) ($d['rate'] ?? $invoice->rate));
+                $c = $r['c'];
+
+                return back()->with('success', ($d['mode'] === 'usd' ? '💳 انخصم ' . $r['usd'] . ' $ من رصيده الدولار' : ($d['mode'] === 'debt' ? '🧾 قعدت عليه دين ' . TS::fmt($d['amount']) . ' د.ل' : '💳 انخصم ' . TS::fmt($d['amount']) . ' د.ل من رصيده')) . ' · رصيده توا: ' . TS::fmt($c->usd) . ' $ / ' . TS::fmt($c->lyd) . ' د.ل');
             }
             if ($d['a'] === 'pct') {
                 abort_if($invoice->status === 'closed', 422, 'الفاتورة مقفولة');
@@ -230,6 +240,35 @@ class TradeController extends Controller
         }
 
         return back()->with('success', '✏️ تعدل رصيد ' . $wallet->name);
+    }
+
+    /** 👤 عميل تجارة: جديد · إيداع (دولار/دينار) · تعديل رصيد */
+    public function tcustomer(Request $request)
+    {
+        $d = $request->validate(['a' => 'required|in:add,deposit,set', 'id' => 'nullable|integer', 'name' => 'nullable|string|max:120', 'phone' => 'nullable|string|max:30',
+            'cur' => 'nullable|in:usd,lyd', 'amount' => 'nullable|numeric', 'note' => 'nullable|string|max:200']);
+        try {
+            if ($d['a'] === 'add') {
+                abort_if(empty($d['name']), 422);
+                \App\Models\Trade\Customer::create(['name' => $d['name'], 'phone' => $d['phone'] ?? null]);
+
+                return back()->with('success', '✓ تضاف العميل ' . $d['name']);
+            }
+            $c = \App\Models\Trade\Customer::findOrFail((int) $d['id']);
+            $cur = ($d['cur'] ?? 'lyd') === 'usd' ? 'usd' : 'lyd';
+            $amt = round((float) ($d['amount'] ?? 0), 2);
+            if ($d['a'] === 'deposit') {
+                abort_if($amt <= 0, 422, 'اكتب المبلغ');
+                TradeService::customerDeposit($c, $cur, $amt, $d['note'] ?? null);
+
+                return back()->with('success', '➕ دخل ' . TS::fmt($amt) . ($cur === 'usd' ? ' $' : ' د.ل') . ' لرصيد ' . $c->name);
+            }
+            \Illuminate\Support\Facades\DB::transaction(fn () => TradeService::cmove($c, 'adjust', $cur, round($amt - (float) $c->{$cur}, 2), null, 0, null, trim('تعديل الرصيد' . (!empty($d['note']) ? ' · ' . $d['note'] : ''))));
+
+            return back()->with('success', '✏️ تعدل رصيد ' . $c->name);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
     }
 
     public function partnerUpdate(Request $request, Partner $partner)

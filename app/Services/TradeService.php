@@ -300,6 +300,78 @@ class TradeService
         });
     }
 
+    /** 👤 عميل التجارة للفاتورة (من حسابه ولا من اسمه) — ينعمل لو مش موجود */
+    public static function tcustomer(Invoice $inv): ?\App\Models\Trade\Customer
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('trade_customers')) {
+            return null;
+        }
+        if (!empty($inv->trade_customer_id) && ($c = \App\Models\Trade\Customer::find($inv->trade_customer_id))) {
+            return $c;
+        }
+        $acc = $inv->customer_id ? \App\Models\Customer::withoutGlobalScope('approved')->find($inv->customer_id) : null;
+        $name = trim((string) (optional($acc)->name ?: ($inv->customer_name ?? '')));
+        if (!$acc && $name === '') {
+            return null;
+        }
+        $c = $acc ? \App\Models\Trade\Customer::where('customer_id', $acc->id)->first() : \App\Models\Trade\Customer::whereNull('customer_id')->where('name', $name)->first();
+        $c = $c ?: \App\Models\Trade\Customer::create(['name' => $name, 'phone' => optional($acc)->phone_1, 'customer_id' => optional($acc)->id]);
+        $inv->trade_customer_id = $c->id;
+        $inv->save();
+
+        return $c;
+    }
+
+    /** حركة على رصيد العميل (دولار ولا دينار) */
+    public static function cmove(\App\Models\Trade\Customer $c, string $type, string $cur, float $amt, ?Invoice $inv, float $lydValue, ?float $rate, ?string $note): void
+    {
+        $c = \App\Models\Trade\Customer::lockForUpdate()->findOrFail($c->id);
+        $col = $cur === 'usd' ? 'usd' : 'lyd';
+        $c->{$col} = round((float) $c->{$col} + $amt, 2);
+        $c->save();
+        \App\Models\Trade\CMove::create(['trade_customer_id' => $c->id, 'invoice_id' => optional($inv)->id, 'type' => $type, 'cur' => $col, 'amount' => round($amt, 2),
+            'lyd_value' => round($lydValue, 2), 'rate' => $rate, 'after' => $c->{$col}, 'note' => $note, 'created_id' => auth()->id()]);
+    }
+
+    /** ➕ العميل حط فلوس عندنا (دولار ولا دينار) — تدخل خزينة التجارة المناسبة ورصيده يزيد */
+    public static function customerDeposit(\App\Models\Trade\Customer $c, string $cur, float $amt, ?string $note = null): void
+    {
+        DB::transaction(function () use ($c, $cur, $amt, $note) {
+            $w = $cur === 'usd' ? (Wallet::where('kind', 'usd')->first() ?: Wallet::orderBy('id')->first()) : (Wallet::where('kind', 'cash')->first() ?: Wallet::orderBy('id')->first());
+            static::move('customer_pay', $w, $amt, null, 0, null, trim('إيداع العميل ' . $c->name . ($cur === 'usd' ? ' (' . $amt . ' $)' : '') . ($note ? ' · ' . $note : '')));
+            static::cmove($c, 'deposit', $cur, $amt, null, $cur === 'usd' ? 0 : $amt, null, $note);
+        });
+    }
+
+    /**
+     * 💳 قيمة من الفاتورة (بالدينار) تتحسب على العميل:
+     *  mode=usd ← تنخصم من رصيده الدولار (÷ سعر الصرف) · mode=lyd ← من رصيده الدينار · mode=debt ← تقعد عليه دين بالدينار
+     *  الفاتورة تتحسب مسددة بالقيمة هذي (الربح يتقسم عادي)
+     */
+    public static function chargeCustomer(Invoice $inv, float $lyd, string $mode, float $rate): array
+    {
+        return DB::transaction(function () use ($inv, $lyd, $mode, $rate) {
+            $c = static::tcustomer($inv);
+            if (!$c) {
+                throw new RuntimeException('اكتب اسم العميل في الفاتورة الأول');
+            }
+            if ($mode === 'usd' && $rate <= 0) {
+                throw new RuntimeException('اكتب سعر الصرف');
+            }
+            $usd = $mode === 'usd' ? round($lyd / $rate, 2) : 0;
+            if ($mode === 'usd') {
+                static::cmove($c, 'charge', 'usd', -$usd, $inv, $lyd, $rate, 'فاتورة ' . $inv->code . ' · ' . TreasuryService::fmt($lyd) . ' د.ل = ' . $usd . ' $ (×' . $rate . ')');
+            } else {
+                static::cmove($c, $mode === 'debt' ? 'debt' : 'charge', 'lyd', -$lyd, $inv, $lyd, null, ($mode === 'debt' ? 'دين' : 'خصم') . ' فاتورة ' . $inv->code);
+            }
+            $inv->collected = round((float) $inv->collected + $lyd, 2);
+            $inv->save();
+            static::move('customer_pay', null, 0, null, 0, $inv, ($mode === 'usd' ? 'من رصيد العميل الدولار ' . $usd . ' $' : ($mode === 'debt' ? 'دين على العميل' : 'من رصيد العميل الدينار')) . ' · ' . TreasuryService::fmt($lyd) . ' د.ل');
+
+            return ['usd' => $usd, 'c' => $c->fresh()];
+        });
+    }
+
     /** وزن كل شريك في الربح: النسبة المكتوبة، ولا على قد اللي دفعه */
     public static function weights(Invoice $inv): array
     {
