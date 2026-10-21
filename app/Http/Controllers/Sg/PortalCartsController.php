@@ -517,7 +517,7 @@ class PortalCartsController extends Controller
             report($e);
         }
         $file = null;
-        if (true) { // الـ PDF يمشي دايماً مع الحجز (المكرر ملوّن فيه)
+        if ($repeat) { // 🔁 الـ PDF يمشي بس لو فيه تكرار — غيره: الرابط والكود بس
             try {
                 $cart = $pdf->prepare($cart);
                 $file = $cart->pdf_path && Storage::disk('local')->exists($cart->pdf_path) ? Storage::disk('local')->path($cart->pdf_path) : null;
@@ -534,7 +534,7 @@ class PortalCartsController extends Controller
                 // 3 رسايل بالترتيب: (1) رابط السلة (2) الـ PDF (3) كود العميل بروحه بخط عريض
                 $txt = (string) $cart->source_url;
                 $cap = '🛒 ' . $cart->retailer_label . ' #' . $cart->id . ($repeat ? ' · 🔁 فيها قطع مكررة (ملوّنة في الكمية)' : '');
-                $codeMsg = '*' . (optional($c)->code ?: preg_replace('/^218/', '0', preg_replace('/\D/', '', (string) $cart->whatsapp_customer_phone))) . '*'; // غير مسجل: رقمه بدل الكود
+                $codeMsg = '*' . (optional($c)->code ?: ($cart->guest_phone ?? null) ?: preg_replace('/^218/', '0', preg_replace('/\D/', '', (string) $cart->whatsapp_customer_phone))) . '*'; // غير مسجل: رقمه بدل الكود
                 @set_time_limit(60);
                 if ($isGroup) {
                     // 📢 للقروب: نفس الترتيب (الرابط ← PDF ← الكود) من نفس رقم الواتساب اللي في القروب
