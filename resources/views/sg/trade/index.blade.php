@@ -25,7 +25,7 @@ table.t td.w { white-space: normal; }
 </div>
 
 <div class="tk">
-    @foreach ($wallets as $w)<div class="card"><div class="l">{{ $w->name }}</div><div class="v num">{{ $f($w->balance) }}</div></div>@endforeach
+    @foreach ($wallets as $w)<div class="card"><div class="l">{{ $w->name }} <form method="post" action="{{ route('sg.trade.wallet.update', $w) }}" style="display:inline" onsubmit="const v=prompt('✏️ الرصيد الصحيح لـ{{ $w->name }}؟',{{ (float) $w->balance + 0 }});if(v===null||v.trim()===''||isNaN(parseFloat(v)))return false;this.balance.value=parseFloat(v);return confirm('نعدلو الرصيد لـ '+v+'؟ الفرق يتسجل في سجل الحركة')">@csrf<input type="hidden" name="balance"><button class="btn ghost sm" style="padding:0 6px;min-height:0;height:22px" title="تعديل الرصيد">✏️</button></form></div><div class="v num">{{ $f($w->balance) }}</div></div>@endforeach
     <div class="card"><div class="l">🏢 رصيد Shop & Go</div><div class="v num">{{ $f(optional($company)->balance) }}</div></div>
     <div class="card"><div class="l">🧾 فواتير مفتوحة</div><div class="v num">{{ $stats['open'] }}</div></div>
     <div class="card"><div class="l">⏳ على العملاء</div><div class="v num">{{ $f($stats['due']) }}</div></div>

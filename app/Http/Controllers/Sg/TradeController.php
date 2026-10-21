@@ -220,6 +220,18 @@ class TradeController extends Controller
         return redirect()->route('sg.trade', ['tab' => 'invoices'])->with('success', '🗑 انحذفت الفاتورة ' . $code . ' ورجعت كل حركاتها');
     }
 
+    /** ✏️ تعديل رصيد خزينة التجارة (كاش/مصرف) — الفرق يتسجل حركة تعديل */
+    public function walletUpdate(Request $request, Wallet $wallet)
+    {
+        $d = $request->validate(['balance' => 'required|numeric', 'note' => 'nullable|string|max:200']);
+        $dd = round((float) $d['balance'] - (float) $wallet->balance, 2);
+        if (abs($dd) > 0.009) {
+            \Illuminate\Support\Facades\DB::transaction(fn () => TradeService::move('adjust', $wallet, $dd, null, 0, null, trim('تعديل رصيد ' . $wallet->name . ' ' . TS::fmt($wallet->balance) . ' ← ' . TS::fmt($d['balance']) . (!empty($d['note']) ? ' · ' . $d['note'] : '')), true));
+        }
+
+        return back()->with('success', '✏️ تعدل رصيد ' . $wallet->name);
+    }
+
     public function partnerUpdate(Request $request, Partner $partner)
     {
         $d = $request->validate(['name' => 'required|string|max:100', 'phone' => 'nullable|string|max:30', 'balance' => 'nullable|numeric', 'note' => 'nullable|string|max:200']);

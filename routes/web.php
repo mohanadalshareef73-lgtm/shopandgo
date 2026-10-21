@@ -430,6 +430,7 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::post('trade/invoices/{invoice}/edit', [$C . 'TradeController', 'invoiceUpdate'])->name('trade.invoice.update');
         Route::post('trade/invoices/{invoice}/delete', [$C . 'TradeController', 'invoiceDelete'])->name('trade.invoice.delete');
         Route::post('trade/money', [$C . 'TradeController', 'money'])->name('trade.money');
+        Route::post('trade/wallet/{wallet}', [$C . 'TradeController', 'walletUpdate'])->name('trade.wallet.update');
         Route::post('trade/invoices', [$C . 'TradeController', 'invoiceStore'])->name('trade.invoice.store');
         Route::get('trade/invoices/{invoice}', [$C . 'TradeController', 'invoice'])->name('trade.invoice');
         Route::post('trade/invoices/{invoice}', [$C . 'TradeController', 'invoiceAct'])->name('trade.invoice.act');
