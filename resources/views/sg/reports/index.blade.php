@@ -100,7 +100,7 @@
                             <tr><td>مبيعات الرحلات (الذي قلناه للعملاء)</td><td class="n num">{{ $f($r['sales']['dinar']) }}</td></tr>
                             <tr><td>− تكلفة الشراء ({{ $f($s['usdSpent']) }} $ {{ $s['usdAvg'] ? 'بمتوسط ' . number_format($s['usdAvg'], 2) : '' }})</td><td class="n num minus">{{ $f($r['cost']['dinar']) }}</td></tr>
                             <tr><td>= ربح الرحلات</td><td class="n num plus">{{ $f($r['goodsProfit']['dinar']) }}</td></tr>
-                            <tr><td>+ ربح الشحن (قبضنا {{ $f($r['shipIncome']['dinar']) }} − دفعنا {{ $f($r['shipCost']['dinar']) }})</td><td class="n num">{{ $f($r['shipIncome']['dinar'] - $r['shipCost']['dinar']) }}</td></tr>
+                            <tr style="{{ empty($r['withShip']) ? 'opacity:.55' : '' }}"><td>{{ empty($r['withShip']) ? '(مش محسوب) ' : '' }}+ ربح الشحن (قبضنا {{ $f($r['shipIncome']['dinar']) }} − دفعنا {{ $f($r['shipCost']['dinar']) }})</td><td class="n num">{{ $f($r['shipIncome']['dinar'] - $r['shipCost']['dinar']) }}</td></tr>
                             <tr><td>− مصاريف الشركة</td><td class="n num minus">{{ $f($r['expenses']['dinar'] + $r['paymentExpenses']['dinar']) }}</td></tr>
                             <tr class="tot"><td>صافي الربح</td><td class="n num">{{ $f($s['net']) }} د.ل</td></tr>
                         </table>

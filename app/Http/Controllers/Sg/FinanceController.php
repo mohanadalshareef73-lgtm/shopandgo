@@ -405,4 +405,15 @@ class FinanceController extends Controller
 
         return back()->with(abs($d) < 0.01 ? 'success' : 'warning', 'تقفلت وردية ' . $user->name . (abs($d) < 0.01 ? ' بدون فرق ✓' : ' · الفرق ' . TreasuryService::fmt($d) . ' د.ل'));
     }
+
+    /** 🚚 تشغيل/إيقاف حساب ربح الشحن في صافي الربح */
+    public function shipToggle()
+    {
+        abort_unless(auth()->user()->hasRole('Admin'), 403);
+        $on = !(bool) AppSettings::get('profit_with_ship', false);
+        AppSettings::put(['profit_with_ship' => $on]);
+        \Illuminate\Support\Facades\Cache::flush();
+
+        return back()->with('success', $on ? '🚚 ربح الشحن صار محسوب في صافي الربح' : '🚚 ربح الشحن ما عادش محسوب في صافي الربح');
+    }
 }

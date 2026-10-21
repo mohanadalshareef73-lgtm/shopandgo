@@ -128,8 +128,10 @@ class FinanceReport
         }
 
         $net = self::empty();
+        // 🚚 ربح الشحن ما يدخلش في صافي الربح إلا لو المدير شغّله (إعداد profit_with_ship)
+        $withShip = (bool) \App\Services\AppSettings::get('profit_with_ship', false);
         foreach ($net as $c => $_) {
-            $net[$c] = $goodsProfit[$c] + $shipIncome[$c] - $shipCost[$c] - $expenses[$c] - $paymentExpenses[$c];
+            $net[$c] = $goodsProfit[$c] + ($withShip ? $shipIncome[$c] - $shipCost[$c] : 0) - $expenses[$c] - $paymentExpenses[$c];
         }
         $net['dinar'] += $cardSales['profit'];
 
@@ -159,6 +161,7 @@ class FinanceReport
             'sales' => $sales,
             'cost' => $cost,
             'goodsProfit' => $goodsProfit,
+            'withShip' => $withShip,
             'shipIncome' => $shipIncome,
             'shipCost' => $shipCost,
             'shipWeight' => $shipWeight,
