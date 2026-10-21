@@ -518,8 +518,8 @@ class DispatchController extends Controller
         $pdf = new \Mpdf\Mpdf(['mode' => 'utf-8', 'format' => 'A4', 'orientation' => 'P',
             'fontDir' => array_merge($fontDirs, [resource_path('fonts/somar')]),
             'fontdata' => array_merge($fontData, ['somar' => ['R' => 'Somar-Regular.ttf', 'B' => 'Somar-Bold.ttf', 'useOTL' => 0xFF, 'useKashida' => 75]]),
-            'tempDir' => $temp, 'default_font' => 'somar', 'default_font_size' => 16,
-            'margin_top' => 8, 'margin_bottom' => 8, 'margin_left' => 6, 'margin_right' => 6, 'shrink_tables_to_fit' => 1, 'autoScriptToLang' => true, 'autoLangToFont' => false]);
+            'tempDir' => $temp, 'default_font' => 'somar', 'default_font_size' => 19,
+            'margin_top' => 8, 'margin_bottom' => 8, 'margin_left' => 6, 'margin_right' => 6, 'shrink_tables_to_fit' => 0, 'autoScriptToLang' => true, 'autoLangToFont' => false]);
         $pdf->SetDirectionality('rtl');
         $title = 'طلعة ' . ($request->batch ?: now()->format('Y-m-d'));
         $pdf->SetTitle($title);
