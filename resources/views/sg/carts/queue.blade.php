@@ -17,6 +17,13 @@
 .bq details[open] .open { display: none; }
 </style>
 @endpush
+@php
+    // 📤 إرسال الطلب: القروبات (من واتساب) + أرقام الحجز
+    $qGroups = collect((array) \App\Services\AppSettings::get('wa_groups_recent', []))->merge((array) \App\Services\AppSettings::get('wa_groups_list', []))->filter(fn ($g) => is_array($g) && !empty($g['id']))->unique('id')->values();
+    $qBph = (array) \App\Services\AppSettings::get('booking_phones', []);
+    $qNums = array_values(array_unique(array_merge((array) \App\Services\AppSettings::get('booking_numbers', []), array_filter($qBph, fn ($x) => !str_contains((string) $x, '@')))));
+    $qLast = (string) \App\Services\AppSettings::get('booking_last_phone', '');
+@endphp
 @section('content')
 <div class="top">
     <div><h1>📋 قائمة الحجز</h1><div class="sub">افتح السلة، احجزها، واضغط <b>✅ تم</b> · باقي <b>{{ $left }}</b> · اضغط على أي سطر تشوف التفاصيل</div></div>
@@ -38,6 +45,15 @@
                 @if (!empty($ct->receipt_path))<a class="btn ghost sm" style="color:#1d4f8f" target="_blank" href="{{ route('sg.pcarts.receipt', $ct) }}">🧾 إيصال التحويل</a>@endif
                 <button type="button" class="btn ghost sm" onclick="event.preventDefault();navigator.clipboard.writeText({{ json_encode((string) $ct->source_url) }});this.textContent='✓'">⧉ الرابط</button>
                 <button type="button" class="btn ghost sm" onclick="event.preventDefault();navigator.clipboard.writeText({{ json_encode((string) $code) }});this.textContent='✓'">⧉ الكود</button>
+                <form method="post" action="{{ route('sg.pcarts.booknow', $ct) }}" style="display:inline-flex;gap:4px" onsubmit="const v=(this.to_new.value||this.to_phone.value).trim();if(!v){alert('اختار القروب ولا الرقم');return false}return confirm('نبعتو الطلب (الرابط + PDF) لـ '+(this.to_phone.selectedOptions[0]&&this.to_phone.value?this.to_phone.selectedOptions[0].text:v)+'؟')">@csrf
+                    <select name="to_phone" class="inp" style="height:32px;width:150px;font-size:13px" onchange="this.form.to_new.style.display=this.value?'none':''">
+                        @foreach ($qGroups as $g)<option value="{{ $g['id'] }}" @selected($qLast === $g['id'])>📢 {{ $g['name'] ?: 'قروب' }}</option>@endforeach
+                        @foreach ($qNums as $n)<option value="{{ $n }}" @selected($qLast === $n)>📱 {{ $n }}</option>@endforeach
+                        <option value="">➕ رقم جديد…</option>
+                    </select>
+                    <input name="to_new" class="inp numr" style="height:32px;width:120px;font-size:13px;{{ ($qGroups->count() || count($qNums)) ? 'display:none' : '' }}" placeholder="رقم جديد" inputmode="tel">
+                    <button class="btn sm" style="background:#e8590c;color:#fff">📤 إرسال{{ !empty($ct->book_sent_to) ? ' ✓' : '' }}</button>
+                </form>
                 @if ($done)
                     <form method="post" action="{{ route('sg.bqueue.done', $ct) }}" style="display:inline">@csrf<input type="hidden" name="undo" value="1"><button class="btn ghost sm">↩ رجعها</button></form>
                 @else

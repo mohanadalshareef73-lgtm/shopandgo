@@ -471,7 +471,8 @@ class PortalCartsController extends Controller
         // الرقم اللي اخترته يوصله الحجز (وانت تحوّله للقروب بروحك)
         $pickTo = trim((string) ($request->input('to_new') ?: $request->input('to_phone')));
         // 📢 قروب الحجز (اللي انكتب فيه #حجز) — نقبلو بس القروبات المسجلة عندنا
-        $groups = collect((array) \App\Services\AppSettings::get('wa_groups_recent', []))->filter(fn ($g) => !empty($g['tag']) && !empty($g['id']))->pluck('id')->all();
+        $groups = collect((array) \App\Services\AppSettings::get('wa_groups_recent', []))->filter(fn ($g) => !empty($g['tag']) && !empty($g['id']))->pluck('id')
+            ->merge(collect((array) \App\Services\AppSettings::get('wa_groups_list', []))->filter(fn ($g) => is_array($g) && !empty($g['id']))->pluck('id'))->unique()->all();
         $isGrp = str_contains($pickTo, '@g.us') && in_array($pickTo, $groups, true);
         if ($pickTo === '' || (str_contains($pickTo, '@') && !$isGrp)) {
             return back()->with('error', 'اختار الرقم اللي يمشيله الحجز');
