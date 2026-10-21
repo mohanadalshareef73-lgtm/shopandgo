@@ -93,10 +93,10 @@ class TradeController extends Controller
     {
         $d = $request->validate([
             'kind' => 'nullable|string|max:40', 'source' => 'nullable|string|max:150', 'usd_total' => 'nullable|numeric|min:0', 'rate' => 'nullable|numeric|min:0',
-            'cost_lyd' => 'required|numeric|min:0', 'extra_lyd' => 'nullable|numeric|min:0', 'sale_lyd' => 'nullable|numeric|min:0', 'wallet_id' => 'required|integer',
+            'cost_lyd' => 'nullable|numeric|min:0', 'extra_lyd' => 'nullable|numeric|min:0', 'sale_lyd' => 'nullable|numeric|min:0', 'wallet_id' => 'required|integer',
             'customer_code' => 'nullable|string|max:30', 'note' => 'nullable|string|max:500', 'qty' => 'nullable|integer|min:1',
             's' => 'required|array', 's.*.partner_id' => 'nullable|integer', 's.*.paid' => 'nullable|numeric|min:0', 's.*.source' => 'nullable|string|max:20', 's.*.kind' => 'nullable|string|max:100', 's.*.pct' => 'nullable|numeric|min:0|max:100',
-            'customer_name' => 'nullable|string|max:120', 'cust_paid' => 'nullable|numeric|min:0', 'cust_cur' => 'nullable|in:lyd,usd',
+            'customer_name' => 'nullable|string|max:120', 'cust_paid' => 'nullable|numeric|min:0', 'cust_cur' => 'nullable|in:lyd,usd', 'sale_cur' => 'nullable|in:lyd,usd',
         ]);
         if (!empty($d['customer_code'])) {
             $c = Customer::withoutGlobalScope('approved')->where('code', trim($d['customer_code']))->first();
@@ -104,6 +104,14 @@ class TradeController extends Controller
                 return back()->withInput()->with('error', 'ما لقيناش عميل بالكود ' . $d['customer_code']);
             }
             $d['customer_id'] = $c->id;
+        }
+        // 💲 سعر البيع بالدولار ← يتحول للدينار بسعر الصرف
+        $rate = (float) ($d['rate'] ?? 0) ?: ((float) ($d['usd_total'] ?? 0) > 0 && (float) ($d['cost_lyd'] ?? 0) > 0 ? (float) $d['cost_lyd'] / (float) $d['usd_total'] : 0);
+        if (($d['sale_cur'] ?? 'lyd') === 'usd' && !empty($d['sale_lyd'])) {
+            $d['sale_lyd'] = round((float) $d['sale_lyd'] * $rate, 2);
+        }
+        if (empty($d['cost_lyd']) && (float) ($d['usd_total'] ?? 0) > 0 && $rate > 0) {
+            $d['cost_lyd'] = round((float) $d['usd_total'] * $rate, 2);
         }
         try {
             $inv = TradeService::createInvoice($d, $d['s']);

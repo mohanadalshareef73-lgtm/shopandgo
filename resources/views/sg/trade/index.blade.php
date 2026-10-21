@@ -172,9 +172,9 @@ table.t td.w { white-space: normal; }
             <div><label class="l">🔢 كود العميل (لو عنده حساب)</label><input name="customer_code" class="inp numr" value="{{ old('customer_code') }}"></div>
             <div><label class="l">🌐 الموقع</label><input name="source" class="inp" value="{{ old('source') }}" placeholder="Amazon · Shein · …"></div>
             <div><label class="l">💲 الإجمالي بالدولار</label><input name="usd_total" id="iUsd" class="inp numr" value="{{ old('usd_total') }}" oninput="calc()"></div>
-            <div><label class="l">🇱🇾 دفعت بالليبي كم *</label><input name="cost_lyd" id="iCost" class="inp numr" value="{{ old('cost_lyd') }}" required oninput="calc()"></div>
-            <div><label class="l">💱 سعر الصرف (تلقائي)</label><input name="rate" id="iRate" class="inp numr" value="{{ old('rate') }}" placeholder="ينحسب وحده"></div>
-            <div><label class="l">🏷 سعر البيع للعميل د.ل</label><input name="sale_lyd" id="iSale" class="inp numr" value="{{ old('sale_lyd') }}" oninput="calc()"></div>
+            <div><label class="l">🇱🇾 دفعت بالليبي كم</label><input name="cost_lyd" id="iCost" class="inp numr" value="{{ old('cost_lyd') }}" oninput="calc()" placeholder="ولا يتحسب: $ × سعر الصرف"></div>
+            <div><label class="l">💱 سعر الصرف (تلقائي)</label><input name="rate" id="iRate" class="inp numr" value="{{ old('rate') }}" placeholder="ينحسب وحده" oninput="rateIn()"></div>
+            <div><label class="l">🏷 سعر البيع للعميل</label><div style="display:flex;gap:4px"><input name="sale_lyd" id="iSale" class="inp numr" style="flex:1" value="{{ old('sale_lyd') }}" oninput="calc()"><select name="sale_cur" id="iSaleCur" class="inp" style="width:auto" onchange="calc()"><option value="lyd">د.ل</option><option value="usd" @selected(old('sale_cur') === 'usd')>$</option></select></div></div>
             <div><label class="l">📈 الربح (تلقائي)</label><input id="iProfit" class="inp numr" readonly style="font-weight:800"></div>
             <div><label class="l">📦 الكمية</label><input name="qty" class="inp numr" value="{{ old('qty', 1) }}"></div>
             <div><label class="l">💵 العميل دفع كم توا</label><div style="display:flex;gap:4px"><input name="cust_paid" class="inp numr" style="flex:1" value="{{ old('cust_paid') }}"><select name="cust_cur" class="inp" style="width:auto"><option value="lyd">د.ل</option><option value="usd" @selected(old('cust_cur') === 'usd')>$</option></select></div></div>
@@ -198,8 +198,14 @@ table.t td.w { white-space: normal; }
 </div></div>
 <script>
 const V=id=>parseFloat(document.getElementById(id).value)||0;
-function calc(){const u=V('iUsd'),c=V('iCost');if(u&&c)document.getElementById('iRate').value=Math.round(c/u*10000)/10000;
-  const p=V('iSale')?V('iSale')-c-V('iExtra'):0;const e=document.getElementById('iProfit');e.value=V('iSale')?Math.round(p*100)/100:'';e.style.color=p<0?'#c62828':'#0f8a5f';sum()}
+let costAuto=false;
+// 💱 الدولار × سعر الصرف = الليبي (لو الليبي فاضي) · الليبي ÷ الدولار = سعر الصرف (لو كتبت الليبي)
+function rateIn(){const u=V('iUsd'),r=V('iRate'),ce=document.getElementById('iCost');if(u&&r&&(!ce.value||costAuto)){ce.value=Math.round(u*r*100)/100;costAuto=true}calc(true)}
+function calc(fromRate){const u=V('iUsd'),ce=document.getElementById('iCost'),re=document.getElementById('iRate');
+  if(document.activeElement===ce)costAuto=false;
+  if(!fromRate){if(u&&V('iCost')&&!costAuto)re.value=Math.round(V('iCost')/u*10000)/10000;else if(u&&V('iRate')&&(!ce.value||costAuto)){ce.value=Math.round(u*V('iRate')*100)/100;costAuto=true}}
+  const c=V('iCost'),r=V('iRate'),usd=document.getElementById('iSaleCur').value==='usd',sale=usd?V('iSale')*r:V('iSale');
+  const p=V('iSale')?sale-c-V('iExtra'):0;const e=document.getElementById('iProfit');e.value=V('iSale')?Math.round(p*100)/100+' د.ل':'';e.style.color=p<0?'#c62828':'#0f8a5f';sum()}
 function sum(){let s=0,pc=0;document.querySelectorAll('.sp').forEach(i=>s+=parseFloat(i.value)||0);document.querySelectorAll('.spc').forEach(i=>pc+=parseFloat(i.value)||0);
   const n=document.getElementById('sumN');n.textContent='· دفعوا '+s.toLocaleString('en-US')+(pc?' · النسب '+pc+'%'+(Math.abs(pc-100)<0.01?' ✓':' (لازم 100%)'):' · الربح على قد اللي دفعه كل واحد');n.style.color=pc&&Math.abs(pc-100)>0.01?'#c62828':'#0f8a5f'}
 @if ($errors->any() || old('cost_lyd'))document.addEventListener('DOMContentLoaded',()=>{const b=document.querySelector('[data-modal=mInv]');b&&b.click()});@endif
