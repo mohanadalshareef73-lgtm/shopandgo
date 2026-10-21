@@ -155,8 +155,20 @@ class PortalCartsController extends Controller
     {
         $data = $request->validate(['do' => 'required|in:confirm,reject,ignore', 'send_whatsapp' => 'nullable|boolean', 'to' => 'nullable|array', 'to.*' => 'string|max:60']);
         if ($data['do'] === 'ignore') {
-            $cart->portal_status = 'ignored'; // ✕ تجاهل: تختفي من «حسبها وما أكدهاش» (السلة نفسها تقعد)
+            $cart->portal_status = 'ignored'; // ✕ تجاهل/🗑 حذف: تختفي من كل القوائم (السلة نفسها تقعد في السجل)
             $cart->save();
+            // 🗑 توصيل تحصيل العربون المفتوح (لو فيه) يتمسح باش ما يطلعش في طلبيات دليفري
+            foreach (\App\Models\Delivery::where('cart_id', $cart->id)->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->get() as $dl) {
+                \Illuminate\Support\Facades\DB::table('delivery_events')->where('delivery_id', $dl->id)->delete();
+                $dl->delete();
+            }
+            \Illuminate\Support\Facades\Cache::forget('sg.badge.pcart');
+            \Illuminate\Support\Facades\Cache::forget('sg.badge.courier');
+            if ($request->boolean('del')) {
+                Log::create(['user_id' => auth()->id(), 'type' => 'cart', 'title' => ' حذف حجز #' . $cart->id, 'log' => ' ' . (optional($cart->customer)->name ?: ($cart->guest_name ?? ''))]);
+
+                return back()->with('success', '🗑 انحذف الحجز #' . $cart->id);
+            }
 
             return back()->with('success', 'تخفّت السلة #' . $cart->id . ' من القائمة');
         }

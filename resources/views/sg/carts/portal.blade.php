@@ -67,6 +67,7 @@
                 <button name="do" value="confirm" class="btn green" style="font-size:15px;padding:9px 16px">✓ تأكيد الحجز</button>
             </form>
             <form method="post" action="{{ route('sg.pcarts.decide', $ct) }}" style="margin:0 0 6px" onsubmit="return confirm('نرفضو الحجز؟ (بدون رسالة للعميل)')">@csrf<input type="hidden" name="send_whatsapp" value="0"><button name="do" value="reject" class="btn ghost sm" style="color:var(--down)">✕ رفض</button></form>
+            <form method="post" action="{{ route('sg.pcarts.decide', $ct) }}" style="margin:0 0 6px" onsubmit="return confirm('نحذفو الحجز #{{ $ct->id }} نهائي؟ يختفي من كل القوائم وما توصلش رسالة للعميل')">@csrf<input type="hidden" name="del" value="1"><button name="do" value="ignore" class="btn ghost sm" style="color:#c62828">🗑 حذف</button></form>
             @endif
             @if (empty($ct->order_id) && $ct->customer_id && in_array($ct->portal_status, ['draft', 'ordered', null], true))
             <details style="margin-bottom:6px"><summary class="btn ghost sm" style="display:inline-flex;cursor:pointer">🏪 حجز في المكتب</summary>
