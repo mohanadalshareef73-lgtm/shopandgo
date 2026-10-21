@@ -49,6 +49,7 @@ class PartnerTransaction extends Model
     {
         $q = static::where('partner_id', $partnerId)->where('currency', $currency);
 
-        return round((float) (clone $q)->where('type', 'expense')->sum('amount') - (float) (clone $q)->where('type', 'settle')->sum('amount'), 2);
+        // 💳 الدين = السحب اليومي + المصروفات الشخصية − اللي سدده (ولا اتخصم من نصيبه)
+        return round((float) (clone $q)->whereIn('type', ['expense', 'withdrawal'])->sum('amount') - (float) (clone $q)->where('type', 'settle')->sum('amount'), 2);
     }
 }

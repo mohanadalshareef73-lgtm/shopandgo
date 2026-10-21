@@ -79,7 +79,7 @@
         <div class="pt surplus mb">
             <div style="font-size:14px;color:var(--ink-2)">الفائض الذي لم يُقسّم (من البداية)</div>
             <div class="v"><span class="num">{{ $f($surplus['surplus']) }}</span> <small style="font-size:14px;color:var(--ink-3);font-weight:400">د.ل</small></div>
-            <div class="note">صافي الربح {{ $f($surplus['net']) }} − سحوبات وتوزيعات {{ $f($surplus['drawn']) }}</div>
+            <div class="note">صافي الربح {{ $f($surplus['net']) }} − توزيعات (والسحب اليومي دين يتخصم من النصيب) {{ $f($surplus['drawn']) }}</div>
             <div class="note">من تاريخ {{ $surplus['from'] ?? 'البداية' }}@if (($surplus['opening'] ?? 0) != 0) · فيه رصيد افتتاحي {{ $f($surplus['opening']) }}@endif</div>
             @role('Admin')<details style="margin-top:8px"><summary class="note" style="cursor:pointer">⚙ تعديل حساب الفائض</summary>
                 <form method="post" action="{{ route('finance.partners.surplus') }}" style="margin-top:8px">@csrf
@@ -92,7 +92,7 @@
             @foreach ($partners as $pt)
                 @php $w = $ptx->where('partner_id', $pt->id)->where('type', 'withdrawal')->sum('s'); $d = $ptx->where('partner_id', $pt->id)->where('type', 'distribution')->sum('s'); $debt = \App\Models\PartnerTransaction::debtOf($pt->id); $pe = $ptx->where('partner_id', $pt->id)->where('type', 'expense')->sum('s'); @endphp
                 <div class="pt"><div class="nm"><span class="av" style="width:30px;height:30px;font-size:13px;background:{{ $partnerCols[$loop->index % 4] }}">{{ mb_substr($pt->name, 0, 1) }}</span>{{ $pt->name }}</div>
-                    <div class="ln"><span>سحب يومي</span><b class="num">{{ $f($w) }}</b></div><div class="ln"><span>توزيع</span><b class="num">{{ $f($d) }}</b></div><div class="ln"><span>مصروفات شخصية (الفترة)</span><b class="num">{{ $f($pe) }}</b></div><div class="ln"><span>دين عليه حالياً</span><b class="num {{ $debt > 0 ? 'minus' : '' }}">{{ $f($debt) }}</b></div><div class="ln tot" style="font-size:14px;border-top-width:1px"><span>المجموع</span><b class="num">{{ $f($w + $d) }}</b></div></div>
+                    <div class="ln"><span>سحب يومي</span><b class="num">{{ $f($w) }}</b></div><div class="ln"><span>توزيع</span><b class="num">{{ $f($d) }}</b></div><div class="ln"><span>مصروفات شخصية (الفترة)</span><b class="num">{{ $f($pe) }}</b></div><div class="ln"><span>دين عليه حالياً <small class="note">(سحب + مصروفات − المسدد)</small></span><b class="num {{ $debt > 0 ? 'minus' : '' }}">{{ $f($debt) }}</b></div><div class="ln tot" style="font-size:14px;border-top-width:1px"><span>المجموع (سحب + توزيع + مصروفات)</span><b class="num">{{ $f($w + $d + $pe) }}</b></div></div>
             @endforeach
         </div>
         @if ($recentTx->count())
