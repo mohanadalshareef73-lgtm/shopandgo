@@ -25,13 +25,13 @@ class TradeService
     }
 
     /** حركة وحدة: تعدّل الخزينة و/أو رصيد الشريك وتتسجل */
-    public static function move(string $type, ?Wallet $w, float $walletChange, ?Partner $p, float $partnerChange, ?Invoice $inv = null, ?string $note = null): Move
+    public static function move(string $type, ?Wallet $w, float $walletChange, ?Partner $p, float $partnerChange, ?Invoice $inv = null, ?string $note = null, bool $allowNeg = false): Move
     {
         $walletChange = round($walletChange, 2);
         $partnerChange = round($partnerChange, 2);
         if ($w) {
             $w = Wallet::lockForUpdate()->find($w->id);
-            if ($walletChange < 0 && (float) $w->balance + $walletChange < -0.009) {
+            if (!$allowNeg && $walletChange < 0 && (float) $w->balance + $walletChange < -0.009) {
                 throw new RuntimeException('رصيد ' . $w->name . ' ما يكفيش (فيه ' . TreasuryService::fmt($w->balance) . ' د.ل)');
             }
             $w->balance = round((float) $w->balance + $walletChange, 2);
@@ -95,53 +95,79 @@ class TradeService
     {
         return DB::transaction(function () use ($d, $shares) {
             $w = Wallet::findOrFail($d['wallet_id']);
+            $usd = (float) ($d['usd_total'] ?? 0);
+            $cost = round((float) ($d['cost_lyd'] ?? 0), 2);
+            $rate = (float) ($d['rate'] ?? 0) ?: ($usd > 0 && $cost > 0 ? round($cost / $usd, 4) : 0); // سعر الصرف تلقائي
+            $hasName = \Illuminate\Support\Facades\Schema::hasColumn('trade_invoices', 'customer_name');
             $inv = Invoice::create([
                 'code' => 'TR-' . now()->format('ymd') . '-' . random_int(100, 999),
                 'kind' => $d['kind'] ?? null, 'source' => $d['source'] ?? null,
-                'usd_total' => (float) ($d['usd_total'] ?? 0), 'rate' => (float) ($d['rate'] ?? 0),
-                'cost_lyd' => round((float) ($d['cost_lyd'] ?? 0), 2), 'extra_lyd' => round((float) ($d['extra_lyd'] ?? 0), 2),
+                'usd_total' => $usd, 'rate' => $rate, 'cost_lyd' => $cost, 'extra_lyd' => round((float) ($d['extra_lyd'] ?? 0), 2),
                 'sale_lyd' => round((float) ($d['sale_lyd'] ?? 0), 2), 'wallet_id' => $w->id,
-            ] + (\Illuminate\Support\Facades\Schema::hasColumn('trade_invoices', 'qty') ? ['qty' => max(1, (int) ($d['qty'] ?? 1))] : []) + [
+            ] + (\Illuminate\Support\Facades\Schema::hasColumn('trade_invoices', 'qty') ? ['qty' => max(1, (int) ($d['qty'] ?? 1))] : [])
+              + ($hasName ? ['customer_name' => $d['customer_name'] ?? null] : []) + [
                 'customer_id' => $d['customer_id'] ?? null, 'note' => $d['note'] ?? null, 'created_id' => auth()->id(),
             ]);
+            $hasPct = \Illuminate\Support\Facades\Schema::hasColumn('trade_shares', 'pct');
             foreach ($shares as $s) {
                 $amt = round((float) ($s['paid'] ?? 0), 2);
-                if ($amt <= 0.009 || empty($s['partner_id'])) {
+                $pct = isset($s['pct']) && $s['pct'] !== '' && $s['pct'] !== null ? round((float) $s['pct'], 2) : null;
+                if (empty($s['partner_id']) || ($amt <= 0.009 && !$pct)) {
                     continue;
                 }
                 $p = Partner::findOrFail($s['partner_id']);
                 $src = (string) ($s['source'] ?? 'balance');
-                $label = 'من رصيده';
-                if ($src === 'cash') {
-                    static::move('deposit', $w, $amt, $p, $amt, $inv, 'دفع لفاتورة ' . $inv->code);
-                    $label = 'دفع توا';
-                } elseif (str_starts_with($src, 'main:')) {
-                    $pid = (int) substr($src, 5);
-                    $kind = trim((string) ($s['kind'] ?? ''));
-                    $mv = static::move('company_in', $w, $amt, $p, $amt, $inv, trim('من خزينة الشركة' . ($kind ? ' · ' . $kind : '') . ' · فاتورة ' . $inv->code));
-                    TreasuryService::withdraw($amt, 'dinar', $pid, 'trade', $mv->id, 'تجارة خارجية · فاتورة ' . $inv->code . ($kind ? ' · ' . $kind : ''));
-                    $label = 'خزينة الشركة · ' . (optional(\App\Models\PaymentMethod::find($pid))->name ?: '') . ($kind ? ' · ' . $kind : '');
-                } elseif ((float) $p->fresh()->balance + 0.009 < $amt) {
-                    throw new RuntimeException('رصيد ' . $p->name . ' (' . TreasuryService::fmt($p->balance) . ') ما يكفيش لـ' . TreasuryService::fmt($amt) . ' — اختار «دفع توا»');
+                $label = $amt > 0.009 ? 'من رصيده' : 'نسبة بدون دفع';
+                if ($amt > 0.009) {
+                    if ($src === 'cash') {
+                        static::move('deposit', $w, $amt, $p, $amt, $inv, 'دفع لفاتورة ' . $inv->code);
+                        $label = 'دفع توا';
+                    } elseif (str_starts_with($src, 'main:')) {
+                        $pid = (int) substr($src, 5);
+                        $kind = trim((string) ($s['kind'] ?? ''));
+                        $mv = static::move('company_in', $w, $amt, $p, $amt, $inv, trim('من خزينة الشركة' . ($kind ? ' · ' . $kind : '') . ' · فاتورة ' . $inv->code));
+                        TreasuryService::withdraw($amt, 'dinar', $pid, 'trade', $mv->id, 'تجارة خارجية · فاتورة ' . $inv->code . ($kind ? ' · ' . $kind : ''));
+                        $label = 'خزينة الشركة · ' . (optional(\App\Models\PaymentMethod::find($pid))->name ?: '') . ($kind ? ' · ' . $kind : '');
+                    } elseif ((float) $p->fresh()->balance + 0.009 < $amt) {
+                        $label = 'من رصيده (يقعد عليه دين ' . TreasuryService::fmt($amt - max(0, (float) $p->fresh()->balance)) . ')';
+                    }
+                    // رصيده ينقص — لو ما عندهش يقعد بالسالب (دين عليه)
+                    static::move('invest', null, 0, $p, -$amt, $inv, 'مساهمة في فاتورة ' . $inv->code);
                 }
-                static::move('invest', null, 0, $p, -$amt, $inv, 'مساهمة في فاتورة ' . $inv->code);
-                Share::create(['invoice_id' => $inv->id, 'partner_id' => $p->id, 'paid' => $amt, 'source' => $label]);
+                Share::create(['invoice_id' => $inv->id, 'partner_id' => $p->id, 'paid' => max(0, $amt), 'source' => $label] + ($hasPct ? ['pct' => $pct] : []));
             }
-            $sum = round(Share::where('invoice_id', $inv->id)->sum('paid'), 2);
-            if (abs($sum - $inv->totalCost()) > 0.01) {
-                throw new RuntimeException('مجموع اللي دفعوه الشركاء (' . TreasuryService::fmt($sum) . ') لازم يساوي تكلفة الفاتورة كاملة (' . TreasuryService::fmt($inv->totalCost()) . ')');
-            }
-            // 🛒 دفع الفاتورة نفسها من خزينة التجارة
+            // 🛒 دفع الفاتورة من خزينة التجارة (لو ما يكفيش تقعد بالسالب)
             if ($inv->totalCost() > 0.009) {
-                static::move('purchase', $w, -$inv->totalCost(), null, 0, $inv, 'دفع فاتورة ' . $inv->code . ($inv->source ? ' · ' . $inv->source : ''));
+                static::move('purchase', $w, -$inv->totalCost(), null, 0, $inv, 'دفع فاتورة ' . $inv->code . ($inv->source ? ' · ' . $inv->source : ''), true);
             }
-
             if ($inv->customer_id && (float) $inv->sale_lyd > 0.009) {
                 static::makeOrder($inv);
             }
+            // 💵 مدفوع من العميل وقت الطلب (دولار ولا دينار)
+            $cp = round((float) ($d['cust_paid'] ?? 0), 2);
+            if ($cp > 0.009) {
+                $lyd = ($d['cust_cur'] ?? 'lyd') === 'usd' ? round($cp * ($rate ?: 0), 2) : $cp;
+                if ($lyd > 0.009) {
+                    static::customerPay($inv->fresh(), $w, $lyd, ($d['cust_cur'] ?? 'lyd') === 'usd' ? 'دفع ' . $cp . ' $ (×' . $rate . ')' : null);
+                }
+            }
 
-            return $inv;
+            return $inv->fresh();
         });
+    }
+
+    /** وزن كل شريك في الربح: النسبة المكتوبة، ولا على قد اللي دفعه */
+    public static function weights(Invoice $inv): array
+    {
+        $shares = $inv->shares;
+        $usePct = $shares->contains(fn ($s) => (float) ($s->pct ?? 0) > 0);
+        $w = [];
+        foreach ($shares as $s) {
+            $w[$s->id] = $usePct ? max(0, (float) ($s->pct ?? 0)) : max(0, (float) $s->paid);
+        }
+        $sum = array_sum($w);
+
+        return $sum > 0 ? array_map(fn ($v) => $v / $sum, $w) : [];
     }
 
     /** 📦 طلبية للعميل في حسابه (عادي كأنها من الشركة) — مربوطة بالفاتورة وفلوسها تمشي لخزينة التجارة */
@@ -232,19 +258,22 @@ class TradeService
             if ($inv->status === 'closed') {
                 throw new RuntimeException('الفاتورة مقفولة من قبل');
             }
-            $base = $inv->paidByPartners();
-            if ($base <= 0.009) {
-                throw new RuntimeException('ما فيش مساهمات شركاء في الفاتورة');
+            $wts = static::weights($inv);
+            if (!$wts) {
+                throw new RuntimeException('ما فيش شركاء (دفع ولا نسبة) في الفاتورة');
             }
             $profit = round((float) $inv->collected - $inv->totalCost(), 2);
             $left = $profit;
-            $n = $inv->shares->count();
-            foreach ($inv->shares->values() as $i => $s) {
-                $part = $i === $n - 1 ? $left : round($profit * (float) $s->paid / $base, 2);
+            $list = $inv->shares->filter(fn ($s) => isset($wts[$s->id]))->values();
+            $n = $list->count();
+            foreach ($list as $i => $s) {
+                $part = $i === $n - 1 ? $left : round($profit * $wts[$s->id], 2);
                 $left = round($left - $part, 2);
-                static::move('invest', null, 0, $s->partner, (float) $s->paid, $inv, 'رجوع مساهمته · ' . $inv->code);
+                if ((float) $s->paid > 0.009) {
+                    static::move('invest', null, 0, $s->partner, (float) $s->paid, $inv, 'رجوع مساهمته · ' . $inv->code);
+                }
                 if (abs($part) > 0.009) {
-                    static::move($part > 0 ? 'profit' : 'loss', null, 0, $s->partner, $part, $inv, ($part > 0 ? 'ربح' : 'خسارة') . ' فاتورة ' . $inv->code . ' (' . round((float) $s->paid / $base * 100, 1) . '%)');
+                    static::move($part > 0 ? 'profit' : 'loss', null, 0, $s->partner, $part, $inv, ($part > 0 ? 'ربح' : 'خسارة') . ' فاتورة ' . $inv->code . ' (' . round($wts[$s->id] * 100, 1) . '%)');
                 }
                 $s->profit = $part;
                 $s->save();

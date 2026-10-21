@@ -95,7 +95,8 @@ class TradeController extends Controller
             'kind' => 'nullable|string|max:40', 'source' => 'nullable|string|max:150', 'usd_total' => 'nullable|numeric|min:0', 'rate' => 'nullable|numeric|min:0',
             'cost_lyd' => 'required|numeric|min:0', 'extra_lyd' => 'nullable|numeric|min:0', 'sale_lyd' => 'nullable|numeric|min:0', 'wallet_id' => 'required|integer',
             'customer_code' => 'nullable|string|max:30', 'note' => 'nullable|string|max:500', 'qty' => 'nullable|integer|min:1',
-            's' => 'required|array', 's.*.partner_id' => 'nullable|integer', 's.*.paid' => 'nullable|numeric|min:0', 's.*.source' => 'nullable|string|max:20', 's.*.kind' => 'nullable|string|max:100',
+            's' => 'required|array', 's.*.partner_id' => 'nullable|integer', 's.*.paid' => 'nullable|numeric|min:0', 's.*.source' => 'nullable|string|max:20', 's.*.kind' => 'nullable|string|max:100', 's.*.pct' => 'nullable|numeric|min:0|max:100',
+            'customer_name' => 'nullable|string|max:120', 'cust_paid' => 'nullable|numeric|min:0', 'cust_cur' => 'nullable|in:lyd,usd',
         ]);
         if (!empty($d['customer_code'])) {
             $c = Customer::withoutGlobalScope('approved')->where('code', trim($d['customer_code']))->first();
@@ -125,13 +126,23 @@ class TradeController extends Controller
 
     public function invoiceAct(Request $request, Invoice $invoice)
     {
-        $d = $request->validate(['a' => 'required|in:pay,close,sale,customer,order', 'wallet_id' => 'nullable|integer', 'amount' => 'nullable|numeric|min:0', 'note' => 'nullable|string|max:300', 'customer_code' => 'nullable|string|max:30']);
+        $d = $request->validate(['a' => 'required|in:pay,close,sale,customer,order,pct', 'pct' => 'nullable|array', 'pct.*' => 'nullable|numeric|min:0|max:100', 'wallet_id' => 'nullable|integer', 'amount' => 'nullable|numeric|min:0', 'note' => 'nullable|string|max:300', 'customer_code' => 'nullable|string|max:30']);
         try {
             if ($d['a'] === 'pay') {
                 abort_if($invoice->status === 'closed', 422, 'الفاتورة مقفولة');
                 TradeService::customerPay($invoice, Wallet::findOrFail((int) $d['wallet_id']), round((float) $d['amount'], 2), $d['note'] ?? null);
 
                 return back()->with('success', '💵 تسجل سداد ' . TS::fmt($d['amount']) . ' د.ل');
+            }
+            if ($d['a'] === 'pct') {
+                abort_if($invoice->status === 'closed', 422, 'الفاتورة مقفولة');
+                foreach ($invoice->shares as $sh) {
+                    $v = $d['pct'][$sh->id] ?? null;
+                    $sh->pct = ($v === null || $v === '') ? null : round((float) $v, 2);
+                    $sh->save();
+                }
+
+                return back()->with('success', '✓ تعدلت نسب الأرباح');
             }
             if ($d['a'] === 'customer') {
                 $c = Customer::withoutGlobalScope('approved')->where('code', trim((string) $d['customer_code']))->first();

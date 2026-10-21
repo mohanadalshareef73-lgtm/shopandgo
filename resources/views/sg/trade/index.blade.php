@@ -84,7 +84,7 @@ table.t td.w { white-space: normal; }
         <tr>
             <td><a href="{{ route('sg.trade.invoice', $i) }}"><b class="num">{{ $i->code }}</b></a><small class="note num" style="display:block">{{ $i->created_at->format('Y-m-d') }}</small></td>
             <td class="w">{{ $i->kind }}{{ $i->source ? ' · ' . $i->source : '' }}</td>
-            <td>{{ optional($i->customer)->name ?: '—' }}</td>
+            <td>{{ optional($i->customer)->name ?: ($i->customer_name ?? '') ?: '—' }}</td>
             <td class="n num">{{ $i->usd_total ? $f($i->usd_total) : '—' }}</td>
             <td class="n num">{{ $f($i->totalCost()) }}</td>
             <td class="n num">{{ $f($i->sale_lyd) }}</td>
@@ -158,22 +158,26 @@ table.t td.w { white-space: normal; }
     <h3>🧾 فاتورة شراء جديدة</h3>
     <form method="post" action="{{ route('sg.trade.invoice.store') }}" id="invF">@csrf
         <div class="grid g3">
-            <div><label class="l">النوع</label><input name="kind" class="inp" value="{{ old('kind') }}" placeholder="بضاعة / جملة / طلب عميل…"></div>
-            <div><label class="l">الموقع / المورد</label><input name="source" class="inp" value="{{ old('source') }}" placeholder="Amazon · Shein · …"></div>
-            <div><label class="l">كود العميل (اختياري)</label><input name="customer_code" class="inp numr" value="{{ old('customer_code') }}"></div>
-            <div><label class="l">الإجمالي بالدولار $</label><input name="usd_total" id="iUsd" class="inp numr" value="{{ old('usd_total') }}" oninput="calc()"></div>
-            <div><label class="l">سعر الصرف</label><input name="rate" id="iRate" class="inp numr" value="{{ old('rate') }}" oninput="calc()"></div>
-            <div><label class="l">تكلفة الفاتورة بالدينار *</label><input name="cost_lyd" id="iCost" class="inp numr" value="{{ old('cost_lyd') }}" required oninput="sum()"></div>
-            <div><label class="l">مصاريف إضافية (شحن/جمارك) د.ل</label><input name="extra_lyd" id="iExtra" class="inp numr" value="{{ old('extra_lyd', 0) }}" oninput="sum()"></div>
-            <div><label class="l">سعر البيع للعميل د.ل</label><input name="sale_lyd" class="inp numr" value="{{ old('sale_lyd') }}"></div>
-            <div><label class="l">عدد القطع</label><input name="qty" class="inp numr" value="{{ old('qty', 1) }}"></div>
+            <div><label class="l">👤 اسم العميل</label><input name="customer_name" class="inp" value="{{ old('customer_name') }}"></div>
+            <div><label class="l">🔢 كود العميل (لو عنده حساب)</label><input name="customer_code" class="inp numr" value="{{ old('customer_code') }}"></div>
+            <div><label class="l">🌐 الموقع</label><input name="source" class="inp" value="{{ old('source') }}" placeholder="Amazon · Shein · …"></div>
+            <div><label class="l">💲 الإجمالي بالدولار</label><input name="usd_total" id="iUsd" class="inp numr" value="{{ old('usd_total') }}" oninput="calc()"></div>
+            <div><label class="l">🇱🇾 دفعت بالليبي كم *</label><input name="cost_lyd" id="iCost" class="inp numr" value="{{ old('cost_lyd') }}" required oninput="calc()"></div>
+            <div><label class="l">💱 سعر الصرف (تلقائي)</label><input name="rate" id="iRate" class="inp numr" value="{{ old('rate') }}" placeholder="ينحسب وحده"></div>
+            <div><label class="l">🏷 سعر البيع للعميل د.ل</label><input name="sale_lyd" id="iSale" class="inp numr" value="{{ old('sale_lyd') }}" oninput="calc()"></div>
+            <div><label class="l">📈 الربح (تلقائي)</label><input id="iProfit" class="inp numr" readonly style="font-weight:800"></div>
+            <div><label class="l">📦 الكمية</label><input name="qty" class="inp numr" value="{{ old('qty', 1) }}"></div>
+            <div><label class="l">💵 العميل دفع كم توا</label><div style="display:flex;gap:4px"><input name="cust_paid" class="inp numr" style="flex:1" value="{{ old('cust_paid') }}"><select name="cust_cur" class="inp" style="width:auto"><option value="lyd">د.ل</option><option value="usd" @selected(old('cust_cur') === 'usd')>$</option></select></div></div>
+            <div><label class="l">➕ مصاريف إضافية د.ل</label><input name="extra_lyd" id="iExtra" class="inp numr" value="{{ old('extra_lyd', 0) }}" oninput="calc()"></div>
             <div><label class="l">تندفع من</label><select name="wallet_id" class="inp">@foreach ($wallets as $w)<option value="{{ $w->id }}">{{ $w->name }} ({{ $f($w->balance) }})</option>@endforeach</select></div>
+            <input type="hidden" name="kind" value="{{ old('kind') }}">
         </div>
-        <h4 style="margin:12px 0 6px">👥 الشركاء وكم دفع كل واحد <span class="note" id="sumN"></span></h4>
-        <table class="t shr"><thead><tr><th>الشريك</th><th>دفع د.ل</th><th>من وين</th><th>نوع الخصم (للشركة)</th></tr></thead><tbody>
+        <h4 style="margin:12px 0 6px">👥 الشركاء <span class="note">— اللي ما دفعش خليه فاضي وحطله نسبة بس · لو رصيده ما يكفيش يقعد عليه دين</span> <span class="note" id="sumN"></span></h4>
+        <table class="t shr"><thead><tr><th>الشريك</th><th>دفع د.ل</th><th>نسبة الربح %</th><th>من وين</th><th>نوع الخصم (للشركة)</th></tr></thead><tbody>
         @foreach ($partners->where('active', true)->values() as $k => $p)
             <tr><td><input type="hidden" name="s[{{ $k }}][partner_id]" value="{{ $p->id }}"><b>{{ $p->name }}</b>{{ $p->is_company ? ' 🏢' : '' }}<small class="note" style="display:block">رصيده {{ $f($p->balance) }}</small></td>
                 <td><input name="s[{{ $k }}][paid]" class="inp numr sp" style="width:110px" oninput="sum()"></td>
+                <td><input name="s[{{ $k }}][pct]" class="inp numr spc" style="width:80px" placeholder="تلقائي" oninput="sum()"></td>
                 <td><select name="s[{{ $k }}][source]" class="inp"><option value="balance">من رصيده</option><option value="cash">دفع توا للتجارة</option>@if ($p->is_company)@foreach ($payments as $pm)<option value="main:{{ $pm->id }}">خزينة الشركة · {{ $pm->name }}</option>@endforeach @endif</select></td>
                 <td>@if ($p->is_company)<input name="s[{{ $k }}][kind]" class="inp" style="width:140px" placeholder="نوع الخصم">@endif</td></tr>
         @endforeach
@@ -183,9 +187,11 @@ table.t td.w { white-space: normal; }
     </form>
 </div></div>
 <script>
-function calc(){const u=parseFloat(document.getElementById('iUsd').value)||0,r=parseFloat(document.getElementById('iRate').value)||0;if(u&&r){document.getElementById('iCost').value=Math.round(u*r*100)/100;sum()}}
-function sum(){const t=(parseFloat(document.getElementById('iCost').value)||0)+(parseFloat(document.getElementById('iExtra').value)||0);let s=0;document.querySelectorAll('.sp').forEach(i=>s+=parseFloat(i.value)||0);
-  const n=document.getElementById('sumN');n.textContent='· المجموع '+s.toLocaleString('en-US')+' من '+t.toLocaleString('en-US')+(Math.abs(s-t)<0.01?' ✓':' — لازم يساويه');n.style.color=Math.abs(s-t)<0.01?'#0f8a5f':'#c62828'}
+const V=id=>parseFloat(document.getElementById(id).value)||0;
+function calc(){const u=V('iUsd'),c=V('iCost');if(u&&c)document.getElementById('iRate').value=Math.round(c/u*10000)/10000;
+  const p=V('iSale')?V('iSale')-c-V('iExtra'):0;const e=document.getElementById('iProfit');e.value=V('iSale')?Math.round(p*100)/100:'';e.style.color=p<0?'#c62828':'#0f8a5f';sum()}
+function sum(){let s=0,pc=0;document.querySelectorAll('.sp').forEach(i=>s+=parseFloat(i.value)||0);document.querySelectorAll('.spc').forEach(i=>pc+=parseFloat(i.value)||0);
+  const n=document.getElementById('sumN');n.textContent='· دفعوا '+s.toLocaleString('en-US')+(pc?' · النسب '+pc+'%'+(Math.abs(pc-100)<0.01?' ✓':' (لازم 100%)'):' · الربح على قد اللي دفعه كل واحد');n.style.color=pc&&Math.abs(pc-100)>0.01?'#c62828':'#0f8a5f'}
 @if ($errors->any() || old('cost_lyd'))document.addEventListener('DOMContentLoaded',()=>{const b=document.querySelector('[data-modal=mInv]');b&&b.click()});@endif
 </script>
 @endsection

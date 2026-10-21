@@ -1,6 +1,6 @@
 @extends('sg.layout')
 @section('title', 'فاتورة ' . $inv->code)
-@php use App\Services\TreasuryService as TS; use App\Models\Trade\Move; $f = fn ($n) => TS::fmt($n); $base = $inv->paidByPartners(); $due = max(0, (float) $inv->sale_lyd - (float) $inv->collected); $est = (float) ($inv->status === 'closed' ? $inv->profit : ((float) $inv->sale_lyd - $inv->totalCost())); @endphp
+@php use App\Services\TreasuryService as TS; use App\Models\Trade\Move; $f = fn ($n) => TS::fmt($n); $base = $inv->paidByPartners(); $wts = \App\Services\TradeService::weights($inv); $due = max(0, (float) $inv->sale_lyd - (float) $inv->collected); $est = (float) ($inv->status === 'closed' ? $inv->profit : ((float) $inv->sale_lyd - $inv->totalCost())); @endphp
 @push('style')
 <style>
 .tk { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
@@ -12,7 +12,7 @@
 @section('content')
 <div class="top">
     <div><h1>🧾 {{ $inv->code }} @if ($inv->status === 'closed')<span class="chip u">مقفولة</span>@else<span class="chip w">مفتوحة</span>@endif</h1>
-        <div class="sub">{{ $inv->kind }}{{ $inv->source ? ' · ' . $inv->source : '' }} · {{ $inv->created_at->format('Y-m-d') }}{{ $inv->customer ? ' · العميل ' . $inv->customer->name . ' (' . $inv->customer->code . ')' : '' }}</div></div>
+        <div class="sub">{{ $inv->kind }}{{ $inv->source ? ' · ' . $inv->source : '' }} · {{ $inv->created_at->format('Y-m-d') }}{{ $inv->customer ? ' · العميل ' . $inv->customer->name . ' (' . $inv->customer->code . ')' : (!empty($inv->customer_name) ? ' · العميل ' . $inv->customer_name : '') }}</div></div>
     <div class="acts"><a class="btn ghost" href="{{ route('sg.trade', ['tab' => 'invoices']) }}">↩ الفواتير</a><button class="sg-burger">☰</button></div>
 </div>
 <div class="tk">
@@ -48,16 +48,18 @@
 </div>
 @endif
 
-<div class="card tw mb">
-    <div class="tw-h"><h3>👥 الشركاء في الفاتورة</h3></div>
-    <table class="t"><thead><tr><th>الشريك</th><th>من وين</th><th class="n">دفع</th><th class="n">النسبة</th><th class="n">{{ $inv->status === 'closed' ? 'نصيبه من الربح' : 'نصيبه المتوقع' }}</th><th class="n">يرجعله كامل</th></tr></thead><tbody>
+<form method="post" action="{{ route('sg.trade.invoice.act', $inv) }}" class="card tw mb">@csrf<input type="hidden" name="a" value="pct">
+    <div class="tw-h"><h3>👥 الشركاء في الفاتورة</h3>@if ($inv->status !== 'closed')<button class="btn ghost sm" style="margin-inline-start:auto">💾 حفظ النسب</button>@endif</div>
+    <table class="t"><thead><tr><th>الشريك</th><th>من وين</th><th class="n">دفع</th><th class="n">نسبة الربح %</th><th class="n">{{ $inv->status === 'closed' ? 'نصيبه من الربح' : 'نصيبه المتوقع' }}</th><th class="n">يرجعله كامل</th></tr></thead><tbody>
     @foreach ($inv->shares as $s)
-        @php $pct = $base > 0 ? (float) $s->paid / $base : 0; $pr = $inv->status === 'closed' ? (float) $s->profit : round($est * $pct, 2); @endphp
-        <tr><td><b>{{ optional($s->partner)->name }}</b></td><td class="note">{{ $s->source }}</td><td class="n num">{{ $f($s->paid) }}</td><td class="n num">{{ round($pct * 100, 1) }}%</td>
+        @php $pct = $wts[$s->id] ?? 0; $pr = $inv->status === 'closed' ? (float) $s->profit : round($est * $pct, 2); @endphp
+        <tr><td><b>{{ optional($s->partner)->name }}</b></td><td class="note">{{ $s->source }}</td><td class="n num">{{ $f($s->paid) }}</td>
+            <td class="n num">@if ($inv->status !== 'closed')<input name="pct[{{ $s->id }}]" class="inp numr" style="width:80px;height:32px" value="{{ $s->pct !== null ? $s->pct + 0 : '' }}" placeholder="{{ round($pct * 100, 1) }}">@else{{ round($pct * 100, 1) }}%@endif</td>
             <td class="n num {{ $pr < 0 ? 'mn' : 'pl' }}">{{ $f($pr) }}</td><td class="n num"><b>{{ $f((float) $s->paid + $pr) }}</b></td></tr>
     @endforeach
     </tbody></table>
-</div>
+    <div class="note" style="padding:8px 14px">💡 النسبة فاضية = على قد اللي دفعه · تقدر تحط نسبة لشريك ما دفعش</div>
+</form>
 
 <div class="card tw">
     <div class="tw-h"><h3>📜 حركات الفاتورة</h3></div>
