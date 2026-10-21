@@ -135,9 +135,24 @@ table.t td.w { white-space: normal; }
 @endif
 
 @if ($tab === 'report')
+@php
+    // 📈 الربح المتوقع من الفواتير المفتوحة (سعر البيع − التكلفة) حتى لو العميل ما دفعش · على النسبة
+    $expBy = []; $invRows = [];
+    foreach ($allInv as $iv) {
+        $w = \App\Services\TradeService::weights($iv);
+        $pr = $iv->status === 'closed' ? (float) $iv->profit : round((float) $iv->sale_lyd - $iv->totalCost(), 2);
+        $cells = [];
+        foreach ($iv->shares as $sh) {
+            $pp = $iv->status === 'closed' ? (float) $sh->profit : round($pr * ($w[$sh->id] ?? 0), 2);
+            $cells[$sh->partner_id] = ['pct' => round(($w[$sh->id] ?? 0) * 100, 1), 'amt' => $pp, 'paid' => (float) $sh->paid];
+            if ($iv->status !== 'closed') { $expBy[$sh->partner_id] = ($expBy[$sh->partner_id] ?? 0) + $pp; }
+        }
+        $invRows[] = ['iv' => $iv, 'profit' => $pr, 'cells' => $cells];
+    }
+@endphp
 <div class="card tw mb">
     <div class="tw-h"><h3>📊 كل شريك</h3></div>
-    <div class="scroll-x"><table class="t"><thead><tr><th>الشريك</th><th class="n">إيداع</th><th class="n">سحب</th><th class="n">من خزينة الشركة</th><th class="n">لمالية الشركة</th><th class="n">في فواتير مفتوحة</th><th class="n">أرباح</th><th class="n">خسائر</th><th class="n">الصافي</th><th class="n">الرصيد</th></tr></thead><tbody>
+    <div class="scroll-x"><table class="t"><thead><tr><th>الشريك</th><th class="n">إيداع</th><th class="n">سحب</th><th class="n">من خزينة الشركة</th><th class="n">لمالية الشركة</th><th class="n">في فواتير مفتوحة</th><th class="n">أرباح</th><th class="n">خسائر</th><th class="n">الصافي</th><th class="n">📈 متوقع (مفتوحة)</th><th class="n">= الكل</th><th class="n">الرصيد</th></tr></thead><tbody>
     @foreach ($partners as $p)
         @php $r = ($report[$p->id] ?? collect())->keyBy('type'); $g = fn ($t) => (float) optional($r->get($t))->s; $open = (float) $p->shares()->whereHas('invoice', fn ($q) => $q->where('status', 'open'))->sum('paid'); @endphp
         <tr><td><b>{{ $p->name }}</b>{{ $p->is_company ? ' 🏢' : '' }}</td>
@@ -146,10 +161,32 @@ table.t td.w { white-space: normal; }
             <td class="n num">{{ $f($open) }}</td>
             <td class="n num pl">{{ $f($g('profit')) }}</td><td class="n num mn">{{ $f(abs($g('loss'))) }}</td>
             <td class="n num {{ $g('profit') + $g('loss') < 0 ? 'mn' : 'pl' }}"><b>{{ $f($g('profit') + $g('loss')) }}</b></td>
+            @php $ex = (float) ($expBy[$p->id] ?? 0); @endphp
+            <td class="n num {{ $ex < 0 ? 'mn' : 'pl' }}">{{ $f($ex) }}</td>
+            <td class="n num {{ $g('profit') + $g('loss') + $ex < 0 ? 'mn' : 'pl' }}"><b>{{ $f($g('profit') + $g('loss') + $ex) }}</b></td>
             <td class="n num"><b>{{ $f($p->balance) }}</b></td></tr>
     @endforeach
     </tbody></table></div>
     @if ($company)<div class="note" style="padding:10px 14px">🏢 ربح Shop & Go الصافي: <b class="num">{{ $f((float) optional(($report[$company->id] ?? collect())->firstWhere('type', 'profit'))->s + (float) optional(($report[$company->id] ?? collect())->firstWhere('type', 'loss'))->s) }}</b> د.ل · رصيدها في التجارة <b class="num">{{ $f($company->balance) }}</b> — تقدر تدرجه لمالية الشركة من «🏠 الملخص».</div>@endif
+</div>
+<div class="card tw mb">
+    <div class="tw-h"><h3>🧾 كل فاتورة: نسبة كل شريك وربحه <span class="h-note">المفتوحة: متوقع (سعر البيع − التكلفة) حتى لو العميل ما دفعش</span></h3></div>
+    <div class="scroll-x"><table class="t"><thead><tr><th>الفاتورة</th><th>العميل</th><th class="n">التكلفة</th><th class="n">البيع</th><th class="n">سدد</th><th class="n">الربح</th>@foreach ($partners as $p)<th class="n">{{ $p->name }}</th>@endforeach</tr></thead><tbody>
+    @forelse ($invRows as $row)
+        @php $iv = $row['iv']; @endphp
+        <tr><td><a href="{{ route('sg.trade.invoice', $iv) }}"><b class="num">{{ $iv->code }}</b></a> @if ($iv->status === 'closed')<span class="chip u">مقفولة</span>@else<span class="chip w">مفتوحة</span>@endif</td>
+            <td>{{ optional($iv->customer)->name ?: ($iv->customer_name ?? '') ?: '—' }}</td>
+            <td class="n num">{{ $f($iv->totalCost()) }}</td><td class="n num">{{ $f($iv->sale_lyd) }}</td><td class="n num">{{ $f($iv->collected) }}</td>
+            <td class="n num {{ $row['profit'] < 0 ? 'mn' : 'pl' }}"><b>{{ $f($row['profit']) }}</b></td>
+            @foreach ($partners as $p)
+                @php $c = $row['cells'][$p->id] ?? null; @endphp
+                <td class="n num">@if ($c)<b class="{{ $c['amt'] < 0 ? 'mn' : 'pl' }}">{{ $f($c['amt']) }}</b><small class="note" style="display:block">{{ $c['pct'] }}% · دفع {{ $f($c['paid']) }}</small>@else—@endif</td>
+            @endforeach
+        </tr>
+    @empty
+        <tr><td colspan="{{ 6 + $partners->count() }}"><div class="empty">ما فيش فواتير</div></td></tr>
+    @endforelse
+    </tbody></table></div>
 </div>
 <div class="card tw mb">
     <div class="tw-h"><h3>📅 حسب الشهر (فواتير مقفولة)</h3></div>

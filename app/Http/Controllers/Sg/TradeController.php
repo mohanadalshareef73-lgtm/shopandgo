@@ -47,6 +47,7 @@ class TradeController extends Controller
             'moves' => Move::with(['partner', 'wallet', 'invoice', 'user'])->when($pid, fn ($q) => $q->where('partner_id', $pid))->latest('id')->take(200)->get(),
             'sel' => $pid ? $partners->firstWhere('id', $pid) : null,
             'payments' => PaymentMethod::where('status', true)->orderBy('id')->get(),
+            'allInv' => $tab === 'report' ? Invoice::with(['shares.partner', 'customer'])->latest('id')->take(200)->get() : collect(),
             'report' => $tab === 'report' ? Move::selectRaw('partner_id, type, SUM(partner_change) s, COUNT(*) n')->whereNotNull('partner_id')->groupBy('partner_id', 'type')->get()->groupBy('partner_id') : collect(),
             'monthly' => $tab === 'report' ? Invoice::where('status', 'closed')->selectRaw("DATE_FORMAT(closed_at, '%Y-%m') m, COUNT(*) n, SUM(profit) p, SUM(cost_lyd + extra_lyd) c, SUM(collected) s")->groupBy('m')->orderByDesc('m')->take(12)->get() : collect(),
             'stats' => [
