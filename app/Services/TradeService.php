@@ -375,15 +375,31 @@ class TradeService
     /** وزن كل شريك في الربح: النسبة المكتوبة، ولا على قد اللي دفعه */
     public static function weights(Invoice $inv): array
     {
+        // ✍ النسبة المكتوبة هي اللي تمشي · اللي ما عندهمش نسبة ياخذوا الباقي (100 − المكتوب) على قد اللي دفعوه
         $shares = $inv->shares;
-        $usePct = $shares->contains(fn ($s) => (float) ($s->pct ?? 0) > 0);
-        $w = [];
+        $fixed = [];
+        $free = [];
         foreach ($shares as $s) {
-            $w[$s->id] = $usePct ? max(0, (float) ($s->pct ?? 0)) : max(0, (float) $s->paid);
+            if ($s->pct !== null && $s->pct !== '' && (float) $s->pct > 0) {
+                $fixed[$s->id] = (float) $s->pct / 100;
+            } elseif ((float) $s->paid > 0) {
+                $free[$s->id] = (float) $s->paid;
+            }
         }
-        $sum = array_sum($w);
+        if (!$fixed) {
+            $sum = array_sum($free);
 
-        return $sum > 0 ? array_map(fn ($v) => $v / $sum, $w) : [];
+            return $sum > 0 ? array_map(fn ($v) => $v / $sum, $free) : [];
+        }
+        $w = $fixed;
+        $rest = max(0, 1 - array_sum($fixed));
+        $sumFree = array_sum($free);
+        foreach ($free as $id => $v) {
+            $w[$id] = $sumFree > 0 ? $rest * $v / $sumFree : 0;
+        }
+        $tot = array_sum($w);
+
+        return $tot > 1.0001 ? array_map(fn ($v) => $v / $tot, $w) : $w; // لو المكتوب أكثر من 100% نوزعوه بنسبته
     }
 
     /** 📦 طلبية للعميل في حسابه (عادي كأنها من الشركة) — مربوطة بالفاتورة وفلوسها تمشي لخزينة التجارة */

@@ -86,7 +86,7 @@ function chGo(m){const a=document.getElementById('chA').value,u=document.getElem
             <td class="n num {{ $pr < 0 ? 'mn' : 'pl' }}">{{ $f($pr) }}</td><td class="n num"><b>{{ $f((float) $s->paid + $pr) }}</b></td></tr>
     @endforeach
     </tbody></table>
-    <div class="note" style="padding:8px 14px">💡 النسبة فاضية = على قد اللي دفعه · تقدر تحط نسبة لشريك ما دفعش</div>
+    <div class="note" style="padding:8px 14px">💡 النسبة اللي تكتبها هي اللي تمشي · اللي فاضيين ياخذوا الباقي على قد اللي دفعوه · تقدر تحط نسبة لشريك ما دفعش</div>
 </form>
 
 <div class="card tw">
