@@ -32,7 +32,7 @@ class PortalCartsController extends Controller
     {
         $this->middleware('permission:cart-list', ['only' => ['index', 'receipt', 'booking', 'download']]);
         // الموظف العادي (يشوف السلات) يقدر يأكد ويحجز ويبعت للرقم زادة
-        $this->middleware('permission:cart-edit|cart-list', ['only' => ['decide', 'office', 'bookNow', 'toDelivery', 'note']]);
+        $this->middleware('permission:cart-edit|cart-list', ['only' => ['decide', 'office', 'bookNow', 'orderToGroup', 'toDelivery', 'note']]);
         $this->middleware('permission:cart-edit', ['only' => ['resend']]);
     }
 
@@ -478,6 +478,25 @@ class PortalCartsController extends Controller
     }
 
     /** ⚡ احجز الآن: للقروب (الرابط ← PDF لو فيه قطع مكررة ← كود العميل) + رسالة الحجز للعميل */
+    /** 📤 من أوامر الإيصال: يبعث سلة الإيصال لقروب الحجز (منتظرة): الرابط + PDF لو فيه تكرار + الكود */
+    public function orderToGroup(Request $request, \App\Models\Order $order, SheinQuotationPdf $pdf)
+    {
+        $cart = CartQuote::where('order_id', $order->id)->latest('id')->first();
+        if (!$cart || !$cart->source_url) {
+            return back()->with('error', 'الإيصال ' . $order->code . ' مش من سلة، فما عندهش رابط نبعتوه');
+        }
+        if ($cart->status !== 'succeeded') {
+            return back()->with('error', 'سلة الإيصال ' . $order->code . ' ما انحسبتش، فما نقدروش نبعتوها');
+        }
+        $g = collect((array) \App\Services\AppSettings::get('wa_groups_recent', []))->filter(fn ($x) => !empty($x['tag']) && !empty($x['id']))->first();
+        if (!$g) {
+            return back()->with('error', 'قروب الحجز (منتظرة) مش مسجل · من الإعدادات: خلّي حد يكتب #حجز في القروب وجرّبه');
+        }
+        $request->merge(['to_phone' => $g['id'], 'to_new' => null, 'wa' => 1]);
+
+        return $this->bookNow($request, $cart, $pdf);
+    }
+
     public function bookNow(Request $request, CartQuote $cart, SheinQuotationPdf $pdf)
     {
         // الرقم اللي اخترته يوصله الحجز (وانت تحوّله للقروب بروحك)
