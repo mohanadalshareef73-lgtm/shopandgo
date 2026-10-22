@@ -41,8 +41,8 @@ class CourierService
             'recipient_name' => $d['recipient_name'] ?? $customer->name,
             'recipient_phone' => $d['recipient_phone'] ?? $customer->phone_1,
             'recipient_phone2' => $d['recipient_phone2'] ?? null,
-            'city' => $d['city'] ?? null,
-            'address' => $d['address'] ?? $customer->address,
+            'city' => ($d['city'] ?? null) ?: ($customer->city ?? null),
+            'address' => ($d['address'] ?? null) ?: static::withArea($customer->area ?? null, $customer->address),
             'location_url' => $d['location_url'] ?? $customer->location_url,
             'package_type' => $d['package_type'] ?? $orders->pluck('package_type')->filter()->unique()->implode('، '),
             'parcels' => (int) ($d['parcels'] ?? max(1, $orders->sum(fn ($o) => $o->bags_num ?: 1))),
@@ -105,6 +105,32 @@ class CourierService
         'هون', 'ودان', 'غات', 'اوباري', 'مرزق', 'يفرن', 'نالوت', 'الجميل', 'العجيلات', 'صرمان', 'جنزور', 'تاجوراء', 'القره بوللي', 'مسلاتة', 'سوسة',
         'امساعد', 'البيضا', 'الجفرة', 'براك', 'الشاطئ', 'رقدالين', 'زلطن', 'الرجبان', 'الزنتان', 'كاباو', 'الاصابعة', 'تيجي', 'بدر', 'العزيزية', 'ككلة',
         'tripoli', 'misrata', 'misurata', 'bayda', 'derna', 'sirte', 'zawiya', 'sabha', 'tobruk', 'ajdabiya', 'marj', 'khoms', 'zliten', 'gharyan'];
+
+    /** العنوان = المنطقة - التفاصيل (لو المنطقة مش مكتوبة فيه) */
+    public static function withArea(?string $area, ?string $address): string
+    {
+        $area = trim((string) $area);
+        $address = trim((string) $address);
+        if ($area === '' || ($address !== '' && str_contains(static::norm($address), static::norm($area)))) {
+            return $address;
+        }
+
+        return $address === '' ? $area : $area . ' - ' . $address;
+    }
+
+    /** نحفظو مدينة ومنطقة العميل (لو الخانات موجودة) */
+    public static function rememberCity(\App\Models\Customer $c, ?string $city, ?string $area): void
+    {
+        if (!\App\Support\Fast::hasColumn('customers', 'city')) {
+            return;
+        }
+        if (trim((string) $city) !== '') {
+            $c->city = trim($city);
+        }
+        if (trim((string) $area) !== '') {
+            $c->area = trim($area);
+        }
+    }
 
     protected static function norm(string $s): string
     {
@@ -188,7 +214,7 @@ class CourierService
         $dl = Delivery::create([
             'code' => Delivery::newCode(), 'customer_id' => $c->id, 'courier_id' => optional($courier)->id, 'source' => 'customer',
             'status' => $courier ? 'assigned' : 'requested', 'recipient_name' => $c->name, 'recipient_phone' => $c->phone_1, 'recipient_phone2' => $c->phone_2,
-            'address' => $c->address, 'location_url' => $c->location_url ?? null, 'package_type' => 'تحصيل حجز', 'parcels' => 0,
+            'city' => $c->city ?? null, 'address' => static::withArea($c->area ?? null, $c->address), 'location_url' => $c->location_url ?? null, 'package_type' => 'تحصيل حجز', 'parcels' => 0,
             'amount' => round($amount, 2), 'fee' => (float) AppSettings::get('courier_default_fee', 10), 'fee_payer' => 'customer', 'pay_type' => 'cash',
             'note' => '💵 تحصيل حجز سلة ' . $cart->retailer_label . ' #' . $cart->id . ' — ما فيش طرد، اقبض المبلغ بس', 'assigned_at' => $courier ? now() : null,
             'cart_id' => $cart->id,
@@ -220,7 +246,7 @@ class CourierService
         $dl = Delivery::create([
             'code' => Delivery::newCode(), 'customer_id' => $c->id, 'courier_id' => optional($courier)->id, 'source' => 'admin',
             'status' => $courier ? 'assigned' : 'requested', 'recipient_name' => $c->name, 'recipient_phone' => $c->phone_1, 'recipient_phone2' => $c->phone_2,
-            'address' => $c->address, 'location_url' => $c->location_url ?? null, 'package_type' => 'تحصيل عربون', 'parcels' => 0,
+            'city' => $c->city ?? null, 'address' => static::withArea($c->area ?? null, $c->address), 'location_url' => $c->location_url ?? null, 'package_type' => 'تحصيل عربون', 'parcels' => 0,
             'amount' => round($amount, 2), 'fee' => max(0, $fee), 'fee_payer' => 'customer', 'pay_type' => 'cash',
             'note' => '💵 تحصيل عربون إيصال ' . $o->code . ' — ما فيش طرد، اقبض المبلغ بس', 'assigned_at' => $courier ? now() : null,
             'deposit_order_id' => $o->id, 'created_id' => auth('web')->id(),

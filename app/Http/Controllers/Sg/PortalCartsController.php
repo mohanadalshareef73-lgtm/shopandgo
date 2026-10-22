@@ -133,7 +133,7 @@ class PortalCartsController extends Controller
                 $dl = \App\Models\Delivery::create([
                     'code' => \App\Models\Delivery::newCode(), 'customer_id' => $cart->customer_id, 'source' => 'customer', 'status' => 'requested',
                     'recipient_name' => optional($cu)->name ?: ($cart->guest_name ?? (optional($cart->incomingMessage)->name ?: 'عميل')),
-                    'recipient_phone' => optional($cu)->phone_1 ?: ($cart->guest_phone ?? null), 'address' => optional($cu)->address ?: ($cart->guest_address ?? null),
+                    'recipient_phone' => optional($cu)->phone_1 ?: ($cart->guest_phone ?? null), 'city' => optional($cu)->city ?? null, 'address' => ($cu ? \App\Services\CourierService::withArea($cu->area ?? null, $cu->address) : '') ?: ($cart->guest_address ?? null),
                     'package_type' => 'تحصيل حجز', 'parcels' => 0, 'amount' => round($amt, 2), 'fee' => (float) \App\Services\AppSettings::get('courier_default_fee', 10),
                     'fee_payer' => 'customer', 'pay_type' => 'cash', 'cart_id' => $cart->id,
                     'note' => '💵 تحصيل حجز سلة ' . $cart->retailer_label . ' #' . $cart->id . ' — ما فيش طرد، اقبض المبلغ بس',

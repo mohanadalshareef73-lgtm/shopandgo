@@ -85,7 +85,7 @@
             <tr class="{{ $sel && $sel->id === $c->id ? 'on' : '' }}" style="cursor:pointer" onclick="location.href='{{ request()->fullUrlWithQuery(['id' => $c->id]) }}'">
                 @if ($tag === 'idle')<td onclick="event.stopPropagation()"><input type="checkbox" class="wpick" name="ids[]" value="{{ $c->id }}" form="bulkWa"></td>@endif
                 <td><div class="who"><span class="av" style="background:{{ $palette[$c->id % 8] }};width:34px;height:34px;font-size:14px">{{ mb_substr($c->name, 0, 1) }}</span><div class="cell2"><b>{{ $c->name }} @if ($tg)<span class="chip {{ $tg[1] }} tagx">{{ $tg[0] }}</span>@endif</b><small class="num">{{ $c->code }} · {{ $c->phone_1 }}</small></div></div></td>
-                <td class="note">{{ \Illuminate\Support\Str::limit($c->address, 22) ?: '—' }}</td>
+                <td class="note">{{ \Illuminate\Support\Str::limit(trim(implode(' · ', array_filter([$c->city ?? null, $c->area ?? null])) ?: (string) $c->address), 26) ?: '—' }}</td>
                 <td class="n num">{{ $c->orders_n }}</td>
                 <td class="n num">{{ $f($c->spent) }}</td>
                 <td class="n">@if ($c->due > 0.009)<b class="num minus">{{ $f($c->due) }}</b>@else<span class="note">✓</span>@endif</td>
@@ -103,7 +103,7 @@
     @php $tg = $tagOf($sel); $wa = \App\Services\MessageService::normalize($sel->phone_1 ?? ''); @endphp
     <div class="card prof">
         <div class="ph">
-            <div class="who"><span class="av">{{ mb_substr($sel->name, 0, 1) }}</span><div><div class="nm">{{ $sel->name }}</div><div class="mt2"><span class="num">{{ $sel->code }}</span> · <span class="num">{{ $sel->phone_1 }}</span>{{ $sel->phone_2 ? ' · ' : '' }}<span class="num">{{ $sel->phone_2 }}</span>{{ $sel->address ? ' · ' . $sel->address : '' }}</div></div></div>
+            <div class="who"><span class="av">{{ mb_substr($sel->name, 0, 1) }}</span><div><div class="nm">{{ $sel->name }}</div><div class="mt2"><span class="num">{{ $sel->code }}</span> · <span class="num">{{ $sel->phone_1 }}</span>{{ $sel->phone_2 ? ' · ' : '' }}<span class="num">{{ $sel->phone_2 }}</span>{{ ($sel->city ?? null) ? ' · ' . $sel->city : '' }}{{ ($sel->area ?? null) ? ' · ' . $sel->area : '' }}{{ $sel->address ? ' · ' . $sel->address : '' }}</div></div></div>
             @php $lvS = \App\Services\LoyaltyService::info($sel); @endphp
             <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">@if ($lvS && $lvS['tier'])<span class="chip" style="background:{{ $lvS['tier'][5] }};color:#fff">{{ $lvS['tier'][2] }} {{ $lvS['tier'][1] }}</span>@endif @if ($tg)<span class="chip {{ $tg[1] }}">{{ $tg[0] }}</span>@endif<span class="chip" style="background:rgba(255,255,255,.12);color:#fff">عميل من {{ \App\Services\Period::MONTHS[$sel->created_at->month - 1] }} {{ $sel->created_at->year }}</span>@if ($sel->credit > 0)<span class="chip u">رصيد لدينا {{ TS::fmt($sel->credit) }}</span>@endif</div>
             <div class="acts2">
@@ -200,7 +200,8 @@
         @csrf
         <div class="f"><label class="l">الاسم</label><input name="name" class="inp" required></div>
         <div class="grid g2 f"><div><label class="l">الهاتف</label><input name="phone_1" id="ncPhone" class="inp numr" required></div><div><label class="l">هاتف آخر</label><input name="phone_2" class="inp numr"></div></div>
-        <div class="f"><label class="l">العنوان / المدينة</label><input name="address" class="inp"></div>
+        <div class="grid g2"><div class="f"><label class="l">المدينة <b style="color:var(--down)">*</b></label><input name="city" class="inp" list="lyCities" value="{{ old('city', 'بنغازي') }}" required></div><div class="f"><label class="l">المنطقة <b style="color:var(--down)">*</b></label><input name="area" class="inp" value="{{ old('area') }}" required placeholder="مثلاً الكيش، الهواري…"></div></div>
+        <div class="f"><label class="l">العنوان بالتفصيل</label><input name="address" class="inp" value="{{ old('address') }}"></div>@include('sg.partials.cities')
         <div class="f"><label class="l">الكود <span class="note">(فارغ = آخر 4 أرقام من الهاتف)</span></label><input name="code" class="inp numr" data-code-check data-phone="#ncPhone" autocomplete="off"></div>
         <div style="display:flex;gap:8px"><button class="btn">حفظ</button><button type="button" class="btn ghost" data-close>إلغاء</button></div>
     </form>
@@ -214,7 +215,8 @@
         @csrf @method('PUT')
         <div class="f"><label class="l">الاسم</label><input name="name" class="inp" value="{{ $sel->name }}" required></div>
         <div class="grid g2 f"><div><label class="l">الهاتف</label><input name="phone_1" class="inp numr" value="{{ $sel->phone_1 }}" required></div><div><label class="l">هاتف آخر</label><input name="phone_2" class="inp numr" value="{{ $sel->phone_2 }}"></div></div>
-        <div class="f"><label class="l">العنوان / المدينة</label><input name="address" class="inp" value="{{ $sel->address }}"></div>
+        <div class="grid g2"><div class="f"><label class="l">المدينة <b style="color:var(--down)">*</b></label><input name="city" class="inp" list="lyCities" value="{{ old('city', $sel->city ?? '') }}" required></div><div class="f"><label class="l">المنطقة <b style="color:var(--down)">*</b></label><input name="area" class="inp" value="{{ old('area', $sel->area ?? '') }}" required></div></div>
+        <div class="f"><label class="l">العنوان بالتفصيل</label><input name="address" class="inp" value="{{ $sel->address }}"></div>
         <div style="display:flex;gap:8px"><button class="btn">حفظ</button><button type="button" class="btn ghost" data-close>إلغاء</button></div>
     </form>
 </div></div>

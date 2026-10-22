@@ -48,10 +48,11 @@ class DeliveryRequestController extends Controller
     {
         $o = $this->load($order, $t);
         $data = $request->validate([
-            'name' => 'required|string|max:120', 'phone' => 'required|string|max:30', 'city' => 'required|string|max:80',
+            'name' => 'required|string|max:120', 'phone' => 'required|string|max:30', 'city' => 'required|string|max:80', 'area' => 'required|string|max:120',
             'address' => 'required|string|max:250', 'location_url' => 'nullable|string|max:500', 'note' => 'nullable|string|max:500',
             'ids' => 'nullable|array', 'ids.*' => 'integer',
-        ], ['name.required' => 'اكتب اسمك', 'phone.required' => 'اكتب رقم هاتفك', 'address.required' => 'اكتب العنوان', 'city.required' => 'اكتب المدينة']);
+        ], ['name.required' => 'اكتب اسمك', 'phone.required' => 'اكتب رقم هاتفك', 'address.required' => 'اكتب العنوان', 'city.required' => 'اكتب المدينة', 'area.required' => 'اكتب المنطقة']);
+        $data['address'] = CourierService::withArea($data['area'], $data['address']);
         $c = $o->customer;
         abort_unless($c, 404);
         $ids = array_map('intval', $data['ids'] ?? [$o->id]);
@@ -69,6 +70,7 @@ class DeliveryRequestController extends Controller
                 'address' => $data['address'], 'location_url' => $data['location_url'] ?? null,
                 'fee' => AppSettings::get('courier_default_fee', 0), 'pay_type' => 'cash', 'note' => $data['note'] ?? null,
             ], $courier, 'customer');
+            CourierService::rememberCity($c, $data['city'], $data['area']);
             if (!$c->address) {
                 $c->address = $data['address'];
             }

@@ -63,7 +63,9 @@
         <div class="fg"><label class="l">بيانات الرحلة</label><input type="text" name="trip_details" class="inp" placeholder="بيانات الرحلة"></div>
         <div class="fg new_customer_fields"><label class="l">رقم الهاتف 2 (إختياري)</label><input type="text" name="phone_2" class="inp numr" placeholder="رقم الهاتف 2 (إختياري)"></div>
         <div class="fg new_customer_fields"><label class="l">كود العميل (إختياري)</label><input type="text" name="code" class="inp numr" placeholder="كود العميل (إختياري)" data-code-check data-phone="#of input[name=phone_1]" autocomplete="off"></div>
-        <div class="fg new_customer_fields"><label class="l">العنوان (إختياري)</label><input type="text" name="address" class="inp" placeholder="العنوان (إختياري)"></div>
+        <div class="fg new_customer_fields"><label class="l">المدينة <b style="color:var(--down)">*</b></label><input type="text" name="city" class="inp" list="lyCities" value="{{ old('city', 'بنغازي') }}" placeholder="المدينة"></div>
+        <div class="fg new_customer_fields"><label class="l">المنطقة <b style="color:var(--down)">*</b></label><input type="text" name="area" class="inp" value="{{ old('area') }}" placeholder="مثلاً الكيش، الهواري…"></div>
+        <div class="fg new_customer_fields"><label class="l">العنوان بالتفصيل (إختياري)</label><input type="text" name="address" class="inp" placeholder="العنوان (إختياري)"></div>@include('sg.partials.cities')
         <div class="fg"><label class="l">نوع الطرد</label><input type="text" name="order_type" class="inp" placeholder="نوع الطرد"></div>
         <div class="fg"><label class="l">عدد الطرود (إختياري)</label><input type="number" name="bags_num" class="inp numr" placeholder="عدد الطرود"></div>
         <div class="fg"><label class="l">الكمية في الطرود (إختياري)</label><input type="number" name="bags_qty" class="inp numr" placeholder="الكمية في الطرود"></div>

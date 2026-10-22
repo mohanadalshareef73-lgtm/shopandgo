@@ -57,7 +57,8 @@ class ClientsController extends Controller
             default => null,
         };
         if ($request->filled('city')) {
-            $q->where('address', 'like', '%' . $request->city . '%');
+            $city = $request->city;
+            $q->where(fn ($w) => $w->where('address', 'like', '%' . $city . '%')->when(\App\Support\Fast::hasColumn('customers', 'city'), fn ($x) => $x->orWhere('city', 'like', '%' . $city . '%')->orWhere('area', 'like', '%' . $city . '%')));
         }
         $sort = $request->input('sort', 'last');
         match ($sort) {
@@ -121,9 +122,10 @@ class ClientsController extends Controller
             'phone_1' => 'required|string|max:20|unique:customers,phone_1',
             'phone_2' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:190',
+            'city' => 'required|string|max:80', 'area' => 'required|string|max:120',
             'code' => 'nullable|string|max:20|unique:customers,code',
             'notes' => 'nullable|string|max:2000',
-        ], ['phone_1.unique' => 'رقم الهاتف مسجل لعميل آخر', 'code.unique' => 'هذا الكود مستخدم — جرب: ' . implode('، ', self::codeSuggestions((string) $request->input('code'), preg_replace('/\D/', '', (string) $request->input('phone_1'))))]);
+        ], ['city.required' => 'اكتب المدينة', 'area.required' => 'اكتب المنطقة', 'phone_1.unique' => 'رقم الهاتف مسجل لعميل آخر', 'code.unique' => 'هذا الكود مستخدم — جرب: ' . implode('، ', self::codeSuggestions((string) $request->input('code'), preg_replace('/\D/', '', (string) $request->input('phone_1'))))]);
         $c = new Customer($data);
         $c->code = $data['code'] ?? self::codeFor($data['phone_1']);
         $c->save();
@@ -139,7 +141,8 @@ class ClientsController extends Controller
             'phone_1' => 'required|string|max:20|unique:customers,phone_1,' . $customer->id,
             'phone_2' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:190',
-        ]);
+            'city' => 'required|string|max:80', 'area' => 'required|string|max:120',
+        ], ['city.required' => 'اكتب المدينة', 'area.required' => 'اكتب المنطقة']);
         $customer->update($data);
 
         return back()->with('success', 'تم حفظ بيانات العميل');

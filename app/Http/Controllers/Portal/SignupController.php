@@ -72,14 +72,16 @@ class SignupController extends Controller
             'name' => ['required', 'string', 'min:3', 'max:80', 'regex:/^[\p{Arabic}\p{L}\s\.\-]+$/u'],
             'phone_1' => ['required', 'regex:/^09[1-6]\d{7}$/'],
             'phone_2' => ['nullable', 'regex:/^0\d{8,9}$/', 'different:phone_1'],
-            'address' => 'required|string|min:3|max:150',
+            'city' => 'required|string|min:2|max:80',
+            'area' => 'required|string|min:2|max:120',
+            'address' => 'nullable|string|max:150',
             'password' => 'required|string|min:8|max:100|confirmed',
             'agree' => 'accepted',
         ], [
             'name.required' => 'اكتب الاسم الكامل', 'name.min' => 'الاسم قصير جداً', 'name.regex' => 'الاسم يجب أن يحتوي على حروف فقط',
             'phone_1.required' => 'اكتب رقم الهاتف', 'phone_1.regex' => 'رقم الهاتف غير صحيح (مثال: 0912345678)',
             'phone_2.regex' => 'رقم الهاتف الثاني غير صحيح', 'phone_2.different' => 'الرقم الثاني مطابق للأول',
-            'address.required' => 'اكتب المدينة والمنطقة',
+            'city.required' => 'اكتب المدينة', 'area.required' => 'اكتب المنطقة',
             'password.required' => 'اختر كلمة مرور', 'password.min' => 'كلمة المرور 8 خانات على الأقل', 'password.confirmed' => 'تأكيد كلمة المرور غير مطابق',
             'agree.accepted' => 'يجب الموافقة على الشروط',
         ]);
@@ -91,7 +93,8 @@ class SignupController extends Controller
         }
         $pending = [
             'name' => trim(preg_replace('/\s+/u', ' ', $data['name'])), 'phone_1' => $data['phone_1'], 'phone_2' => $data['phone_2'] ?? null,
-            'address' => strip_tags($data['address']), 'password' => Hash::make($data['password']),
+            'city' => strip_tags(trim($data['city'])), 'area' => strip_tags(trim($data['area'])),
+            'address' => strip_tags(trim(($data['address'] ?? '') ?: (trim($data['city']) . ' - ' . trim($data['area'])))), 'password' => Hash::make($data['password']),
         ];
         if (Otp::enabled()) {
             if (!Otp::send('signup', $pending['phone_1'])) {
@@ -229,6 +232,10 @@ class SignupController extends Controller
         $c->phone_1 = $d['phone_1'];
         $c->phone_2 = $d['phone_2'];
         $c->address = $d['address'];
+        if (\App\Support\Fast::hasColumn('customers', 'city')) {
+            $c->city = $d['city'] ?? null;
+            $c->area = $d['area'] ?? null;
+        }
         $c->password = $d['password'];
         $c->code = $code;
         $c->signup_status = 'pending';

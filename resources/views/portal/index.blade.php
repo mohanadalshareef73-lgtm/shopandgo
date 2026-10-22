@@ -197,7 +197,8 @@
         @endforeach
         <div class="fl" style="margin-top:12px"><label>اسم المستلم</label><input name="recipient_name" class="inp" style="height:50px" value="{{ old('recipient_name', $c->name) }}" required></div>
         <div class="fl"><label>هاتف المستلم</label><input name="recipient_phone" class="inp num" style="height:50px;text-align:right" value="{{ old('recipient_phone', $c->phone_1) }}" required inputmode="tel"></div>
-        <div class="fl"><label>العنوان</label><input name="address" class="inp" style="height:50px" value="{{ old('address', $c->address) }}" required placeholder="المدينة، الحي، أقرب معلم"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="fl"><label>المدينة</label><input name="city" class="inp" style="height:50px" list="lyCities" value="{{ old('city', $c->city ?? null ?: 'بنغازي') }}" required></div><div class="fl"><label>المنطقة</label><input name="area" class="inp" style="height:50px" value="{{ old('area', $c->area ?? null) }}" required placeholder="الكيش، الهواري…"></div></div>@include('sg.partials.cities')
+        <div class="fl"><label>العنوان بالتفصيل</label><input name="address" class="inp" style="height:50px" value="{{ old('address', $c->address) }}" required placeholder="الشارع، أقرب معلم"></div>
         <div class="fl"><label>الموقع على الخريطة (اختياري)</label><div class="inp" style="justify-content:space-between;padding:0 0 0 8px;height:50px"><input name="location_url" id="loc" value="{{ old('location_url', $c->location_url) }}" placeholder="رابط Google Maps" style="border:0;outline:0;background:none;flex:1;height:100%;padding:0 14px;direction:ltr;font-size:13px"><button type="button" class="cp" id="gps" style="border:0;cursor:pointer">📍 موقعي الآن</button></div><div class="lbl" id="gpsN" style="margin-top:4px"></div></div>
         @if ($pointsOn && $pts >= $pointsMin && $pts > 0)<label class="ck2"><input type="checkbox" name="use_points" value="1" id="useP" data-v="{{ $pts * $pointValue }}"> استخدام نقاطي ({{ $pts }} نقطة = {{ $f($pts * $pointValue) }} د.ل)</label>@endif
         <div class="fl"><label>كوبون خصم (اختياري)</label><input name="coupon_code" class="inp" style="height:50px;direction:ltr;text-transform:uppercase" value="{{ old('coupon_code') }}" placeholder="مثلاً PTX7K2Q9"></div>
@@ -393,9 +394,11 @@
     <div class="prof"><div class="av">{{ mb_substr($c->name, 0, 1) }}</div><div style="flex:1"><b>{{ $c->name }}</b><span class="num" style="display:block;text-align:right">{{ $c->phone_1 }}</span><span>كودك {{ $c->code }} · عميل منذ {{ optional($c->created_at)->format('Y') }}</span></div></div>
     <div class="gl">حسابي</div>
     <div class="grp">
-        <details class="it" style="display:block"><summary style="display:flex;align-items:center;gap:12px;list-style:none"><span class="ic"><svg width="18" height="18"><use href="#i-pin"/></svg></span><span class="x">عنوان التوصيل والهاتف<span>{{ $c->address ?: 'لم يُحدد' }}{{ $c->location_url ? ' · يوجد موقع على الخريطة' : '' }}</span></span><svg width="16" height="16" style="color:var(--ink-3)"><use href="#i-chev"/></svg></summary>
+        <details class="it" style="display:block"><summary style="display:flex;align-items:center;gap:12px;list-style:none"><span class="ic"><svg width="18" height="18"><use href="#i-pin"/></svg></span><span class="x">عنوان التوصيل والهاتف<span>{{ trim(implode(' · ', array_filter([$c->city ?? null, $c->area ?? null]))) ?: ($c->address ?: 'لم يُحدد') }}{{ $c->location_url ? ' · يوجد موقع على الخريطة' : '' }}</span></span><svg width="16" height="16" style="color:var(--ink-3)"><use href="#i-chev"/></svg></summary>
             <form method="post" action="{{ route('portal.profile') }}" style="margin-top:10px">@csrf
-                <input name="address" class="inp" style="height:46px;margin-bottom:8px" value="{{ $c->address }}" placeholder="العنوان">
+                <input name="city" class="inp" style="height:46px;margin-bottom:8px" list="lyCities" value="{{ $c->city ?? null ?: 'بنغازي' }}" placeholder="المدينة" required>
+                <input name="area" class="inp" style="height:46px;margin-bottom:8px" value="{{ $c->area ?? null }}" placeholder="المنطقة" required>
+                <input name="address" class="inp" style="height:46px;margin-bottom:8px" value="{{ $c->address }}" placeholder="العنوان بالتفصيل">
                 <input name="location_url" class="inp" style="height:46px;margin-bottom:8px;direction:ltr" value="{{ $c->location_url }}" placeholder="رابط الموقع">
                 <input name="phone_2" class="inp num" style="height:46px;margin-bottom:8px;text-align:right" value="{{ $c->phone_2 }}" placeholder="هاتف ثانٍ">
                 <button class="btn" style="width:100%">حفظ</button>

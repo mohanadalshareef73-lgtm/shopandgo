@@ -169,7 +169,9 @@ class PortalController extends Controller
     public function profile(Request $request)
     {
         $c = $this->me();
-        $data = $request->validate(['address' => 'nullable|string|max:250', 'location_url' => 'nullable|string|max:500', 'phone_2' => 'nullable|string|max:30']);
+        $data = $request->validate(['city' => 'required|string|max:80', 'area' => 'required|string|max:120', 'address' => 'nullable|string|max:250', 'location_url' => 'nullable|string|max:500', 'phone_2' => 'nullable|string|max:30'], ['city.required' => 'اكتب المدينة', 'area.required' => 'اكتب المنطقة']);
+        \App\Services\CourierService::rememberCity($c, $data['city'], $data['area']);
+        unset($data['city'], $data['area']);
         $c->fill(array_filter($data, fn ($v) => $v !== null))->save();
 
         return back()->with('success', 'تم حفظ بياناتك');
@@ -192,12 +194,12 @@ class PortalController extends Controller
         $data = $request->validate([
             'order_ids' => 'required|array|min:1', 'order_ids.*' => 'integer',
             'recipient_name' => 'required|string|max:120', 'recipient_phone' => 'required|string|max:30', 'recipient_phone2' => 'nullable|string|max:30',
-            'city' => 'nullable|string|max:80', 'address' => 'required|string|max:250', 'location_url' => 'nullable|string|max:500',
+            'city' => 'required|string|max:80', 'area' => 'required|string|max:120', 'address' => 'required|string|max:250', 'location_url' => 'nullable|string|max:500',
             'plan_cash' => 'nullable|numeric|min:0', 'plan_bank' => 'nullable|numeric|min:0', 'bank_payment_id' => 'nullable|exists:payment_methods,id',
             'receipt' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:6144', 'note' => 'nullable|string|max:500', 'use_points' => 'nullable|boolean',
             'coupon_code' => 'nullable|string|max:30',
         ], [
-            'order_ids.required' => 'اختر الطلبيات التي تريد توصيلها', 'address.required' => 'اكتب العنوان', 'recipient_phone.required' => 'اكتب رقم هاتف المستلم',
+            'order_ids.required' => 'اختر الطلبيات التي تريد توصيلها', 'address.required' => 'اكتب العنوان', 'city.required' => 'اكتب المدينة', 'area.required' => 'اكتب المنطقة', 'recipient_phone.required' => 'اكتب رقم هاتف المستلم',
         ]);
         $orders = $this->readyOrders()->whereIn('id', array_map('intval', $data['order_ids']))->values();
         if ($orders->isEmpty()) {
@@ -230,12 +232,13 @@ class PortalController extends Controller
             $plan = (float) ($data['plan_cash'] ?? 0) + (float) ($data['plan_bank'] ?? 0);
             $dl = CourierService::assign($c, $orders, [
                 'recipient_name' => $data['recipient_name'], 'recipient_phone' => $data['recipient_phone'], 'recipient_phone2' => $data['recipient_phone2'] ?? null,
-                'city' => $data['city'] ?? null, 'address' => $data['address'], 'location_url' => $data['location_url'] ?? null,
+                'city' => $data['city'] ?? null, 'address' => \App\Services\CourierService::withArea($data['area'] ?? null, $data['address']), 'location_url' => $data['location_url'] ?? null,
                 'plan_cash' => $data['plan_cash'] ?? 0, 'plan_bank' => $data['plan_bank'] ?? 0, 'bank_payment_id' => $data['bank_payment_id'] ?? null,
                 'pay_type' => ($data['plan_bank'] ?? 0) > 0 ? (($data['plan_cash'] ?? 0) > 0 ? 'mixed' : 'bank') : 'cash',
                 'fee' => AppSettings::get('courier_default_fee', 0), 'note' => $data['note'] ?? null,
                 'bank_receipt' => $request->hasFile('receipt') ? \App\Support\ImageShrink::store($request->file('receipt'), 'receipts', 'public') : null,
             ], null, 'customer');
+            \App\Services\CourierService::rememberCity($c, $data['city'] ?? null, $data['area'] ?? null);
             if (!$c->address) {
                 $c->address = $data['address'];
             }

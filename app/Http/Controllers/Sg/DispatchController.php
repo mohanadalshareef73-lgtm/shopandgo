@@ -54,7 +54,7 @@ class DispatchController extends Controller
         }
         // كل التوصيلات المفتوحة — حتى طلبات العملاء من حساباتهم تطلع هني طول
         $all = Delivery::with(['customer', 'orders', 'courier'])->where(fn ($w) => $w->whereIn('status', self::ACTIVE)->when(\Illuminate\Support\Facades\Schema::hasColumn('deliveries', 'kept'), fn ($x) => $x->orWhere('kept', true)))->latest('id')->get();
-        $all->each(fn ($d) => $d->zone = $d->zone ?: (static::outside($d->city, $d->address) ? 'out' : 'in'));
+        $all->each(fn ($d) => $d->zone = $d->zone ?: (static::outside($d->city ?: (optional($d->customer)->city ?? null), $d->address) ? 'out' : 'in'));
         // 💵 تحصيل عربون/حجز جاي من رابط العميل ← يقعد «عربون» تلقائي
         foreach ($all as $d) {
             if (($d->deposit_order_id || $d->cart_id) && $d->kind !== 'deposit') {
@@ -506,7 +506,7 @@ class DispatchController extends Controller
             ->when($request->filled('ids'), fn ($q) => $q->whereIn('id', array_filter(array_map('intval', explode(',', (string) $request->ids)))))
             ->orderBy('id')->get();
         if (!$request->filled('batch')) {
-            $rows = $rows->filter(fn ($d) => ($d->zone ?: (static::outside($d->city, $d->address) ? 'out' : 'in')) === $tab)->values();
+            $rows = $rows->filter(fn ($d) => ($d->zone ?: (static::outside($d->city ?: (optional($d->customer)->city ?? null), $d->address) ? 'out' : 'in')) === $tab)->values();
         }
         abort_if($rows->isEmpty(), 404);
         $temp = storage_path('app/mpdf-temp');
@@ -824,7 +824,7 @@ class DispatchController extends Controller
         $dl = Delivery::create([
             'code' => Delivery::newCode(), 'customer_id' => $cu->id, 'courier_id' => optional($courier)->id, 'source' => 'admin',
             'status' => $courier ? 'assigned' : 'requested', 'recipient_name' => $cu->name, 'recipient_phone' => $cu->phone_1,
-            'city' => $city, 'address' => $cu->address, 'location_url' => $cu->location_url ?? null,
+            'city' => $city ?: ($cu->city ?? null), 'address' => \App\Services\CourierService::withArea($cu->area ?? null, $cu->address), 'location_url' => $cu->location_url ?? null,
             'package_type' => $orders->pluck('package_type')->filter()->unique()->implode('، '),
             'parcels' => max(1, $orders->sum(fn ($o) => $o->bags_num ?: 1)), 'amount' => round($due, 2), 'fee' => $fee,
             'pay_type' => $due <= 0.009 ? 'paid' : 'cash', 'assigned_at' => $courier ? now() : null, 'created_id' => auth()->id(),

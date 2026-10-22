@@ -301,6 +301,8 @@ class OrderController extends Controller
                 'phone_1' => 'required_if:customer_id,new|max:20|unique:customers,phone_1',
                 'phone_2' => 'nullable|string|max:20',
                 'address' => 'nullable|string|max:50',
+                'city' => 'required_if:customer_id,new|nullable|string|max:80',
+                'area' => 'required_if:customer_id,new|nullable|string|max:120',
                 'qty' => 'required|integer',
                 'platform_id' => 'required|string',
                 'bags_qty' => 'nullable|integer',
@@ -316,6 +318,7 @@ class OrderController extends Controller
             [
                 'name.required_if' => 'يجب إدخال الاسم',
                 'phone_1.required_if' => 'يجب اضافة رقم الهاتف',
+                'city.required_if' => 'اكتب مدينة العميل', 'area.required_if' => 'اكتب منطقة العميل',
                 'phone_1.unique' => 'رقم الهاتف الذي قمت بإدخاله موجود',
                 'qty.required' => 'يجب إدخال الكمية',
                 'platform_id.required' => 'يجب اختيار المنصة',
@@ -340,6 +343,10 @@ class OrderController extends Controller
                 $customer->phone_1 = request('phone_1');
                 $customer->phone_2 = request('phone_2');
                 $customer->address = request('address');
+                if (\App\Support\Fast::hasColumn('customers', 'city')) {
+                    $customer->city = trim((string) request('city')) ?: null;
+                    $customer->area = trim((string) request('area')) ?: null;
+                }
                 if (request('code') && Customer::where('code', request('code'))->exists()) {
                     DB::rollback();
                     return redirect()->back()->withInput()->with('error', 'كود الزبون ' . request('code') . ' موجود مسبقآ — جرب: ' . implode('، ', \App\Http\Controllers\Sg\ClientsController::codeSuggestions((string) request('code'), preg_replace('/\D/', '', (string) request('phone_1')))));

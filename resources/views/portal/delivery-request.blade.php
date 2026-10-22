@@ -34,8 +34,8 @@
         <div style="display:grid;gap:10px;margin-top:10px">
             <input name="name" class="inp" placeholder="الاسم" value="{{ old('name', optional($c)->name) }}" required>
             <input name="phone" class="inp num" placeholder="رقم الهاتف" inputmode="tel" value="{{ old('phone', optional($c)->phone_1) }}" required style="text-align:right">
-            <input name="city" class="inp" placeholder="المدينة" list="cities" value="{{ old('city', 'بنغازي') }}" required>
-            <datalist id="cities"><option value="بنغازي"><option value="طرابلس"><option value="مصراتة"><option value="البيضاء"><option value="طبرق"><option value="درنة"><option value="المرج"><option value="أجدابيا"><option value="سرت"><option value="سبها"></datalist>
+            <input name="city" class="inp" placeholder="المدينة" list="lyCities" value="{{ old('city', optional($c)->city ?: 'بنغازي') }}" required>@include('sg.partials.cities')
+            <input name="area" class="inp" placeholder="المنطقة (مثلاً الكيش، الهواري…)" value="{{ old('area', optional($c)->area) }}" required>
             <div class="note" style="margin-top:-4px">لو برا بنغازي نتواصلوا معاك على طريقة التوصيل</div>
             <input name="address" class="inp" placeholder="العنوان بالتفصيل (الشارع، أقرب معلم…)" value="{{ old('address', optional($c)->address) }}" required>
             <input name="location_url" class="inp" placeholder="رابط موقعك من خرائط Google (اختياري)" value="{{ old('location_url', optional($c)->location_url) }}" style="direction:ltr">

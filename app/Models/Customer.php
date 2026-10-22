@@ -26,6 +26,8 @@ class Customer extends Authenticatable
         'code',
         'password', // You’ll need this if using password-based login
         'address',
+        'city',
+        'area',
         'notes',
         'credit',
     ];
