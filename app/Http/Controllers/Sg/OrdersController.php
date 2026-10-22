@@ -68,7 +68,7 @@ class OrdersController extends Controller
         $bind = [$t, '%-' . $t, '%-' . $t . '%', $t . '%'];
         $items = [];
         $clean = fn (array $parts) => implode(' · ', array_filter(array_map(fn ($x) => trim((string) $x, " .\t"), $parts), fn ($x) => $x !== ''));
-        if (in_array($type, ['all', 'cart'], true)) {
+        if (in_array($type, ['all', 'cart', 'orders'], true)) {
             // 👤 أكواد الزبائن أول: الكود المطابق، بعده اللي يبدا بالرقم، بعده اللي فيه الرقم
             $custs = Customer::where('code', 'like', '%' . $t . '%')
                 ->orderByRaw('CASE WHEN code = ? THEN 0 WHEN code LIKE ? THEN 1 ELSE 2 END', [$t, $t . '%'])->orderByRaw('LENGTH(code)')->orderBy('code')
@@ -103,12 +103,12 @@ class OrdersController extends Controller
         }
         if ($type !== 'trip') {
             $orders = Order::with('customer:id,name,code')->where('code', 'like', '%' . $t . '%')
-                ->orderByRaw($rank('code'), $bind)->orderByRaw('LENGTH(code)')->orderByDesc('id')->limit($type === 'all' ? 6 : 8)->get();
+                ->orderByRaw($rank('code'), $bind)->orderByRaw('LENGTH(code)')->orderByDesc('id')->limit(in_array($type, ['all', 'orders'], true) ? 6 : 8)->get();
             foreach ($orders as $o) {
                 $items[] = ['kind' => 'order', 'code' => $o->code, 'sub' => $clean([optional($o->customer)->name, optional($o->customer)->code, $o->stageLabel()]), 'url' => route('sg.orders.show', $o)];
             }
         }
-        if ($type !== 'order') {
+        if (in_array($type, ['all', 'trip'], true)) { // ✈ الرحلات تطلع بس في واجهة الرحلات (مش في الطلبات)
             $trips = \App\Models\TripPurchase::where('trip_code', 'like', '%' . $t . '%')
                 ->orderByRaw($rank('trip_code'), $bind)->orderByRaw('LENGTH(trip_code)')->orderByDesc('id')->limit(6)->get(['id', 'trip_code', 'purchased_at']);
             $seen = [];
