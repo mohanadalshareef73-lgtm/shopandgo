@@ -19,6 +19,9 @@
 .cmd .menu { min-width: 210px; }
 .cmd .menu hr { border: 0; border-top: 1px solid #eef0f4; margin: 4px 0; }
 .cmd .menu .danger { color: var(--down); }
+.trip-steps { display: flex; gap: 3px; margin-top: 6px; width: 120px; }
+.trip-steps i { flex: 1; height: 5px; border-radius: 3px; background: #e6e8ee; }
+.trip-steps i.on { background: var(--brand); }
 </style>
 @endpush
 @section('content')
@@ -105,7 +108,7 @@
             @endphp
             <tr>
                 <td class="trc"><a href="{{ route('finance.trips.show', $trip->id) }}"><b>{{ $trip->trip_code }}</b></a>@if ($trip->legacy) <span class="chip n" style="font-size:11px" title="مستوردة من المنظومة القديمة">قديمة</span>@endif<small class="num">{{ $trip->purchased_at->format('Y-m-d') }}</small> @foreach ($pfs as $p)<span class="pf {{ strtolower($p) }}" style="font-size:10px;padding:1px 6px">{{ $p }}</span> @endforeach @if ($trip->coupon_used)<span class="chip u" style="font-size:10.5px;padding:1px 7px">كوبون</span>@endif</td>
-                <td><span class="st" style="background:{{ $c }}1a;color:{{ $c === '#b7bccb' ? 'var(--ink-3)' : $c }}"><i></i>{{ $s['status'] ?: $t }}</span></td>
+                <td><span class="st" style="background:{{ $c }}1a;color:{{ $c === '#b7bccb' ? 'var(--ink-3)' : $c }}"><i></i>{{ $s['status'] ?: $t }}</span>@php $stepN = array_search($trip->col, array_keys($titles)) + 1; @endphp<div class="trip-steps" title="المرحلة {{ $stepN }} من 5">@for ($i = 1; $i <= 5; $i++)<i class="{{ $i <= $stepN ? 'on' : '' }}"></i>@endfor</div></td>
                 <td class="n num">{{ $s['orders'] }}</td>
                 <td class="n num">{{ $ords->pluck('customer_id')->unique()->count() }}</td>
                 <td class="n num">@if ($trip->unknownCost())<span class="note" title="التكلفة غير مسجلة">—</span>@else{{ $f($trip->cost) }} <span class="note">{{ TS::sign($trip->cost_currency) }}</span>@endif @if ($trip->cards_amount > 0)<small style="display:block;color:var(--ink-3);font-size:11px">💳 {{ $f($trip->cards_amount) }} $ بطاقات</small>@endif</td>
