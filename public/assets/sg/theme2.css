@@ -1,0 +1,104 @@
+/* Shop & Go — الشكل البسيط الأنيق (اتجاه 2)
+   يتحمّل بعد theme.css ويغطي عليه. أبيض نظيف، خطوط رفيعة، مسافات واسعة، بدون ظلال. */
+
+html.nui {
+  --bg: #fafafb; --surface: #fff; --line: #ebecf0; --line-soft: #f2f3f5;
+  --ink: #111827; --ink-2: #4b5563; --ink-3: #6b7280;
+  --brand: #262c4a; --side: #ffffff; --soft: #f6f7f9; --nav-on: #f3f4f6;
+  --accent: #e8590c; --accent-bg: #fff4ec; --accent-ink: #b4470b;
+}
+html.nui body { background: var(--bg); }
+html.nui .sg-main { color: var(--ink); padding: 32px 40px 56px; }
+
+/* القائمة: بيضاء بخط رفيع */
+html.nui .sg-side { background: #fff; border-left: 1px solid var(--line); box-shadow: none; padding: 26px 16px; }
+html.nui .sg-side .logo { background: transparent; padding: 0; width: 140px; border-radius: 0; margin-bottom: 26px; }
+html.nui .sg-side a.it { color: var(--ink-2); font-weight: 600; font-size: 15px; min-height: 40px; border-radius: 8px; margin-bottom: 2px; }
+html.nui .sg-side a.it svg { color: #9ca3af; width: 18px; height: 18px; }
+html.nui .sg-side a.it:hover { background: var(--soft); color: var(--ink); }
+html.nui .sg-side a.it.on { background: var(--nav-on); color: var(--ink); font-weight: 700; }
+html.nui .sg-side a.it.on svg { color: var(--ink); }
+html.nui .sg-side a.it .bd, html.nui .sg-side a.it.on .bd { background: transparent; color: var(--accent-ink); border: 1px solid #f7d2bb; font-size: 12px; padding: 0 7px; }
+html.nui .sg-side .cap { color: #9ca3af; font-size: 12px; font-weight: 600; margin: 22px 14px 8px; }
+html.nui .sg-side .me { border-top-color: var(--line); color: var(--ink); }
+html.nui .sg-side .me .note, html.nui .sg-side .note { color: var(--ink-3) !important; }
+html.nui .sg-side .me .btn.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+html.nui .ui-toggle { border: 1px solid var(--line); color: var(--ink-3); border-radius: 8px; }
+
+/* رأس الصفحة */
+html.nui .sg-main .top { margin-bottom: 28px; align-items: flex-end; }
+html.nui .sg-main .top h1 { font-size: 26px; font-weight: 700; letter-spacing: -.3px; }
+html.nui .sg-main .top .sub { font-size: 14.5px; color: var(--ink-3); font-weight: 500; }
+html.nui .sg-main .crumb { color: #9ca3af; font-weight: 500; font-size: 13px; }
+
+/* كروت: حد رفيع، بدون ظل */
+html.nui .sg-main .card { border: 1px solid var(--line); border-radius: 12px; box-shadow: none; padding: 20px 22px; }
+html.nui .sg-main .card.dark, html.nui .sg-main .kpi.accent { background: #fff; color: var(--ink); border-color: var(--line); box-shadow: none; }
+html.nui .sg-main .card.dark h3, html.nui .sg-main .kpi.accent .v, html.nui .sg-main .card.dark .big-num { color: var(--ink); }
+html.nui .sg-main .kpi.accent .lbl, html.nui .sg-main .kpi.accent .s, html.nui .sg-main .card.dark .ln span { color: var(--ink-3); }
+html.nui .sg-main .card.dark .ln { border-bottom-color: var(--line); }
+html.nui .sg-main .card.dark .ln.tot { border-top-color: var(--ink); }
+html.nui .sg-main .card h3 { font-size: 16px; font-weight: 700; }
+html.nui .sg-main .grid, html.nui .sg-main .kpis { gap: 16px; }
+html.nui .sg-main .kpi .lbl, html.nui .sg-main .tile .t-lbl { font-size: 13.5px; font-weight: 600; color: var(--ink-3); }
+html.nui .sg-main .kpi .v, html.nui .sg-main .tile .t-val { font-size: 30px; font-weight: 700; letter-spacing: -.6px; margin: 10px 0 6px; }
+html.nui .sg-main .kpi.red .v { color: var(--down); } html.nui .sg-main .kpi.green .v { color: var(--up); }
+html.nui .sg-main .tile .ico { background: transparent; border: 1px solid var(--line); border-radius: 8px; width: 34px; height: 34px; color: var(--ink-2); }
+html.nui .sg-main .ticker { background: #fff; color: var(--ink); border: 1px solid var(--line); border-radius: 12px; }
+html.nui .sg-main .ticker .it { border-left-color: var(--line); }
+html.nui .sg-main .ticker .lbl { color: var(--ink-3); }
+
+/* المراحل والفرز */
+html.nui .sg-main .stages { background: transparent; border: 0; box-shadow: none; padding: 0; gap: 8px; }
+html.nui .sg-main .stg { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 7px 12px; color: var(--ink-2); font-weight: 600; }
+html.nui .sg-main .stg .n { background: var(--soft); border-radius: 6px; }
+html.nui .sg-main .stg.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+html.nui .sg-main .seg { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; box-shadow: none; padding: 3px; }
+html.nui .sg-main .seg a, html.nui .sg-main .seg button { border-radius: 7px; font-weight: 600; }
+html.nui .sg-main .seg a.on, html.nui .sg-main .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(17,24,39,.08); }
+html.nui .sg-main .pill { height: 36px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink-2) !important; font-weight: 600; padding: 0 12px; }
+html.nui .sg-main .pill.on { background: var(--ink); border-color: var(--ink); color: #fff !important; }
+html.nui .sg-main .tabs a.on { border-color: var(--ink); }
+
+/* جداول: خطوط رفيعة فقط */
+html.nui .sg-main .card.tw { padding: 0; }
+html.nui .sg-main .tw > .tw-h, html.nui .sg-main .tw > form > .tw-h, html.nui .sg-main form.tw-h { background: #fff; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; padding: 14px 18px; }
+html.nui .sg-main .sx input { background: #fff; border: 1px solid var(--line); border-radius: 8px; height: 38px; }
+html.nui .sg-main table.t { background: #fff; border: 0; border-radius: 0; }
+html.nui .sg-main table.t th { background: #fff; color: var(--ink-3) !important; font-size: 12.5px; font-weight: 600; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+html.nui .sg-main table.t td { background: #fff; padding: 16px 18px; border-bottom: 1px solid var(--line-soft); }
+html.nui .sg-main table.t tbody tr:hover td { background: #fafafb; }
+html.nui .sg-main table.t tr.on td, html.nui .sg-main table.t tr.picked td { background: #fff8f3; }
+html.nui .sg-main .tw-f { background: #fff; border: 0 !important; border-top: 1px solid var(--line) !important; border-radius: 0; box-shadow: none; padding: 14px 18px; }
+
+/* حالات: نقطة ونص، خلفية خفيفة جداً */
+html.nui .sg-main .st, html.nui .sg-main .chip { border-radius: 6px; font-weight: 600; font-size: 13px; padding: 3px 9px; }
+html.nui .sg-main .shelf { background: #fff; color: var(--ink); border: 1px solid var(--ink); border-radius: 6px; }
+html.nui .sg-main .pf.shein { border-radius: 5px; }
+
+/* أزرار */
+html.nui .sg-main .btn { background: var(--ink); color: #fff; border-radius: 8px; min-height: 40px; font-weight: 600; padding: 9px 16px; box-shadow: none; }
+html.nui .sg-main .btn.sm { min-height: 32px; padding: 5px 11px; border-radius: 7px; }
+html.nui .sg-main .btn.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
+html.nui .sg-main .btn.ghost:hover { background: var(--soft); }
+html.nui .sg-main .btn.green { background: #fff; color: #15803d; border: 1px solid #bbe5c8; }
+html.nui .sg-main .btn.red { background: #fff; color: #b91c1c; border: 1px solid #f3c4c4; }
+html.nui .sg-main .btn.wa { background: #fff; color: #15803d; border: 1px solid #bbe5c8; }
+html.nui .sg-main .btn.primary, html.nui .sg-main .btn.accent { background: var(--accent); color: #fff; }
+html.nui .sg-main .btn:disabled { background: #d1d5db; color: #fff; }
+
+/* خانات */
+html.nui .sg-main .inp { border-radius: 8px; border-color: var(--line); background: #fff; height: 42px; }
+html.nui .sg-main textarea.inp { height: auto; }
+html.nui .sg-main .inp:focus, html.nui .sg-main .sx input:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(17,24,39,.08); }
+html.nui .sg-main label.l { font-weight: 600; color: var(--ink-2); }
+html.nui .sg-main .opts span { border-radius: 8px; }
+html.nui .sg-main .opts input:checked + span { border-color: var(--ink); background: #fff; }
+html.nui .sg-main input[type=checkbox] { accent-color: var(--ink); }
+html.nui .sg-main .hint { background: var(--soft); border: 1px solid var(--line); border-radius: 8px; }
+html.nui .sg-main .flash { border-radius: 10px; font-weight: 600; }
+html.nui .modal { border-radius: 14px; }
+html.nui .trip-steps i.on { background: var(--ink); }
+
+@media (max-width: 980px) { html.nui .sg-main { padding: 18px 16px 40px; } }
+html.nui .sg-main .stg.on .n { background: rgba(255,255,255,.18); color: #fff; }
