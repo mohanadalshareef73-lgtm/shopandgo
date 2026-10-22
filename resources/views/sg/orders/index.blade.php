@@ -64,10 +64,11 @@ td.oacts .om > .menu { position: static; margin-top: 6px; box-shadow: none; bord
 <div class="card tw">
     <form method="get" class="tw-h">
         @if (request('stage'))<input type="hidden" name="stage" value="{{ request('stage') }}">@endif
-        <div class="sx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="q" id="liveQ" value="{{ request('q') }}" placeholder="اكتب: كود عميل، اسم، رقم إيصال، هاتف… (يفلتر وأنت تكتب)" autocomplete="off"></div>
+        <div class="sx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="q" id="liveQ" value="{{ request('q') }}" placeholder="اكتب: كود عميل، اسم، رقم إيصال، هاتف… واضغط Enter" autocomplete="off" data-nolive></div>
         <select name="platform" class="pill" data-autosubmit><option value="">المنصة: الكل</option>@foreach ($platforms as $pl)<option value="{{ $pl->id }}" @selected(request('platform') == $pl->id)>{{ $pl->name }}</option>@endforeach</select>
-        <input name="trip" id="liveT" list="tripList" class="pill" value="{{ request('trip') }}" placeholder="✈ رقم الرحلة… (يفلتر وأنت تكتب)" autocomplete="off" inputmode="numeric" style="min-width:210px;font-size:15px;font-weight:700"><datalist id="tripList">@foreach ($trips as $t)<option value="{{ $t }}">@endforeach</datalist>
+        <input name="trip" id="liveT" list="tripList" class="pill" value="{{ request('trip') }}" placeholder="✈ رقم الرحلة…" autocomplete="off" inputmode="numeric" style="min-width:210px;font-size:15px;font-weight:700"><datalist id="tripList">@foreach ($trips as $t)<option value="{{ $t }}">@endforeach</datalist>
         <select name="user" class="pill" data-autosubmit><option value="">الموظف: الكل</option>@foreach ($users as $us)<option value="{{ $us->id }}" @selected(request('user') == $us->id)>{{ $us->name }}</option>@endforeach</select>
+        <button class="btn" type="submit">🔍 بحث</button>@if (request('q') || request('trip'))<a class="btn ghost" href="{{ route('sg.orders.index') }}">✕ مسح</a>@endif
         @if (request()->hasAny(['q', 'platform', 'trip', 'user']))<a class="note" href="{{ route('sg.orders.index', array_filter(['stage' => request('stage')])) }}">✕ مسح</a>@endif
     </form>
 
@@ -190,36 +191,13 @@ window.openDep = function (o) {
   picks.forEach(p => p.addEventListener('change', upd));
   document.getElementById('all').addEventListener('change', e => { picks.forEach(p => p.checked = e.target.checked); upd(); });
 })();
-// بحث مباشر: كل حرف يفلتر بدون ما تضغط Enter
+// 🔍 بحث كيف المنظومة القديمة: تكتب وتضغط Enter أو «بحث» — ويدوّر في كل الطلبات (مش في التبويب المختار بس)
 (function () {
   const q = document.getElementById('liveQ'); if (!q) return;
   const tr = document.getElementById('liveT');
-  let t, ctl;
-  const live = () => {
-    clearTimeout(t);
-    t = setTimeout(async () => {
-      const u = new URL(location.href); u.searchParams.delete('page');
-      q.value.trim() ? u.searchParams.set('q', q.value.trim()) : u.searchParams.delete('q');
-      if (tr) { tr.value.trim() ? u.searchParams.set('trip', tr.value.trim()) : u.searchParams.delete('trip'); }
-      try {
-        if (ctl) ctl.abort(); ctl = new AbortController();
-        const html = await (await fetch(u, { signal: ctl.signal, headers: { 'X-Requested-With': 'fetch' } })).text();
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        const nw = doc.getElementById('bulkForm'), old = document.getElementById('bulkForm');
-        const nf = doc.querySelector('.card.tw > .tw-f'), of = document.querySelector('.card.tw > .tw-f');
-        if (nw && old) { old.replaceWith(nw); if (nf && of) of.replaceWith(nf); history.replaceState(null, '', u); rebind(); }
-      } catch (e) {}
-    }, 300);
-  };
-  q.addEventListener('input', live);
-  if (tr) tr.addEventListener('input', live);
-  function rebind() {
-    const picks = [...document.querySelectorAll('.pick')], bar = document.getElementById('bulkBar'), n = document.getElementById('selN');
-    function upd() { const c = picks.filter(p => p.checked).length; n.textContent = c; bar.classList.toggle('show', c > 0); picks.forEach(p => p.closest('tr').classList.toggle('picked', p.checked)); }
-    picks.forEach(p => p.addEventListener('change', upd));
-    const all = document.getElementById('all'); if (all) all.addEventListener('change', e => { picks.forEach(p => p.checked = e.target.checked); upd(); });
-  }
-  q.form.addEventListener('submit', e => { e.preventDefault(); q.dispatchEvent(new Event('input')); });
+  q.form.addEventListener('submit', () => {
+    if (q.value.trim() || (tr && tr.value.trim())) { q.form.querySelectorAll('input[name=stage], input[name=page]').forEach(i => i.remove()); }
+  });
 })();
 </script>
 @endpush
