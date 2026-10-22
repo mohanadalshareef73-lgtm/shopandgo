@@ -82,3 +82,60 @@ html.nui .modal { border-radius: 18px; }
 
 @media (max-width: 980px) { html.nui .sg-main { padding: 16px; } }
 @media print { html.nui body, html.nui .sg-main { background: #fff; } }
+
+/* ================= الشكل الراقي (v2) ================= */
+html.nui { --bg: #f6f7fb; --side: #1b2040; --side-2: #262c4a; --gold: #f2a65a; }
+html.nui body { background: var(--bg); }
+
+/* قائمة جانبية كحلي غامق */
+html.nui .sg-side { background: var(--side); border-left: 0; box-shadow: -1px 0 0 rgba(0,0,0,.04); scrollbar-color: #3a4170 transparent; }
+html.nui .sg-side .logo { background: #fff; border-radius: 16px; padding: 10px 14px; width: 168px; box-sizing: border-box; }
+html.nui .sg-side a.it { color: #c3c8de; font-weight: 600; }
+html.nui .sg-side a.it svg { color: #8a91b4; }
+html.nui .sg-side a.it:hover { background: rgba(255,255,255,.06); color: #fff; }
+html.nui .sg-side a.it.on { background: rgba(255,255,255,.10); color: #fff; font-weight: 800; }
+html.nui .sg-side a.it.on svg { color: var(--gold); }
+html.nui .sg-side a.it .bd, html.nui .sg-side a.it.on .bd { background: var(--accent); color: #fff; }
+html.nui .sg-side .cap { color: #7d84a8; letter-spacing: .3px; }
+html.nui .sg-side .me { border-top-color: rgba(255,255,255,.1); color: #fff; }
+html.nui .sg-side .me .note, html.nui .sg-side .note { color: #a3a9c6 !important; }
+html.nui .sg-side .me .btn.ghost { background: rgba(255,255,255,.08); color: #fff; border: 0; box-shadow: none; }
+html.nui .ui-toggle { border-color: rgba(255,255,255,.18); color: #a3a9c6; }
+
+/* رأس الصفحة */
+html.nui .sg-main .top h1 { font-size: 30px; letter-spacing: -.2px; }
+html.nui .sg-main .crumb { color: var(--ink-3); font-weight: 600; }
+
+/* كروت: بدون حدود، ظل ناعم طبقتين */
+html.nui .sg-main .card { border: 0; border-radius: 18px; box-shadow: 0 1px 2px rgba(16,20,40,.04), 0 6px 20px rgba(16,20,40,.05); }
+html.nui .sg-main .card.dark, html.nui .sg-main .kpi.accent { background: var(--side); box-shadow: 0 10px 28px rgba(27,32,64,.25); }
+html.nui .sg-main .kpi.accent .v, html.nui .sg-main .card.dark .big-num { color: #fff; }
+html.nui .sg-main .kpi .v, html.nui .sg-main .tile .t-val { font-weight: 800; letter-spacing: -.5px; }
+html.nui .sg-main .kpi .lbl, html.nui .sg-main .tile .t-lbl { font-size: 14px; letter-spacing: .1px; }
+html.nui .sg-main .tile .ico { background: #f1f2f8; color: var(--side); border-radius: 12px; width: 40px; height: 40px; }
+html.nui .sg-main .stages { border: 0; box-shadow: 0 1px 2px rgba(16,20,40,.04), 0 6px 20px rgba(16,20,40,.05); }
+html.nui .sg-main .stg.on { background: var(--side); }
+html.nui .sg-main .tw > .tw-h, html.nui .sg-main .tw > form > .tw-h, html.nui .sg-main form.tw-h { border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; padding: 14px 16px; background: transparent; }
+html.nui .sg-main .card.tw { padding: 0; }
+html.nui .sg-main .tw-f { border: 0 !important; border-top: 1px solid var(--line-soft) !important; border-radius: 0; box-shadow: none; background: #fbfcfe; }
+
+/* جداول */
+html.nui .sg-main table.t { border: 0; border-radius: 0; }
+html.nui .sg-main table.t th { background: #fbfcfe; font-size: 13.5px; padding: 12px 16px; }
+html.nui .sg-main table.t td { padding: 15px 16px; }
+html.nui .sg-main table.t tbody tr:hover td { background: #f7f8fd; }
+html.nui .sg-main .shelf { background: var(--side); }
+
+/* أزرار */
+html.nui .sg-main .btn { background: var(--side); }
+html.nui .sg-main .btn.ghost { background: #fff; color: var(--ink); }
+html.nui .sg-main .btn.green { background: #e6f6ec; color: #1b7a43; }
+html.nui .sg-main .btn.red { background: #fdecec; color: #b42323; }
+html.nui .sg-main .btn.wa { background: var(--wa-bg); color: #1a8c4b; }
+html.nui .sg-main .btn.primary, html.nui .sg-main .btn.accent { background: var(--accent); }
+html.nui .sg-main .pill.on { background: var(--side); border-color: var(--side); }
+html.nui .sg-main .seg a.on, html.nui .sg-main .seg button.on { color: var(--side); }
+
+/* تركيز الخانات */
+html.nui .sg-main .inp:focus, html.nui .sg-main .sx input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(232, 89, 12, .14); }
+html.nui .sg-main .btn:disabled { background: #b9c0cf; color: #fff; }

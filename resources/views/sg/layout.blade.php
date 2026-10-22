@@ -47,7 +47,7 @@
     </style>
     {{-- 🎨 الشكل الجديد: يتفعّل تلقائياً، وزر «الشكل القديم» في القائمة يرجّعه --}}
     <script>try { if (localStorage.getItem('sgUI') !== 'old') document.documentElement.classList.add('nui'); } catch (e) { document.documentElement.classList.add('nui'); }</script>
-    <link rel="stylesheet" href="{{ asset('assets/sg/theme.css') }}?v=1">
+    <link rel="stylesheet" href="{{ asset('assets/sg/theme.css') }}?v=2">
 </head>
 <body class="@yield('bodyClass', 'soft'){{ request('embed') ? ' embed' : '' }}">
 @if (request('embed'))<style>/* 🪟 داخل نافذة: بدون القائمة والأعلى */ .embed .sg-side, .embed .bell-wrap, .embed .sg-burger, .embed .sg-back, .embed .no-embed { display: none !important; } .embed .sg-app { display: block; } .embed .sg-main { margin: 0 !important; padding: 14px !important; max-width: none !important; }</style>@endif
