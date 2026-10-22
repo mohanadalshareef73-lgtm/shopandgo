@@ -79,7 +79,21 @@ class TripPurchase extends Model
         static $has;
         $has ??= \Illuminate\Support\Facades\Schema::hasColumn('trip_purchases', 'legacy');
 
-        return $has ? $q->where(fn ($w) => $w->where('legacy', false)->orWhereNull('legacy')->orWhere('purchased_at', '>=', now()->subMonths(3)->toDateString())) : $q;
+        if ($has) {
+            $q->where(fn ($w) => $w->where('legacy', false)->orWhereNull('legacy')->orWhere('purchased_at', '>=', now()->subMonths(3)->toDateString()));
+        }
+        // ✈ تنبيهات تأخير الرحلات تبدا من رحلة معينة (افتراضياً B-0392): اللي قبلها ما يجيش عليها تنبيه
+        static $from = false;
+        if ($from === false) {
+            $code = (string) \App\Services\AppSettings::get('trip_alert_from', 'B-0392');
+            $from = $code !== '' ? static::query()->where('trip_code', $code)->first(['id', 'purchased_at']) : null;
+        }
+        if ($from) {
+            $d = \Carbon\Carbon::parse($from->purchased_at)->toDateString();
+            $q->where(fn ($w) => $w->whereDate('purchased_at', '>', $d)->orWhere(fn ($x) => $x->whereDate('purchased_at', $d)->where('id', '>=', $from->id)));
+        }
+
+        return $q;
     }
 
     public function cashCost(): float

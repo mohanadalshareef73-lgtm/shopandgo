@@ -29,6 +29,17 @@ class OpsAlerts extends Command
                 route('finance.trips.create'), 'warn', true);
         }
 
+        // تنبيهات تأخير قديمة لرحلات قبل رحلة البداية (B-0392) تتعلّم مقروءة وما تزعجش
+        try {
+            $okIds = TripPurchase::alertable()->pluck('id');
+            $oldUrls = TripPurchase::whereNotIn('id', $okIds)->pluck('id')->map(fn ($id) => route('finance.trips.show', $id));
+            if ($oldUrls->count()) {
+                \App\Models\SgAlert::where('type', 'trip_late')->whereNull('read_at')->whereIn('url', $oldUrls->all())->update(['read_at' => now()]);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         $late = (int) AppSettings::get('trip_late_days', 10);
         $trips = TripPurchase::alertable()->with('orders')->where('purchased_at', '<=', now()->subDays($late)->toDateString())->get()
             ->filter(function ($t) {
