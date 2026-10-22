@@ -92,7 +92,7 @@
     <form method="get" class="tw-h">
         @if (request('stage'))<input type="hidden" name="stage" value="{{ request('stage') }}">@endif
         @if (request('m'))<input type="hidden" name="m" value="{{ request('m') }}">@endif
-        <div class="sx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="q" id="tripQ" value="{{ request('q') }}" placeholder="اكتب جزء من رقم الرحلة أو رقم إيصال… (يفلتر وأنت تكتب)" autocomplete="off"></div>
+        <div class="sx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="q" id="tripQ" value="{{ request('q') }}" placeholder="اكتب رقم الرحلة أو رقم إيصال… واضغط Enter" autocomplete="off" data-nolive></div><button class="btn" type="submit">🔍 بحث</button>
         @if (request('q'))<a class="note" href="{{ request()->fullUrlWithQuery(['q' => null]) }}">✕ مسح</a>@endif
     </form>
     <div class="scroll-x">
@@ -185,28 +185,10 @@
 @endsection
 @push('script')
 <script>
-// بحث الرحلات المباشر
+// 🔍 بحث الرحلات كيف المنظومة القديمة: تكتب وتضغط Enter أو «بحث» — ويدوّر في كل الرحلات
 (function () {
   const q = document.getElementById('tripQ'); if (!q) return;
-  let t, ctl;
-  q.addEventListener('input', () => {
-    clearTimeout(t);
-    t = setTimeout(async () => {
-      const u = new URL(location.href); u.searchParams.delete('page');
-      q.value.trim() ? u.searchParams.set('q', q.value.trim()) : u.searchParams.delete('q');
-      try {
-        if (ctl) ctl.abort(); ctl = new AbortController();
-        const doc = new DOMParser().parseFromString(await (await fetch(u, { signal: ctl.signal })).text(), 'text/html');
-        const main = q.closest('.card.tw'), nmain = doc.getElementById('tripQ')?.closest('.card.tw'); if (!main || !nmain) return;
-        [...main.children].forEach(c => { if (c.tagName !== 'FORM') c.remove(); });
-        [...nmain.children].forEach(c => { if (c.tagName !== 'FORM') main.appendChild(c); });
-        document.querySelectorAll('.card.tw.mt').forEach(c => c.remove());
-        let after = main; doc.querySelectorAll('.card.tw.mt').forEach(c => { after.after(c); after = c; });
-        history.replaceState(null, '', u);
-      } catch (e) {}
-    }, 300);
-  });
-  q.form.addEventListener('submit', e => { e.preventDefault(); q.dispatchEvent(new Event('input')); });
+  q.form.addEventListener('submit', () => { if (q.value.trim()) q.form.querySelectorAll('input[name=stage], input[name=page]').forEach(i => i.remove()); });
 })();
 </script>
 <script>
