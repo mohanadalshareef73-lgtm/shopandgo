@@ -13,13 +13,18 @@ class UrgentAlert
 
     public static function phones(): array
     {
-        $v = AppSettings::get('urgent_phones', []);
-        if (is_string($v)) {
-            $v = preg_split('/[\s,،]+/u', $v);
-        }
-        $v = array_values(array_filter(array_map('trim', (array) $v)));
+        $split = function ($v) {
+            if (is_string($v)) {
+                $v = preg_split('/[\s,،]+/u', $v);
+            }
 
-        return $v ?: AppSettings::reportPhones();
+            return array_values(array_filter(array_map('trim', (array) $v)));
+        };
+        $mine = $split(AppSettings::get('urgent_phones', [])) ?: AppSettings::reportPhones();
+        // 🏪 رقم المحل كمان يوصله نفس التنبيه
+        $shop = $split(AppSettings::get('urgent_shop_phones', []));
+
+        return array_values(array_unique(array_merge($mine, $shop)));
     }
 
     public static function send(string $key, string $text, int $everyMinutes = 30): bool
