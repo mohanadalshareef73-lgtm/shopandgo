@@ -48,6 +48,7 @@
     </form>
     <div class="links"><a href="{{ route('customer.forgot') }}" style="font-weight:700">🔑 نسيت كلمة المرور؟ غيّرها برمز على الواتساب</a><br>أو @if ($s['shop_phone'])<a href="https://wa.me/{{ \App\Services\MessageService::normalize((string) $s['shop_phone']) }}" target="_blank">تواصل معنا عبر واتساب</a>@else<b>تواصل معنا</b>@endif</div>
     <div class="feat"><div><span>📦</span>طلباتي</div><div><span>🚚</span>طلب توصيل</div><div><span>💳</span>حسابي</div></div>
+    @include('portal.partials.trust')
 </div>
 </body>
 </html>

@@ -98,6 +98,8 @@
         'ret' => '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
         'audit' => '<path d="M12 8v4l3 2"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><path d="M3 4v5h5"/>',
         'backup' => '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/>',
+        'kpi' => '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+        'reviews' => '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
         'stores' => '<path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/>',
     ];
     $items = [
@@ -122,6 +124,8 @@
         ['offers', 'العروض والكوبونات', route('sg.offers'), 'offer-manage'],
         ['alerts', 'مركز التنبيهات', route('sg.alerts.center'), null],
         ['rep', 'التقارير', route('sg.reports'), 'reports-list'],
+        ['kpi', 'أرقام نتابعوها', \Illuminate\Support\Facades\Route::has('sg.kpi') ? route('sg.kpi') : '#', 'reports-list'],
+        ['reviews', 'تقييمات الشركة', \Illuminate\Support\Facades\Route::has('sg.reviews') ? route('sg.reviews') : '#', 'ticket-list', \App\Support\Fast::hasTable('company_reviews') ? \Illuminate\Support\Facades\Cache::remember('sg.badge.reviews', 60, fn () => \App\Models\CompanyReview::where('status', 'pending')->count()) : 0],
         ['visits', 'الزيارات', route('sg.visits'), 'reports-list'],
         ['camp', 'حملات واتساب', route('sg.campaigns'), 'system-edit'],
         ['-', 'النظام'],

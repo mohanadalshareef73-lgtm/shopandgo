@@ -64,6 +64,16 @@ class Order extends Model
                 report($e);
             }
         });
+        // ⭐ تسلّمت؟ نطلبو من الزبون يقيّمنا (ما يمشيش في التسليم الصامت)
+        static::updated(function (Order $o) {
+            if ($o->wasChanged('delivered') && $o->delivered) {
+                try {
+                    \App\Services\ReviewService::request($o);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+        });
         // العميل طلع مستوى جديد (برونزي/فضي/ذهبي)؟ نبلغوه
         static::saved(function (Order $o) {
             if ($o->wasRecentlyCreated || $o->wasChanged(['total_price', 'discount', 'status'])) {

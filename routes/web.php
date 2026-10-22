@@ -33,6 +33,11 @@ Route::get('order-invoice/{orderCode}', [App\Http\Controllers\OrderInvoiceContro
 
 // Customer login (/login)
 Route::get('/login', [CustomerAuthController::class, 'showLoginForm'])->name('customer.login');
+// ⭐ تقييمات الشركة (عامة) + الأرقام الحية
+Route::get('review/{order}/{t}', [App\Http\Controllers\Portal\ReviewController::class, 'form'])->whereNumber('order')->name('review.form');
+Route::post('review/{order}/{t}', [App\Http\Controllers\Portal\ReviewController::class, 'store'])->whereNumber('order')->middleware('throttle:10,1')->name('review.store');
+Route::get('reviews', [App\Http\Controllers\Portal\ReviewController::class, 'index'])->name('reviews.public');
+Route::get('stats.json', [App\Http\Controllers\Portal\ReviewController::class, 'stats'])->name('stats.public');
 Route::post('/login', [CustomerAuthController::class, 'login'])->middleware('throttle:login')->name('customer.login.submit');
 // تسجيل عميل جديد + رمز التحقق عبر واتساب
 Route::get('/register', [App\Http\Controllers\Portal\SignupController::class, 'form'])->name('customer.register');
@@ -398,6 +403,9 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::post('coupons', [$C . 'OffersController', 'coupon'])->name('coupons.store');
         Route::post('orders/{order}/coupon', [$C . 'OffersController', 'applyCoupon'])->name('orders.coupon');
         Route::get('issues', [$C . 'IssuesController', 'index'])->name('issues');
+        Route::get('reviews-admin', [$C . 'ReviewsController', 'index'])->name('reviews');
+        Route::post('reviews-admin/{review}', [$C . 'ReviewsController', 'act'])->name('reviews.act');
+        Route::get('kpi', [$C . 'KpiController', 'index'])->name('kpi');
         Route::post('orders/{order}/issues', [$C . 'IssuesController', 'store'])->name('issues.store');
         Route::post('issues/{issue}/resolve', [$C . 'IssuesController', 'resolve'])->name('issues.resolve');
         Route::post('issues-bulk', [$C . 'IssuesController', 'bulk'])->name('issues.bulk');
