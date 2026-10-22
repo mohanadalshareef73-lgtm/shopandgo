@@ -56,6 +56,47 @@ class OrdersController extends Controller
         };
     }
 
+    /** 🔎 اقتراحات وانت تكتب: أقرب الإيصالات والرحلات لجزء الرقم المكتوب (ما يفلترش الجدول) */
+    public function suggest(Request $request)
+    {
+        $t = trim((string) $request->input('t', ''));
+        $type = $request->input('type', 'all');
+        if ($t === '' || mb_strlen($t) > 40) {
+            return response()->json(['items' => []]);
+        }
+        $rank = fn ($col) => "CASE WHEN $col = ? THEN 0 WHEN $col LIKE ? THEN 1 WHEN $col LIKE ? THEN 2 WHEN $col LIKE ? THEN 3 ELSE 4 END";
+        $bind = [$t, '%-' . $t, '%-' . $t . '%', $t . '%'];
+        $items = [];
+        if ($type !== 'trip') {
+            $orders = Order::with('customer:id,name,code')->where('code', 'like', '%' . $t . '%')
+                ->orderByRaw($rank('code'), $bind)->orderByRaw('LENGTH(code)')->orderByDesc('id')->limit(8)->get();
+            foreach ($orders as $o) {
+                $items[] = ['kind' => 'order', 'code' => $o->code, 'sub' => trim(optional($o->customer)->name . ' · ' . optional($o->customer)->code, ' ·') . ' · ' . $o->stageLabel(), 'url' => route('sg.orders.show', $o)];
+            }
+        }
+        if ($type !== 'order') {
+            $trips = \App\Models\TripPurchase::where('trip_code', 'like', '%' . $t . '%')
+                ->orderByRaw($rank('trip_code'), $bind)->orderByRaw('LENGTH(trip_code)')->orderByDesc('id')->limit(6)->get(['id', 'trip_code', 'purchased_at']);
+            $seen = [];
+            foreach ($trips as $tr) {
+                $seen[] = $tr->trip_code;
+                $items[] = ['kind' => 'trip', 'code' => $tr->trip_code, 'sub' => 'رحلة · ' . optional($tr->purchased_at)->format('Y-m-d'), 'url' => route('finance.trips.show', $tr->id)];
+            }
+            // رحلات قديمة مكتوبة في الإيصالات بس (ما عندهاش تسجيل شراء)
+            if (count($trips) < 6) {
+                $old = Order::where('trip_details', 'like', '%' . $t . '%')->whereNotIn('trip_details', $seen ?: [''])
+                    ->distinct()->limit(40)->pluck('trip_details')
+                    ->sortBy(fn ($c) => [$c === $t ? 0 : (str_ends_with($c, '-' . $t) ? 1 : (str_contains($c, '-' . $t) ? 2 : (str_starts_with($c, $t) ? 3 : 4))), strlen($c), $c])
+                    ->take(6 - count($trips));
+                foreach ($old as $code) {
+                    $items[] = ['kind' => 'trip', 'code' => $code, 'sub' => 'رحلة قديمة · إيصالاتها', 'url' => route('sg.orders.index', ['trip' => $code])];
+                }
+            }
+        }
+
+        return response()->json(['items' => $items]);
+    }
+
     public function index(Request $request)
     {
         $base = Order::query();

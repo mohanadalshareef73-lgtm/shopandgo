@@ -249,6 +249,7 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         $C = 'App\Http\Controllers\Sg\\';
 
         Route::get('orders', [$C . 'OrdersController', 'index'])->name('orders.index');
+        Route::get('orders/suggest', [$C . 'OrdersController', 'suggest'])->name('orders.suggest');
         Route::post('orders/bulk', [$C . 'OrdersController', 'bulk'])->name('orders.bulk');
         Route::get('orders/create', [$C . 'OrdersController', 'create'])->name('orders.create');
         Route::get('site-pay', [$C . 'SitePayController', 'index'])->name('sitepay');

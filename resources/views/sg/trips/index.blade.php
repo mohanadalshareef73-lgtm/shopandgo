@@ -29,7 +29,7 @@
 <div class="top">
     <div><h1>الرحلات</h1><div class="sub">كل رحلة أين وصلت، وكم سلّمنا منها</div></div>
     <div class="acts">
-        <form method="get" style="display:flex;gap:6px;align-items:center"><input name="q" value="{{ request('q') }}" class="inp numr" placeholder="🔍 رقم الرحلة… مثلاً B-0404" style="height:42px;width:230px;font-size:15px" autocomplete="off"><button class="btn ghost" style="height:42px">بحث</button></form>
+        <form method="get" style="display:flex;gap:6px;align-items:center"><input name="q" value="{{ request('q') }}" class="inp numr" placeholder="🔍 رقم الرحلة… مثلاً B-0404" style="height:42px;width:230px;font-size:15px" autocomplete="off" data-nolive data-suggest="trip"><button class="btn ghost" style="height:42px">بحث</button></form>
         <div class="seg">@foreach ([1 => 'شهر', 2 => 'شهرين', 6 => '6 شهور', 120 => 'الكل'] as $k => $v)<a href="{{ request()->fullUrlWithQuery(['m' => $k]) }}" class="{{ (int) request('m', 2) === $k ? 'on' : '' }}">{{ $v }}</a>@endforeach</div>
         @can('trip-purchase-create')<a class="btn" href="{{ route('finance.trips.create') }}">✈ إضافة رحلة</a>@endcan
         <button class="sg-burger">☰</button>
@@ -92,7 +92,7 @@
     <form method="get" class="tw-h">
         @if (request('stage'))<input type="hidden" name="stage" value="{{ request('stage') }}">@endif
         @if (request('m'))<input type="hidden" name="m" value="{{ request('m') }}">@endif
-        <div class="sx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="q" id="tripQ" value="{{ request('q') }}" placeholder="اكتب رقم الرحلة أو رقم إيصال… واضغط Enter" autocomplete="off" data-nolive></div><button class="btn" type="submit">🔍 بحث</button>
+        <div class="sx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="q" id="tripQ" value="{{ request('q') }}" placeholder="اكتب رقم الرحلة أو رقم إيصال… واضغط Enter" autocomplete="off" data-nolive data-suggest="all"></div><button class="btn" type="submit">🔍 بحث</button>
         @if (request('q'))<a class="note" href="{{ request()->fullUrlWithQuery(['q' => null]) }}">✕ مسح</a>@endif
     </form>
     <div class="scroll-x">
@@ -201,4 +201,5 @@ document.querySelectorAll('[data-status]').forEach(b => b.addEventListener('clic
   document.getElementById('mStatus').classList.add('open');
 }));
 </script>
+@include('sg.partials.suggest')
 @endpush

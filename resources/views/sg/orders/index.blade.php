@@ -64,9 +64,9 @@ td.oacts .om > .menu { position: static; margin-top: 6px; box-shadow: none; bord
 <div class="card tw">
     <form method="get" class="tw-h">
         @if (request('stage'))<input type="hidden" name="stage" value="{{ request('stage') }}">@endif
-        <div class="sx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="q" id="liveQ" value="{{ request('q') }}" placeholder="اكتب: كود عميل، اسم، رقم إيصال، هاتف… واضغط Enter" autocomplete="off" data-nolive></div>
+        <div class="sx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="q" id="liveQ" value="{{ request('q') }}" placeholder="اكتب: كود عميل، اسم، رقم إيصال، هاتف… واضغط Enter" autocomplete="off" data-nolive data-suggest="all"></div>
         <select name="platform" class="pill" data-autosubmit><option value="">المنصة: الكل</option>@foreach ($platforms as $pl)<option value="{{ $pl->id }}" @selected(request('platform') == $pl->id)>{{ $pl->name }}</option>@endforeach</select>
-        <input name="trip" id="liveT" list="tripList" class="pill" value="{{ request('trip') }}" placeholder="✈ رقم الرحلة…" autocomplete="off" inputmode="numeric" style="min-width:210px;font-size:15px;font-weight:700"><datalist id="tripList">@foreach ($trips as $t)<option value="{{ $t }}">@endforeach</datalist>
+        <input name="trip" id="liveT" data-suggest="trip" class="pill" value="{{ request('trip') }}" placeholder="✈ رقم الرحلة…" autocomplete="off" inputmode="numeric" style="min-width:210px;font-size:15px;font-weight:700"><datalist id="tripList">@foreach ($trips as $t)<option value="{{ $t }}">@endforeach</datalist>
         <select name="user" class="pill" data-autosubmit><option value="">الموظف: الكل</option>@foreach ($users as $us)<option value="{{ $us->id }}" @selected(request('user') == $us->id)>{{ $us->name }}</option>@endforeach</select>
         <button class="btn" type="submit">🔍 بحث</button>@if (request('q') || request('trip'))<a class="btn ghost" href="{{ route('sg.orders.index') }}">✕ مسح</a>@endif
         @if (request()->hasAny(['q', 'platform', 'trip', 'user']))<a class="note" href="{{ route('sg.orders.index', array_filter(['stage' => request('stage')])) }}">✕ مسح</a>@endif
@@ -200,4 +200,5 @@ window.openDep = function (o) {
   });
 })();
 </script>
+@include('sg.partials.suggest')
 @endpush
