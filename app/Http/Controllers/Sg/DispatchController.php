@@ -54,7 +54,7 @@ class DispatchController extends Controller
         }
         // كل التوصيلات المفتوحة — حتى طلبات العملاء من حساباتهم تطلع هني طول
         $all = Delivery::with(['customer', 'orders', 'courier'])->where(fn ($w) => $w->whereIn('status', self::ACTIVE)->when(\Illuminate\Support\Facades\Schema::hasColumn('deliveries', 'kept'), fn ($x) => $x->orWhere('kept', true)))->latest('id')->get();
-        $all->each(fn ($d) => $d->zone = $d->zone ?: (static::outside($d->city) ? 'out' : 'in'));
+        $all->each(fn ($d) => $d->zone = $d->zone ?: (static::outside($d->city, $d->address) ? 'out' : 'in'));
         // 💵 تحصيل عربون/حجز جاي من رابط العميل ← يقعد «عربون» تلقائي
         foreach ($all as $d) {
             if (($d->deposit_order_id || $d->cart_id) && $d->kind !== 'deposit') {
@@ -340,7 +340,7 @@ class DispatchController extends Controller
 
                 return back()->with('success', 'تحول لـ' . ($delivery->kind === 'deposit' ? 'عربون (انبعتله الرابط والتفاصيل)' : 'طلبية'));
             case 'move':
-                $cur = $delivery->zone ?: (static::outside($delivery->city) ? 'out' : 'in');
+                $cur = $delivery->zone ?: (static::outside($delivery->city, $delivery->address) ? 'out' : 'in');
                 $delivery->zone = $cur === 'out' ? 'in' : 'out';
                 $delivery->save();
                 $delivery->log($delivery->status, $delivery->zone === 'out' ? 'تحول لطابور خارج بنغازي' : 'تحول لطابور المندوب');
@@ -506,7 +506,7 @@ class DispatchController extends Controller
             ->when($request->filled('ids'), fn ($q) => $q->whereIn('id', array_filter(array_map('intval', explode(',', (string) $request->ids)))))
             ->orderBy('id')->get();
         if (!$request->filled('batch')) {
-            $rows = $rows->filter(fn ($d) => ($d->zone ?: (static::outside($d->city) ? 'out' : 'in')) === $tab)->values();
+            $rows = $rows->filter(fn ($d) => ($d->zone ?: (static::outside($d->city, $d->address) ? 'out' : 'in')) === $tab)->values();
         }
         abort_if($rows->isEmpty(), 404);
         $temp = storage_path('app/mpdf-temp');
@@ -841,15 +841,9 @@ class DispatchController extends Controller
     }
 
     /** 🚚 خارج بنغازي؟ (المدينة مكتوبة ومش بنغازي) */
-    public static function outside(?string $city): bool
+    public static function outside(?string $city, ?string $address = null): bool
     {
-        $c = trim((string) $city);
-        if ($c === '') {
-            return false;
-        }
-        $n = str_replace(['ى', 'إ', 'أ', 'آ'], ['ي', 'ا', 'ا', 'ا'], mb_strtolower($c));
-
-        return !str_contains($n, 'بنغازي') && !str_contains($n, 'benghazi') && !str_contains($n, 'banghazi');
+        return \App\Services\CourierService::outsideBenghazi($city, $address);
     }
 
     /** 💵 عربون: نبعتو للزبون الرابط والتفاصيل */

@@ -141,7 +141,7 @@ class PortalCartsController extends Controller
                 $dl->log('requested', 'تحصيل حجز سلة #' . $cart->id);
             }
         }
-        $dl->zone = \App\Http\Controllers\Sg\DispatchController::outside($dl->city) ? 'out' : 'in';
+        $dl->zone = \App\Http\Controllers\Sg\DispatchController::outside($dl->city, $dl->address) ? 'out' : 'in';
         $dl->kind = 'deposit';
         $dl->note = trim(($dl->note ? $dl->note . ' · ' : '') . 'من تأكيد الحجوزات');
         $dl->save();

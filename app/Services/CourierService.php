@@ -58,6 +58,11 @@ class CourierService
             'assigned_at' => $courier ? now() : null,
             'created_id' => auth('web')->id(),
         ]);
+        // 🚚 المدينة مش بنغازي (أو العنوان في مدينة ثانية) → تنزل في طلبيات خارج بنغازي
+        if (\App\Support\Fast::hasColumn('deliveries', 'zone') && static::outsideBenghazi($dl->city, $dl->address)) {
+            $dl->zone = 'out';
+            $dl->saveQuietly();
+        }
         foreach ($orders as $o) {
             $dl->orders()->attach($o->id, ['due' => max(0, $o->remaining())]);
             $o->delivery_id = $dl->id;
@@ -94,16 +99,39 @@ class CourierService
         }
     }
 
-    /** 🚚 خارج بنغازي؟ (المدينة مكتوبة ومش بنغازي) — هذي ما تمشيش للمندوب أوتوماتيك */
-    public static function outsideBenghazi(?string $city): bool
+    /** مدن برا بنغازي (لو انكتبت في العنوان والمدينة فاضية أو مكتوب فيها بنغازي بالغلط) */
+    public const OTHER_CITIES = ['طرابلس', 'مصراتة', 'البيضاء', 'درنة', 'سرت', 'الزاوية', 'سبها', 'طبرق', 'اجدابيا', 'المرج', 'الخمس', 'زليتن', 'غريان',
+        'ترهونة', 'الكفرة', 'صبراتة', 'زوارة', 'بني وليد', 'شحات', 'القبة', 'الابيار', 'توكرة', 'سلوق', 'قمينس', 'جالو', 'اوجلة', 'البريقة', 'راس لانوف',
+        'هون', 'ودان', 'غات', 'اوباري', 'مرزق', 'يفرن', 'نالوت', 'الجميل', 'العجيلات', 'صرمان', 'جنزور', 'تاجوراء', 'القره بوللي', 'مسلاتة', 'سوسة',
+        'امساعد', 'البيضا', 'الجفرة', 'براك', 'الشاطئ', 'رقدالين', 'زلطن', 'الرجبان', 'الزنتان', 'كاباو', 'الاصابعة', 'تيجي', 'بدر', 'العزيزية', 'ككلة',
+        'tripoli', 'misrata', 'misurata', 'bayda', 'derna', 'sirte', 'zawiya', 'sabha', 'tobruk', 'ajdabiya', 'marj', 'khoms', 'zliten', 'gharyan'];
+
+    protected static function norm(string $s): string
     {
-        $c = trim((string) $city);
-        if ($c === '') {
+        return str_replace(['ى', 'إ', 'أ', 'آ', 'ة'], ['ي', 'ا', 'ا', 'ا', 'ه'], mb_strtolower(trim($s)));
+    }
+
+    /** 🚚 خارج بنغازي؟ المدينة مكتوبة ومش بنغازي، أو العنوان فيه مدينة ثانية — هذي تنزل في «خارج بنغازي» */
+    public static function outsideBenghazi(?string $city, ?string $address = null): bool
+    {
+        $isBgh = fn ($n) => str_contains($n, 'بنغازي') || str_contains($n, 'benghazi') || str_contains($n, 'banghazi');
+        $c = static::norm((string) $city);
+        if ($c !== '' && !$isBgh($c)) {
+            return true;
+        }
+        $a = static::norm((string) $address);
+        if ($a === '' || $isBgh($a)) {
             return false;
         }
-        $n = str_replace(['ى', 'إ', 'أ', 'آ'], ['ي', 'ا', 'ا', 'ا'], mb_strtolower($c));
+        foreach (static::OTHER_CITIES as $other) {
+            $o = preg_quote(static::norm($other), '/');
+            // كلمة كاملة، ومش اسم شارع (شارع طرابلس / طريق المطار…)
+            if (preg_match('/(?<![\p{L}])' . $o . '(?![\p{L}])/u', $a) && !preg_match('/(شارع|طريق|ش\.)\s*' . $o . '/u', $a)) {
+                return true;
+            }
+        }
 
-        return !str_contains($n, 'بنغازي') && !str_contains($n, 'benghazi') && !str_contains($n, 'banghazi');
+        return false;
     }
 
     /** نختارو مندوب أوتوماتيك: متاح، ومنطقته نفس المدينة لو فيه، والأقل شغل توا */

@@ -62,7 +62,7 @@ class DeliveryRequestController extends Controller
         DB::beginTransaction();
         try {
             // 🚚 خارج بنغازي: ما تمشيش للمندوب — تقعد في واجهة المندوبين «طلبيات خارج بنغازي» والإدارة تتصرف
-            $outside = CourierService::outsideBenghazi($data['city'] ?? null);
+            $outside = CourierService::outsideBenghazi($data['city'] ?? null, $data['address'] ?? null);
             $courier = $outside ? null : CourierService::autoPick($data['city'] ?? null); // أقرب مندوب متاح (لو فيه) — وإلا الإدارة تعيّنه
             $dl = CourierService::assign($c, $orders, [
                 'recipient_name' => $data['name'], 'recipient_phone' => $data['phone'], 'city' => $data['city'] ?? null,

@@ -33,8 +33,8 @@ class CouriersController extends Controller
         $bal = $couriers->mapWithKeys(fn ($c) => [$c->id => CourierService::balance($c)]);
         $requests = Delivery::with(['customer', 'orders'])->where('status', 'requested')->latest()->get();
         // 🚚 طلبيات خارج بنغازي: ما تمشيش للمندوب أوتوماتيك — لروحها في واجهة
-        $outside = $requests->filter(fn ($r) => CourierService::outsideBenghazi($r->city))->values();
-        $requests = $requests->reject(fn ($r) => CourierService::outsideBenghazi($r->city))->values();
+        $outside = $requests->filter(fn ($r) => CourierService::outsideBenghazi($r->city, $r->address))->values();
+        $requests = $requests->reject(fn ($r) => CourierService::outsideBenghazi($r->city, $r->address))->values();
         // 🛵 طلبات العملاء (داخل وخارج بنغازي) صارت في «طلبيات دليفري»
         $requests = collect();
         $outside = collect();
