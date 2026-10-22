@@ -613,7 +613,10 @@ class PortalCartsController extends Controller
         \App\Services\AppSettings::put(['booking_last_phone' => $pickTo, 'booking_numbers' => array_values($nums)]);
         // ⚡ من «حسبها وما أكدهاش»: يمشي للرقم طول من غير تأكيد ولا إيصال
         $waMode = $request->boolean('wa');
-        abort_unless($cart->status === 'succeeded' && ($waMode || $cart->customer_id), 404);
+        // بدل صفحة 404: رسالة واضحة (سلة بدون رابط ما تنبعتش · الزبون بدون حساب يمشي رقمه بدل الكود)
+        if (!$cart->source_url) {
+            return back()->with('error', 'السلة #' . $cart->id . ' ما عندهاش رابط نبعتوه للقروب');
+        }
         $c = $cart->customer;
         // لازم يتأكد الحجز أول (ينعمل الإيصال ويوصل العميل) وبعدين ⚡ احجز
         if (!$waMode && $cart->portal_status !== 'confirmed') {
@@ -646,7 +649,7 @@ class PortalCartsController extends Controller
             report($e);
         }
         $file = null;
-        if ($repeat) { // 🔁 الـ PDF يمشي بس لو فيه تكرار — غيره: الرابط والكود بس
+        if ($repeat && $cart->status === 'succeeded') { // 🔁 الـ PDF يمشي بس لو فيه تكرار — غيره: الرابط والكود بس
             try {
                 $cart = $pdf->prepare($cart);
                 $file = $cart->pdf_path && Storage::disk('local')->exists($cart->pdf_path) ? Storage::disk('local')->path($cart->pdf_path) : null;
