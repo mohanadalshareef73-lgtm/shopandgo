@@ -144,8 +144,8 @@
         <a href="{{ route('admin.home') }}"><img class="logo" src="{{ asset('assets/sg/logo.png') }}" alt="Shop and Go"></a>
         @role('Admin')
         @php
-            $rCart = (float) (\App\Models\Setting::query()->value('usd_to_lyd_rate') ?: 0);
-            $rBuy = (float) (\App\Models\CurrencyExchange::latestRate() ?: 0);
+            $rCart = (float) \Illuminate\Support\Facades\Cache::remember('sg.rate.cart', 60, fn () => (float) (\App\Models\Setting::query()->value('usd_to_lyd_rate') ?: 0));
+            $rBuy = (float) \Illuminate\Support\Facades\Cache::remember('sg.rate.buy', 60, fn () => (float) (\App\Models\CurrencyExchange::latestRate() ?: 0));
             $rAt = \App\Services\AppSettings::get('rate_updated_at');
             $rOld = !$rAt || \Carbon\Carbon::parse($rAt)->lt(now()->subDay());
             $rLow = $rBuy > 0 && $rCart > 0 && $rCart < $rBuy;
@@ -191,8 +191,8 @@
         </div></div>
         @role('Admin')
         @php
-            $rCart = (float) (\App\Models\Setting::query()->value('usd_to_lyd_rate') ?: 0);
-            $rBuy = (float) (\App\Models\CurrencyExchange::latestRate() ?: 0);
+            $rCart = (float) \Illuminate\Support\Facades\Cache::remember('sg.rate.cart', 60, fn () => (float) (\App\Models\Setting::query()->value('usd_to_lyd_rate') ?: 0));
+            $rBuy = (float) \Illuminate\Support\Facades\Cache::remember('sg.rate.buy', 60, fn () => (float) (\App\Models\CurrencyExchange::latestRate() ?: 0));
             $rAt = \App\Services\AppSettings::get('rate_updated_at');
             $rOld = !$rAt || \Carbon\Carbon::parse($rAt)->lt(now()->subDay());
             $rLow = $rBuy > 0 && $rCart > 0 && $rCart < $rBuy;
@@ -269,7 +269,9 @@
     const fd = new FormData(); fd.append('id', a.dataset.id); fd.append('_token', tok);
     fetch(readUrl, { method: 'POST', body: fd, keepalive: true, headers: { 'X-CSRF-TOKEN': tok } }).catch(() => {}).finally(() => { if (go && go !== '#') location.href = go; else poll(); });
   });
-  poll(); setInterval(poll, 20000);
+  // ⚡ كل دقيقة بدل كل 20 ثانية، وما يسألش والتاب مخفي (كل تاب مفتوح كان يتقل على السيرفر)
+  poll(); setInterval(() => { if (!document.hidden) poll(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 })();
 </script>
 @stack('script')

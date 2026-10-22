@@ -220,15 +220,18 @@ class CouriersController extends Controller
     public function alerts(Request $request)
     {
         $since = (int) $request->input('since', 0);
-
-        return response()->json([
+        // ⚡ نفس الجواب لكل الموظفين لمدة 10 ثواني (بدل استعلامات مع كل سؤال من كل تاب)
+        $d = \Illuminate\Support\Facades\Cache::remember('sg.alerts.feed', 10, fn () => [
             'unread' => SgAlert::whereNull('read_at')->count(),
             'last' => (int) SgAlert::max('id'),
             'items' => SgAlert::latest('id')->take(12)->get()->map(fn ($a) => [
                 'id' => $a->id, 'title' => $a->title, 'body' => $a->body, 'url' => $a->url, 'level' => $a->level,
-                'new' => $a->id > $since, 'unread' => !$a->read_at, 'ago' => $a->created_at->diffForHumans(),
-            ]),
+                'unread' => !$a->read_at, 'at' => $a->created_at->timestamp,
+            ])->all(),
         ]);
+        $d['items'] = array_map(fn ($a) => $a + ['new' => $a['id'] > $since, 'ago' => \Carbon\Carbon::createFromTimestamp($a['at'])->diffForHumans()], $d['items']);
+
+        return response()->json($d);
     }
 
     public function alertsRead(Request $request)
@@ -238,6 +241,7 @@ class CouriersController extends Controller
             $q->where('id', (int) $request->id);
         }
         $q->update(['read_at' => now()]);
+        \Illuminate\Support\Facades\Cache::forget('sg.alerts.feed');
 
         return response()->json(['ok' => true]);
     }
