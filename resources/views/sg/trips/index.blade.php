@@ -92,7 +92,7 @@
     <form method="get" class="tw-h">
         @if (request('stage'))<input type="hidden" name="stage" value="{{ request('stage') }}">@endif
         @if (request('m'))<input type="hidden" name="m" value="{{ request('m') }}">@endif
-        <div class="sx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="q" id="tripQ" value="{{ request('q') }}" placeholder="اكتب رقم الرحلة أو رقم إيصال… واضغط Enter" autocomplete="off" data-nolive data-suggest="all"></div><button class="btn" type="submit">🔍 بحث</button>
+        <div class="sx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="q" id="tripQ" value="{{ request('q') }}" placeholder="اكتب رقم الرحلة أو رقم إيصال… واضغط Enter" autocomplete="off" data-nolive data-suggest="trip"></div><button class="btn" type="submit">🔍 بحث</button>
         @if (request('q'))<a class="note" href="{{ request()->fullUrlWithQuery(['q' => null]) }}">✕ مسح</a>@endif
     </form>
     <div class="scroll-x">
