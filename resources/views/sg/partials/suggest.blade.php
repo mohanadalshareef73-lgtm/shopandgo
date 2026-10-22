@@ -5,9 +5,10 @@
 .sg-sug a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px; color: var(--ink); }
 .sg-sug a.on, .sg-sug a:hover { background: #f1f3f8; }
 .sg-sug a b { font-family: InterNum, Somar, sans-serif; font-weight: 800; font-size: 15.5px; direction: ltr; }
-.sg-sug a small { color: var(--ink-3); font-size: 12.5px; margin-inline-start: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.sg-sug a small { color: var(--ink-3); font-size: 12.5px; margin-inline-start: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
 .sg-sug a i { font-style: normal; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: #eef0f4; color: var(--ink-2); }
 .sg-sug a i.t { background: #e8f0fb; color: #2a78d6; }
+.sg-sug a i.c { background: #fff1e6; color: #a8400a; }
 .sg-sug .none { padding: 10px 12px; color: var(--ink-3); font-size: 13.5px; }
 </style>
 <script>
@@ -20,7 +21,7 @@
     const hide = () => { box.hidden = true; idx = -1; };
     const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const draw = () => {
-      box.innerHTML = items.length ? items.map((x, i) => `<a href="${esc(x.url)}" class="${i === idx ? 'on' : ''}"><i class="${x.kind === 'trip' ? 't' : ''}">${x.kind === 'trip' ? 'رحلة' : 'إيصال'}</i><b>${esc(x.code)}</b><small>${esc(x.sub)}</small></a>`).join('') : '<div class="none">ما فيش نتائج قريبة</div>';
+      box.innerHTML = items.length ? items.map((x, i) => `<a href="${esc(x.url)}" class="${i === idx ? 'on' : ''}"><i class="${x.kind === 'trip' ? 't' : (x.kind === 'cust' ? 'c' : '')}">${x.kind === 'trip' ? 'رحلة' : (x.kind === 'cust' ? 'زبون' : 'إيصال')}</i><b>${esc(x.code)}</b><small>${esc(x.sub)}</small></a>`).join('') : '<div class="none">ما فيش نتائج قريبة</div>';
       place(); box.hidden = false;
     };
     inp.addEventListener('input', () => {

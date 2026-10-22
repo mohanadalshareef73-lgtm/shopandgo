@@ -67,11 +67,22 @@ class OrdersController extends Controller
         $rank = fn ($col) => "CASE WHEN $col = ? THEN 0 WHEN $col LIKE ? THEN 1 WHEN $col LIKE ? THEN 2 WHEN $col LIKE ? THEN 3 ELSE 4 END";
         $bind = [$t, '%-' . $t, '%-' . $t . '%', $t . '%'];
         $items = [];
+        $clean = fn (array $parts) => implode(' · ', array_filter(array_map(fn ($x) => trim((string) $x, " .\t"), $parts), fn ($x) => $x !== ''));
+        if ($type === 'all') {
+            // 👤 أكواد الزبائن أول: الكود المطابق، بعده اللي يبدا بالرقم، بعده اللي فيه الرقم
+            $custs = Customer::where('code', 'like', '%' . $t . '%')
+                ->orderByRaw('CASE WHEN code = ? THEN 0 WHEN code LIKE ? THEN 1 ELSE 2 END', [$t, $t . '%'])->orderByRaw('LENGTH(code)')->orderBy('code')
+                ->limit(6)->get(['id', 'code', 'name', 'phone_1']);
+            foreach ($custs as $c) {
+                $n = Order::where('customer_id', $c->id)->count();
+                $items[] = ['kind' => 'cust', 'code' => $c->code, 'sub' => $clean([$c->name, $c->phone_1, $n . ' إيصال']), 'url' => route('sg.orders.index', ['q' => $c->code])];
+            }
+        }
         if ($type !== 'trip') {
             $orders = Order::with('customer:id,name,code')->where('code', 'like', '%' . $t . '%')
-                ->orderByRaw($rank('code'), $bind)->orderByRaw('LENGTH(code)')->orderByDesc('id')->limit(8)->get();
+                ->orderByRaw($rank('code'), $bind)->orderByRaw('LENGTH(code)')->orderByDesc('id')->limit($type === 'all' ? 6 : 8)->get();
             foreach ($orders as $o) {
-                $items[] = ['kind' => 'order', 'code' => $o->code, 'sub' => trim(optional($o->customer)->name . ' · ' . optional($o->customer)->code, ' ·') . ' · ' . $o->stageLabel(), 'url' => route('sg.orders.show', $o)];
+                $items[] = ['kind' => 'order', 'code' => $o->code, 'sub' => $clean([optional($o->customer)->name, optional($o->customer)->code, $o->stageLabel()]), 'url' => route('sg.orders.show', $o)];
             }
         }
         if ($type !== 'order') {
