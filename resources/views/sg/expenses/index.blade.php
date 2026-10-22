@@ -30,6 +30,82 @@
     <div class="acts">@can('partner-create')@if ($partners->count())<button class="btn ghost" data-modal="mPartExp">👤 مصروف شريك</button>@endif @endcan @if (!$mine)<button class="btn" data-modal="mSalary" onclick="setSal('salary')">💰 مرتب موظف</button><button class="btn ghost" data-modal="mSalary" onclick="setSal('advance')">💸 سلفة</button><button class="btn ghost" data-modal="mBonus">🎁 مكافأة موظف</button>@endif @include('sg.partials.period')<a class="btn ghost" href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}">⬇ Excel</a><button class="sg-burger">☰</button></div>
 </div>
 
+@if (!$mine)
+<div class="tabs">
+    <a href="{{ route('sg.expenses', array_filter(['p' => request('p')])) }}" class="{{ $tab === 'company' ? 'on' : '' }}">🧾 مصروفات الشركة</a>
+    <a href="{{ route('sg.expenses', array_filter(['tab' => 'staff', 'p' => request('p')])) }}" class="{{ $tab === 'staff' ? 'on' : '' }}">👥 مصروفات الموظفين @if ($openAdv->sum() > 0)<span class="b r num">{{ $f($openAdv->sum()) }}</span>@endif</a>
+</div>
+@endif
+@if ($tab === 'staff')
+@php $sc = $staffCards; @endphp
+<div class="kpis g4">
+    <div class="card kpi"><div class="lbl">صرفوا {{ $period->label }}</div><div class="v"><span class="num">{{ $f($sc->sum('spent')) }}</span> <small>د.ل</small></div><div class="s">{{ $sc->where('n', '>', 0)->count() }} موظف</div></div>
+    <div class="card kpi red"><div class="lbl">باقي ينخصم من الرواتب</div><div class="v"><span class="num">{{ $f($openAdv->sum()) }}</span> <small>د.ل</small></div><div class="s">سلف ومصروفات شخصية</div></div>
+    <div class="card kpi green"><div class="lbl">انخصم</div><div class="v"><span class="num">{{ $f($sc->sum('deducted')) }}</span> <small>د.ل</small></div><div class="s">من سلف {{ $period->label }}</div></div>
+    <div class="card kpi"><div class="lbl">على الشركة</div><div class="v"><span class="num">{{ $f($sc->sum('work')) }}</span> <small>د.ل</small></div><div class="s">مصروفات شغل ما تنخصمش</div></div>
+</div>
+<div class="side-lay">
+    <div>
+        @if ($sc->count())
+        <div class="grid g3 mb">
+            @foreach ($sc as $r)
+                <div class="card">
+                    <div style="display:flex;align-items:center;gap:10px"><span class="av">{{ mb_substr($r->user->name, 0, 1) }}</span><div style="flex:1;min-width:0"><b style="font-size:16px">{{ $r->user->name }}</b><div class="note">{{ $r->n }} مصروف {{ $period->label }}</div></div></div>
+                    <div class="ln" style="margin-top:10px"><span>صرف {{ $period->label }}</span><b class="num">{{ $f($r->spent) }}</b></div>
+                    <div class="ln"><span>انخصم من الراتب</span><b class="num plus">{{ $f($r->deducted) }}</b></div>
+                    <div class="ln tot"><span>باقي ينخصم</span><b class="num {{ $r->open > 0 ? 'minus' : '' }}">{{ $f($r->open) }} د.ل</b></div>
+                    <div style="display:flex;gap:6px;margin-top:10px">
+                        <button type="button" class="btn sm" style="flex:1" data-modal="mSalary" onclick="setSal('salary');const s=document.getElementById('salStaff');s.value='{{ $r->user->id }}';s.dispatchEvent(new Event('change'))">💵 خصم من الراتب</button>
+                        <a class="btn ghost sm" href="{{ route('sg.expenses', array_filter(['tab' => 'staff', 'staff' => $r->user->id, 'p' => request('p')])) }}">السجل</a>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+        @endif
+        <div class="card tw">
+            <form method="get" class="tw-h">
+                <input type="hidden" name="tab" value="staff">@if (request('p'))<input type="hidden" name="p" value="{{ request('p') }}">@endif @if (request('staff'))<input type="hidden" name="staff" value="{{ request('staff') }}">@endif
+                <h3 style="margin:0">كل المصروفات</h3>
+                <div class="sx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="q" value="{{ request('q') }}" placeholder="التفاصيل…" data-nolive></div>
+                @foreach (['' => 'الكل', 'open' => 'ينخصم', 'done' => 'انخصم', 'work' => 'على الشركة'] as $k => $v)<a class="pill {{ (string) request('st') === $k ? 'on' : '' }}" href="{{ request()->fullUrlWithQuery(['st' => $k ?: null, 'page' => null]) }}">{{ $v }}</a>@endforeach
+                @if (request('staff'))<a class="note" href="{{ request()->fullUrlWithQuery(['staff' => null]) }}">✕ كل الموظفين</a>@endif
+            </form>
+            <div class="scroll-x"><table class="t">
+                <thead><tr><th>التاريخ</th><th>الموظف</th><th>التفاصيل</th><th>النوع</th><th>من خزينة</th><th class="n">المبلغ</th><th>الحالة</th><th></th></tr></thead>
+                <tbody>
+                @forelse ($staffList ?? [] as $e)
+                    <tr>
+                        <td class="note num">{{ $e->date }}</td>
+                        <td><b>{{ optional($e->staff)->name ?? '—' }}</b></td>
+                        <td class="wrap">{{ \Illuminate\Support\Str::limit(preg_replace('/^(سلفة|مصروف شغل) — [^·]*· ?/u', '', (string) $e->note), 60) ?: '—' }}</td>
+                        <td><span class="chip n">{{ $e->staff_kind === 'work' ? 'مصروف شغل' : 'سلفة / شخصي' }}</span></td>
+                        <td class="note">{{ optional($e->payment)->name }}</td>
+                        <td class="n"><b class="num">{{ $f($e->cost) }}</b> د.ل</td>
+                        <td>@if ($e->staff_kind === 'work')<span class="chip u">على الشركة</span>@elseif ($e->settled_id)<span class="chip d">انخصم ✓</span>@else<span class="chip w">ينخصم</span>@endif</td>
+                        <td>@can('purchase-delete')@if (!$e->settled_id)<form method="post" action="{{ route('sg.expenses.destroy', $e) }}" onsubmit="return confirm('نحذفو المصروف؟ المبلغ يرجع للخزينة')">@csrf @method('DELETE')<button class="btn ghost sm" style="color:var(--down)">🗑</button></form>@endif @endcan</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="8"><div class="empty"><span class="ic">👥</span>ما فيش مصروفات موظفين هنا</div></td></tr>
+                @endforelse
+                </tbody>
+            </table></div>
+        </div>
+        @if ($staffList)@include('sg.partials.pager', ['p' => $staffList])@endif
+    </div>
+    <div class="card sticky">
+        <h3>➕ مصروف لموظف</h3>
+        <form method="post" action="{{ route('sg.expenses.salary') }}">@csrf
+            <div class="f"><label class="l">الموظف</label><select name="staff_id" class="inp" required><option value="">اختار الموظف…</option>@foreach ($staff as $u)<option value="{{ $u->id }}" @selected(request('staff') == $u->id)>{{ $u->name }}</option>@endforeach</select></div>
+            <div class="f"><label class="l">المبلغ (د.ل)</label><input name="cost" class="inp big" required inputmode="decimal" placeholder="0"></div>
+            <div class="f"><label class="l">النوع</label><div class="opts fill"><label><input type="radio" name="kind" value="advance" checked><span>💸 سلفة / شخصي (ينخصم)</span></label><label><input type="radio" name="kind" value="work"><span>🏢 مصروف شغل (على الشركة)</span></label></div></div>
+            <div class="f"><label class="l">التفاصيل</label><input name="note" class="inp" placeholder="مثلاً: غدا، مواصلات، شحن رصيد…"></div>
+            <div class="grid g2 f"><div><label class="l">من خزينة</label><select name="payment_id" class="inp">@foreach ($payments as $pm)<option value="{{ $pm->id }}" @selected($pm->id == $cashId)>{{ $pm->name }}</option>@endforeach</select></div><div><label class="l">التاريخ</label><input type="date" name="date" class="inp" value="{{ now()->toDateString() }}"></div></div>
+            <button class="btn block">حفظ</button>
+        </form>
+        <div class="hint mt">💡 وقت تعطي الموظف راتبه، اضغط «💵 خصم من الراتب» على كرته: يطلعلك الباقي ينخصم والمرتب ينقص بيه.</div>
+    </div>
+</div>
+@else
 <div class="kpis g4">
     <div class="card kpi accent"><div class="lbl">مصاريف {{ $period->label }}</div><div class="v"><span class="num">{{ $f($total) }}</span> <small>د.ل</small></div><div class="s">@include('sg.partials.chg', ['cur' => $total, 'prev' => $prev, 'invert' => true]) عن {{ $period->prevLabel }} ({{ $f($prev) }})</div></div>
     <div class="card kpi"><div class="lbl">متوسط في اليوم</div><div class="v"><span class="num">{{ $f($total / $days) }}</span> <small>د.ل</small></div><div class="s">{{ $days }} يوم</div></div>
@@ -125,6 +201,7 @@
     @endcan
     </div>
 </div>
+@endif
 
 @can('purchase-create')
 <div class="modal-bg" id="catsM"><div class="modal" style="max-width:560px">
@@ -162,7 +239,7 @@
         <input type="hidden" name="kind" id="salKind" value="salary">
         <div class="f"><label class="l">الموظف</label><select name="staff_id" id="salStaff" class="inp" required><option value="">— اختار —</option>@foreach ($staff as $u)<option value="{{ $u->id }}" data-adv="{{ $openAdv[$u->id] ?? 0 }}">{{ $u->name }}</option>@endforeach</select></div>
         <div id="salAdv" hidden style="background:#fff4e6;border:2px solid #e8590c;border-radius:12px;padding:10px 12px;margin-bottom:10px">
-            ⚠ عنده سلف ما تخصمتش: <b class="num" id="salAdvN"></b> د.ل
+            ⚠ عنده سلف ما انخصمتش: <b class="num" id="salAdvN"></b> د.ل
             <label class="ck" style="margin-top:6px;font-weight:800"><input type="checkbox" name="deduct" value="1" checked> اخصمها من المرتب</label>
         </div>
         <div class="grid g2 f"><div><label class="l" id="salAmtL">المرتب (د.ل)</label><input name="cost" id="salAmt" class="inp numr" required inputmode="decimal" style="font-size:20px;font-weight:800"></div>

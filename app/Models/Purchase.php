@@ -17,5 +17,11 @@ class Purchase extends Model
         return $this->hasOne(PaymentMethod::class, 'id', 'payment_id');
     }
 
+    /** 👥 الموظف اللي عليه المصروف (سلفة / مصروف شغل / مرتب) */
+    public function staff()
+    {
+        return $this->belongsTo(User::class, 'staff_id');
+    }
+
 
 }

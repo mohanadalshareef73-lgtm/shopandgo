@@ -180,8 +180,8 @@ class DeliveryController extends Controller
             }
             $orders = $orders->map->fresh();
 
-            // 0) 📉 النواقص المسجلة (ما تقررش فيها) واخترنا «خصم النواقص»: تتخصم من الإيصال
-            // النواقص اللي سعرها مش متسجل: الموظف يكتب قيمتها وقت التسليم وتتخصم
+            // 0) 📉 النواقص المسجلة (ما تقررش فيها) واخترنا «خصم النواقص»: تنخصم من الإيصال
+            // النواقص اللي سعرها مش متسجل: الموظف يكتب قيمتها وقت التسليم وتنخصم
             foreach ((array) ($data['miss_val'] ?? []) as $oid => $mv) {
                 $o = $orders->firstWhere('id', (int) $oid);
                 if ($o && (float) $mv > 0.009 && (int) $o->missing_qty > 0 && !$o->missing_action) {
@@ -189,7 +189,7 @@ class DeliveryController extends Controller
                     $o->save();
                     $data['miss_deduct'][$oid] = '1';
                 } elseif ($o && (float) $mv > 0.009) {
-                    // نواقص مضافة من الزر (من غير سعر): القيمة اللي كتبها الموظف تتخصم على أول وحدة
+                    // نواقص مضافة من الزر (من غير سعر): القيمة اللي كتبها الموظف تنخصم على أول وحدة
                     $first = \App\Models\OrderIssue::where('order_id', $o->id)->where('type', 'missing')->where('status', 'open')->first();
                     if ($first) {
                         $first->value = round((float) $mv, 2);
@@ -222,7 +222,7 @@ class DeliveryController extends Controller
             }
             $orders = $orders->map->fresh();
 
-            // 0) ⚠ مشكلة مفتوحة على الإيصال واخترنا نخصمها: تتخصم من الإيصال وتتقفل المشكلة
+            // 0) ⚠ مشكلة مفتوحة على الإيصال واخترنا نخصمها: تنخصم من الإيصال وتتقفل المشكلة
             foreach ((array) ($data['issue_deduct'] ?? []) as $isId => $val) {
                 if ((float) $val <= 0.009) {
                     continue;

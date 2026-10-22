@@ -66,7 +66,45 @@ class ExpensesController extends Controller
             'left' => (int) now()->startOfDay()->diffInDays(now()->startOfMonth()->addDays(min(28, $c->monthly_day) - 1), false),
         ]);
 
+        // 👥 مصروفات الموظفين: كل موظف كم صرف (سلفة/شخصي ينخصم من راتبه، أو مصروف شغل على الشركة)
+        $tab = $request->input('tab') === 'staff' && !$mine && \Illuminate\Support\Facades\Schema::hasColumn('purchases', 'staff_kind') ? 'staff' : 'company';
+        $staffCards = collect();
+        $staffList = null;
+        if ($tab === 'staff') {
+            $inP = Purchase::whereIn('staff_kind', ['advance', 'work'])->whereBetween('date', [$p->from->toDateString(), $p->to->toDateTimeString()])->get();
+            $open = Purchase::where('staff_kind', 'advance')->whereNull('settled_id')->get()->groupBy('staff_id');
+            $ids = $inP->pluck('staff_id')->merge($open->keys())->filter()->unique();
+            $staffCards = User::whereIn('id', $ids)->orderBy('name')->get(['id', 'name'])->map(function ($u) use ($inP, $open) {
+                $mineP = $inP->where('staff_id', $u->id);
+
+                return (object) [
+                    'user' => $u, 'n' => $mineP->count(),
+                    'spent' => round((float) $mineP->sum('cost'), 2),
+                    'work' => round((float) $mineP->where('staff_kind', 'work')->sum('cost'), 2),
+                    'deducted' => round((float) $mineP->where('staff_kind', 'advance')->whereNotNull('settled_id')->sum('cost'), 2),
+                    'open' => round((float) optional($open->get($u->id))->sum('cost'), 2),
+                ];
+            })->sortByDesc('open')->values();
+            $sl = Purchase::with(['payment', 'staff'])->whereIn('staff_kind', ['advance', 'work'])->whereBetween('date', [$p->from->toDateString(), $p->to->toDateTimeString()]);
+            if ($request->filled('staff')) {
+                $sl->where('staff_id', (int) $request->staff);
+            }
+            $st = $request->input('st');
+            if ($st === 'open') {
+                $sl->where('staff_kind', 'advance')->whereNull('settled_id');
+            } elseif ($st === 'done') {
+                $sl->where('staff_kind', 'advance')->whereNotNull('settled_id');
+            } elseif ($st === 'work') {
+                $sl->where('staff_kind', 'work');
+            }
+            if ($request->filled('q')) {
+                $sl->where('note', 'like', '%' . $request->q . '%');
+            }
+            $staffList = $sl->orderByDesc('date')->orderByDesc('id')->paginate(30)->withQueryString();
+        }
+
         return view('sg.expenses.index', [
+            'tab' => $tab, 'staffCards' => $staffCards, 'staffList' => $staffList,
             'nav' => 'exp', 'period' => $p, 'total' => $total, 'prev' => $prev, 'byCat' => $byCat, 'days' => $days,
             'tripProfit' => $tripProfit, 'six' => ['labels' => $months->map(fn ($m) => Period::MONTHS[$m->month - 1])->values(), 'values' => $six->values()],
             'list' => $list, 'cats' => $cats, 'fixed' => $fixed,
@@ -137,13 +175,13 @@ class ExpensesController extends Controller
     /** 💰 مرتب / 💸 سلفة لموظف (المدير بس) — المرتب ينوه على السلف ويخصمها لو اخترت */
     public function salary(Request $request)
     {
-        abort_unless(auth()->user()->hasRole('Admin') || auth()->user()->can('user-edit'), 403);
+        abort_unless(auth()->user()->hasRole('Admin') || auth()->user()->can('user-edit') || ($request->input('kind') !== 'salary' && auth()->user()->can('purchase-create')), 403);
         $data = $request->validate([
-            'kind' => 'required|in:salary,advance', 'staff_id' => 'required|exists:users,id', 'cost' => 'required|numeric|min:0.01',
+            'kind' => 'required|in:salary,advance,work', 'staff_id' => 'required|exists:users,id', 'cost' => 'required|numeric|min:0.01',
             'payment_id' => 'required|exists:payment_methods,id', 'date' => 'nullable|date', 'note' => 'nullable|string|max:300', 'deduct' => 'nullable|boolean',
         ], ['staff_id.required' => 'اختار الموظف', 'cost.required' => 'اكتب المبلغ']);
         $u = User::find($data['staff_id']);
-        $catName = $data['kind'] === 'salary' ? 'مرتبات' : 'سلف الموظفين';
+        $catName = ['salary' => 'مرتبات', 'advance' => 'سلف الموظفين', 'work' => 'مصروفات شغل الموظفين'][$data['kind']];
         DB::beginTransaction();
         try {
             $desc = PurchaseDescription::where('name', $catName)->first();
@@ -165,7 +203,7 @@ class ExpensesController extends Controller
             $e->desc_id = $desc->id;
             $e->cost = $net;
             $e->date = $data['date'] ?? now()->toDateString();
-            $e->note = trim(($data['kind'] === 'salary' ? 'مرتب' : 'سلفة') . ' — ' . $u->name . ($ded > 0 ? ' · المرتب ' . $gross . ' − سلف ' . $ded : '') . (!empty($data['note']) ? ' · ' . $data['note'] : ''));
+            $e->note = trim((['salary' => 'مرتب', 'advance' => 'سلفة', 'work' => 'مصروف شغل'][$data['kind']]) . ' — ' . $u->name . ($ded > 0 ? ' · المرتب ' . $gross . ' − سلف ' . $ded : '') . (!empty($data['note']) ? ' · ' . $data['note'] : ''));
             $e->payment_id = $data['payment_id'];
             $e->currency = 'dinar';
             $e->currency_sign = TreasuryService::sign('dinar');
@@ -180,7 +218,7 @@ class ExpensesController extends Controller
                 $a->settled_id = $e->id;
                 $a->save();
             }
-            Log::create(['user_id' => auth()->id(), 'type' => 'purchase', 'title' => ' ' . ($data['kind'] === 'salary' ? 'مرتب' : 'سلفة') . ' (' . $u->name . ')', 'log' => ' ' . $gross . ($ded > 0 ? ' · خصم سلف ' . $ded . ' · صافي ' . $net : '')]);
+            Log::create(['user_id' => auth()->id(), 'type' => 'purchase', 'title' => ' ' . (['salary' => 'مرتب', 'advance' => 'سلفة', 'work' => 'مصروف شغل'][$data['kind']]) . ' (' . $u->name . ')', 'log' => ' ' . $gross . ($ded > 0 ? ' · خصم سلف ' . $ded . ' · صافي ' . $net : '')]);
             DB::commit();
         } catch (\Throwable $ex) {
             DB::rollBack();
@@ -191,7 +229,7 @@ class ExpensesController extends Controller
 
         return back()->with('success', $data['kind'] === 'salary'
             ? '✓ مرتب ' . $u->name . ': ' . TreasuryService::fmt($gross) . ' د.ل' . ($ded > 0 ? ' · تخصمت سلف ' . TreasuryService::fmt($ded) . ' · استلم ' . TreasuryService::fmt($net) : '')
-            : '✓ سلفة ' . $u->name . ': ' . TreasuryService::fmt($gross) . ' د.ل (تتخصم من مرتبه)');
+            : ($data['kind'] === 'work' ? '✓ مصروف شغل على ' . $u->name . ': ' . TreasuryService::fmt($gross) . ' د.ل (على الشركة)' : '✓ سلفة ' . $u->name . ': ' . TreasuryService::fmt($gross) . ' د.ل (ينخصم من مرتبه)'));
     }
 
     public function destroy(Purchase $purchase)

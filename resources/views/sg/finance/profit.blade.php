@@ -79,7 +79,7 @@
         <div class="pt surplus mb">
             <div style="font-size:14px;color:var(--ink-2)">الفائض الذي لم يُقسّم (من البداية)</div>
             <div class="v"><span class="num">{{ $f($surplus['surplus']) }}</span> <small style="font-size:14px;color:var(--ink-3);font-weight:400">د.ل</small></div>
-            <div class="note">صافي الربح {{ $f($surplus['net']) }} − توزيعات (والسحب اليومي دين يتخصم من النصيب) {{ $f($surplus['drawn']) }}</div>
+            <div class="note">صافي الربح {{ $f($surplus['net']) }} − توزيعات (والسحب اليومي دين ينخصم من النصيب) {{ $f($surplus['drawn']) }}</div>
             <div class="note">من تاريخ {{ $surplus['from'] ?? 'البداية' }}@if (($surplus['opening'] ?? 0) != 0) · فيه رصيد افتتاحي {{ $f($surplus['opening']) }}@endif</div>
             @role('Admin')<details style="margin-top:8px"><summary class="note" style="cursor:pointer">⚙ تعديل حساب الفائض</summary>
                 <form method="post" action="{{ route('finance.partners.surplus') }}" style="margin-top:8px">@csrf

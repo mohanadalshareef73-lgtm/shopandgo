@@ -68,15 +68,38 @@ class OrdersController extends Controller
         $bind = [$t, '%-' . $t, '%-' . $t . '%', $t . '%'];
         $items = [];
         $clean = fn (array $parts) => implode(' · ', array_filter(array_map(fn ($x) => trim((string) $x, " .\t"), $parts), fn ($x) => $x !== ''));
-        if ($type === 'all') {
+        if (in_array($type, ['all', 'cart'], true)) {
             // 👤 أكواد الزبائن أول: الكود المطابق، بعده اللي يبدا بالرقم، بعده اللي فيه الرقم
             $custs = Customer::where('code', 'like', '%' . $t . '%')
                 ->orderByRaw('CASE WHEN code = ? THEN 0 WHEN code LIKE ? THEN 1 ELSE 2 END', [$t, $t . '%'])->orderByRaw('LENGTH(code)')->orderBy('code')
                 ->limit(6)->get(['id', 'code', 'name', 'phone_1']);
             foreach ($custs as $c) {
                 $n = Order::where('customer_id', $c->id)->count();
-                $items[] = ['kind' => 'cust', 'code' => $c->code, 'sub' => $clean([$c->name, $c->phone_1, $n . ' إيصال']), 'url' => route('sg.orders.index', ['q' => $c->code])];
+                $nc = \App\Models\CartQuote::where('customer_id', $c->id)->count();
+                $items[] = ['kind' => 'cust', 'code' => $c->code, 'name' => trim((string) $c->name, ' .'), 'phone' => $c->phone_1,
+                    'sub' => $clean([$n . ' إيصال', $nc ? $nc . ' سلة' : '']),
+                    'url' => $type === 'cart' ? route('sg.carts', ['search' => $c->code]) : route('sg.orders.index', ['q' => $c->code])];
             }
+        }
+        if ($type === 'cart') {
+            // 🛒 السلات: برقمها، أو اسم/رقم صاحبها
+            $digits = preg_replace('/\D/', '', $t);
+            $carts = \App\Models\CartQuote::with(['customer:id,name,code,phone_1', 'incomingMessage'])
+                ->where(function ($w) use ($t, $digits) {
+                    if ($digits !== '') {
+                        $w->where('id', 'like', $digits . '%');
+                    }
+                    $w->orWhereHas('customer', fn ($c) => $c->where('name', 'like', '%' . $t . '%')->orWhere('phone_1', 'like', '%' . $t . '%'))
+                        ->orWhereHas('incomingMessage', fn ($m) => $m->where('name', 'like', '%' . $t . '%')->orWhere('contact_phone', 'like', '%' . $t . '%'));
+                })->orderByRaw('CASE WHEN id = ? THEN 0 ELSE 1 END', [(int) $digits])->orderByDesc('id')->limit(6)->get();
+            foreach ($carts as $ct) {
+                $nm = optional($ct->customer)->name ?: optional($ct->incomingMessage)->name;
+                $ph = optional($ct->customer)->phone_1 ?: preg_replace('/^218/', '0', (string) (optional($ct->incomingMessage)->contact_phone ?: $ct->guest_phone));
+                $items[] = ['kind' => 'cart', 'code' => strtoupper($ct->retailer ?: 'shein') . ' #' . $ct->id, 'name' => trim((string) $nm, ' .'), 'phone' => $ph,
+                    'sub' => \App\Models\CartQuote::OPERATOR_STATUSES[$ct->operator_status] ?? '', 'url' => route('carts.show', $ct)];
+            }
+
+            return response()->json(['items' => $items]);
         }
         if ($type !== 'trip') {
             $orders = Order::with('customer:id,name,code')->where('code', 'like', '%' . $t . '%')

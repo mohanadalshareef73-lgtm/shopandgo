@@ -387,6 +387,7 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::get('portal-carts/{cart}/download', [$C . 'PortalCartsController', 'download'])->name('pcarts.download');
         Route::post('portal-carts/{cart}/book-now', [$C . 'PortalCartsController', 'bookNow'])->name('pcarts.booknow');
         Route::post('orders/{order}/to-group', [$C . 'PortalCartsController', 'orderToGroup'])->name('orders.togroup');
+        Route::post('carts/{cart}/confirm-book', [$C . 'PortalCartsController', 'confirmBook'])->name('carts.confirmbook');
         Route::post('portal-carts/{cart}/office', [$C . 'PortalCartsController', 'office'])->name('pcarts.office');
         Route::post('portal-carts/{cart}/resend', [$C . 'PortalCartsController', 'resend'])->name('pcarts.resend');
         Route::get('returns/orders', [$C . 'ReturnsController', 'customerOrders'])->name('returns.orders');

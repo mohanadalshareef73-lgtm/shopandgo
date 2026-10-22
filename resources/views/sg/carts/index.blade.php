@@ -87,11 +87,11 @@
 <div class="card tw">
     <form method="get" class="fx3">
         @if ($op)<input type="hidden" name="operator_status" value="{{ $op }}">@endif
-        <div class="sx" style="flex:1;min-width:220px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="search" value="{{ $filters['search'] ?? '' }}" placeholder="اسم العميل، رقم واتساب، #رقم السلة أو الرابط"></div>
+        <div class="sx" style="flex:1;min-width:220px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input name="search" value="{{ $filters['search'] ?? '' }}" placeholder="كود الزبون، اسم، رقم هاتف، #رقم السلة… واضغط Enter" autocomplete="off" data-nolive data-suggest="cart"></div>
         <select name="retailer" class="inp" data-autosubmit><option value="">كل المتاجر</option><option value="shein" @selected($retailer === 'shein')>شي إن</option><option value="iherb" @selected($retailer === 'iherb')>آي هيرب</option><option value="amazon" @selected($retailer === 'amazon')>أمازون</option></select>
         <select name="session_uuid" class="inp" data-autosubmit><option value="">كل أرقام الاستقبال</option>@foreach ($receivingSessions as $uuid => $session)<option value="{{ $uuid }}" @selected(($filters['session_uuid'] ?? '') === $uuid)>{{ $session['phone'] ? $session['phone'] . ' · ' : '' }}{{ $session['name'] ?? $uuid }}</option>@endforeach</select>
         <select name="per_page" class="inp" data-autosubmit>@foreach ([10, 25, 50, 100] as $size)<option value="{{ $size }}" @selected($perPage === $size)>{{ $size }} سلة</option>@endforeach</select>
-        <button class="btn sm">بحث</button>
+        <button class="btn sm">🔍 بحث</button>
         @if (!empty($filters['search']) || $op || !empty($filters['session_uuid']))<a class="note" href="{{ route('sg.carts', array_filter(['retailer' => $retailer])) }}">✕ مسح</a>@endif
     </form>
     <div class="ct-h"><span>السلة</span><span>العميل</span><span>الإجمالي</span><span>الحالة</span><span></span></div>
@@ -118,7 +118,7 @@
                     @if ($cart->retailer === 'amazon')<span class="meta" style="display:block">{{ \Illuminate\Support\Str::limit(data_get($cart->payload, 'result.items.0.name', 'منتج أمازون قيد الفحص'), 40) }}</span>@endif
                 </span>
             </a>
-            <div class="who3"><span class="av" style="background:{{ $col }}1a;color:{{ $col }}">{{ mb_substr($name, 0, 1) }}</span><div style="min-width:0"><b>{{ $name }}</b><small>{{ $cart->contact_phone ? preg_replace('/^218/', '0', $cart->contact_phone) : 'بدون رقم' }}</small><small>{{ $cart->created_at->format('Y-m-d H:i') }}</small></div></div>
+            <div class="who3"><span class="av" style="background:{{ $col }}1a;color:{{ $col }}">{{ mb_substr($name, 0, 1) }}</span><div style="min-width:0"><b>{{ $name }}</b><small class="num" style="color:#111;font-weight:700;font-size:13.5px">{{ $cart->contact_phone ? preg_replace('/^218/', '0', $cart->contact_phone) : 'بدون رقم' }}</small><small>{{ $cart->created_at->format('Y-m-d H:i') }}</small></div></div>
             <div class="tot">
                 @if ($cart->status === 'succeeded')
                     <b>{{ data_get($viewTotals, $cart->id . '.amount') ?? data_get($cart->payload, 'result.total.amount', '—') }}</b> <span class="note">{{ data_get($viewTotals, $cart->id . '.currency') ?? data_get($cart->payload, 'result.total.currency') }}</span>
@@ -133,6 +133,7 @@
                 @if (in_array($cart->last_error, [\App\Services\CartWalletPausedException::EMPTY, \App\Services\CartWalletPausedException::INSUFFICIENT], true))<span class="qs wait">⏸ تستنى شحن المحفظة</span>@endif
             </div>
             <div style="display:flex;gap:6px;justify-content:flex-end">
+                @if ($cart->status === 'succeeded' && !($cart->booked_done_at ?? null))@can('cart-list')<button type="button" class="btn green sm" onclick="openCB({{ json_encode(['id' => $cart->id, 'url' => route('sg.carts.confirmbook', $cart), 'name' => $name, 'phone' => $cart->contact_phone ? preg_replace('/^218/', '0', $cart->contact_phone) : '', 'total' => data_get($viewTotals, $cart->id . '.amount') ?? data_get($cart->payload, 'result.total.amount'), 'has' => (bool) $cart->order_id]) }})">✓ تأكيد الحجز</button>@endcan @elseif ($cart->booked_done_at ?? null)<span class="chip u">✓ تحجزت</span>@endif
                 @if ($cart->whatsapp_url)<a class="btn ghost sm" href="{{ $cart->whatsapp_url }}" target="_blank" rel="noopener" title="واتساب" style="color:var(--wa)">💬</a>@endif
                 <a class="btn ghost sm" href="{{ route('carts.show', $cart) }}">فتح ←</a>
             </div>
@@ -143,6 +144,33 @@
     </div>
     <div class="tw-f"><span>{{ $carts->firstItem() ?? 0 }}–{{ $carts->lastItem() ?? 0 }} من <b class="num">{{ $carts->total() }}</b> سلة</span>@include('sg.partials.pager', ['p' => $carts])</div>
 </div>
+<div class="modal-bg" id="mCB"><div class="modal" style="max-width:460px">
+    <h3 id="cbT">✓ تأكيد الحجز</h3>
+    <div class="who" style="margin-bottom:10px"><span class="av" id="cbAv">؟</span><div><b id="cbN"></b><div class="num" id="cbP" style="font-weight:700;color:#111;direction:ltr;text-align:right"></div></div></div>
+    <div class="ln"><span>إجمالي السلة</span><b class="num" id="cbTot">—</b></div>
+    <form method="post" id="cbF" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='⏳ يتأكد ويتبعت…'">@csrf
+        <div id="cbPay">
+            <div class="f mt"><label class="l">العربون المدفوع <span class="note">(اختياري — لو ما دفعش خليه 0)</span></label><input name="paid" class="inp big" inputmode="decimal" placeholder="0"></div>
+            <div class="f"><label class="l">الدفع</label><select name="payment_id" class="inp">@foreach (\App\Models\PaymentMethod::where('status', true)->orderBy('id')->get() as $pm)<option value="{{ $pm->id }}" @selected($pm->id == \App\Services\AppSettings::cashPaymentId())>{{ $pm->name }}</option>@endforeach</select></div>
+        </div>
+        <div class="hint">لما تضغط «تأكيد الحجز» يصير الآتي مرة وحدة:<br>1) 🧾 ينعمل إيصال ويوصل للعميل على الواتساب ويطلع في «الطلبات»<br>2) 📤 السلة تمشي لقروب منتظرة: الرابط + PDF لو فيها تكرار + الكود<br>3) 📋 تنزل في «قائمة الحجز» ← تحجزت</div>
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="btn green" style="flex:1">✓ تأكيد الحجز</button><button type="button" class="btn ghost" data-close>إلغاء</button></div>
+    </form>
+</div></div>
+<script>
+window.openCB = function (d) {
+  document.getElementById('cbT').textContent = '✓ تأكيد الحجز · سلة #' + d.id;
+  document.getElementById('cbN').textContent = d.name || '—';
+  document.getElementById('cbAv').textContent = (d.name || '؟').trim().charAt(0);
+  document.getElementById('cbP').textContent = d.phone || '';
+  document.getElementById('cbTot').textContent = d.total ? d.total + ' د.ل' : '—';
+  document.getElementById('cbPay').hidden = !!d.has;
+  const f = document.getElementById('cbF'); f.action = d.url; f.reset();
+  const b = f.querySelector('button'); b.disabled = false; b.textContent = '✓ تأكيد الحجز';
+  document.getElementById('mCB').classList.add('open');
+};
+</script>
+@include('sg.partials.suggest')
 @endsection
 @push('script')
 <script>

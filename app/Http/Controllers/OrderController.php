@@ -966,7 +966,7 @@ class OrderController extends Controller
                 OrderItem::where('order_id', $order->id)->delete();
             }
 
-            // 💵 تعديل المدفوع من صفحة التعديل: الزيادة دفعة جديدة · النقص يتخصم من آخر الدفعات (الخزينة تتعدل بالفرق)
+            // 💵 تعديل المدفوع من صفحة التعديل: الزيادة دفعة جديدة · النقص ينخصم من آخر الدفعات (الخزينة تتعدل بالفرق)
             if ($request->filled('paid_new') && is_numeric($request->paid_new)) {
                 $order = $order->fresh();
                 $diff = round((float) $request->paid_new - (float) $order->paid_price, 2);

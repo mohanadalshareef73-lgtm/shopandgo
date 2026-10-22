@@ -49,6 +49,15 @@ class CartController extends Controller
         $search = trim($filters['search'] ?? '');
         if (preg_match('/^#(\d+)$/D', $search, $matches)) {
             $query->where('id', $matches[1]);
+        } elseif ($search !== '' && ($exact = \App\Models\Customer::where('code', $search)->first())) {
+            // 👤 كود زبون بالضبط (كيف الطلبات): كل سلاته هو بس
+            $ph = preg_replace('/^0/', '', preg_replace('/\D/', '', (string) $exact->phone_1));
+            $query->where(function ($w) use ($exact, $ph) {
+                $w->where('customer_id', $exact->id);
+                if (strlen($ph) >= 8) {
+                    $w->orWhereHas('incomingMessage', fn ($m) => $m->where('contact_phone', 'like', '%' . $ph)->orWhere('from', 'like', '%' . $ph . '%'));
+                }
+            });
         } elseif ($search !== '') {
             $query->where(function ($query) use ($search) {
                 $query->where('source_url', 'like', '%'.$search.'%')
@@ -56,6 +65,7 @@ class CartController extends Controller
                         $incoming->where('name', 'like', '%'.$search.'%')->orWhere('from', 'like', '%'.$search.'%')
                             ->orWhere('contact_phone', 'like', '%'.$search.'%');
                     });
+                $query->orWhereHas('customer', fn ($c) => $c->where('name', 'like', '%'.$search.'%')->orWhere('code', $search)->orWhere('phone_1', 'like', '%'.$search.'%'));
                 if (ctype_digit($search)) {
                     $query->orWhere('id', $search);
                 }

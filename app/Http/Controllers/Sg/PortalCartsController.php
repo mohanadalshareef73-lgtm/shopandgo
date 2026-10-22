@@ -32,7 +32,7 @@ class PortalCartsController extends Controller
     {
         $this->middleware('permission:cart-list', ['only' => ['index', 'receipt', 'booking', 'download']]);
         // الموظف العادي (يشوف السلات) يقدر يأكد ويحجز ويبعت للرقم زادة
-        $this->middleware('permission:cart-edit|cart-list', ['only' => ['decide', 'office', 'bookNow', 'orderToGroup', 'toDelivery', 'note']]);
+        $this->middleware('permission:cart-edit|cart-list', ['only' => ['decide', 'office', 'bookNow', 'orderToGroup', 'confirmBook', 'toDelivery', 'note']]);
         $this->middleware('permission:cart-edit', ['only' => ['resend']]);
     }
 
@@ -478,6 +478,104 @@ class PortalCartsController extends Controller
     }
 
     /** ⚡ احجز الآن: للقروب (الرابط ← PDF لو فيه قطع مكررة ← كود العميل) + رسالة الحجز للعميل */
+    /**
+     * ✓ تأكيد الحجز من «السلات» بضغطة وحدة:
+     * يتربط بحساب العميل (ولا يتفتحله) ← ينعمل إيصال (والعربون لو مكتوب) ويوصل العميل ← يمشي لقروب منتظرة (الرابط + PDF لو فيه تكرار + الكود) ← ينزل في «تحجزت»
+     */
+    public function confirmBook(Request $request, CartQuote $cart, SheinQuotationPdf $pdf)
+    {
+        $data = $request->validate(['paid' => 'nullable|numeric|min:0', 'payment_id' => 'nullable|exists:payment_methods,id']);
+        if ($cart->status !== 'succeeded') {
+            return back()->with('error', 'السلة #' . $cart->id . ' ما انحسبتش — ما نقدروش نأكدو حجزها');
+        }
+        // 👤 العميل: لو السلة من الواتساب ومش مربوطة بحساب، نلقوه برقمه ولا نفتحوله حساب
+        $newAcc = null;
+        if (!$cart->customer_id) {
+            $waPh = preg_replace('/^218/', '0', preg_replace('/\D/', '', (string) $cart->whatsapp_customer_phone));
+            $waPh = (str_contains((string) $cart->whatsapp_customer_phone, '@') || strlen($waPh) > 13) ? '' : $waPh;
+            if ($waPh === '' && ($im = $cart->incomingMessage)) {
+                $waPh = preg_replace('/^218/', '0', preg_replace('/\D/', '', (string) ($im->contact_phone ?: $im->phone)));
+                $waPh = strlen($waPh) > 13 ? '' : $waPh;
+            }
+            [$gc, $isNew] = \App\Support\GuestAccount::resolve($cart->guest_name ?? optional($cart->incomingMessage)->name, $cart->guest_phone ?? ($waPh ?: null), $cart->guest_address ?? null);
+            if (!$gc) {
+                return back()->with('error', 'رقم العميل في السلة #' . $cart->id . ' مش واضح — ما قدرناش نربطوه بحساب. اعمله إيصال يدوي');
+            }
+            $cart->customer_id = $gc->id;
+            $cart->save();
+            $cart->setRelation('customer', $gc);
+            $newAcc = $isNew;
+        }
+        $this->accNew = $newAcc;
+        $c = $cart->customer;
+        $order = $cart->order_id ? \App\Models\Order::find($cart->order_id) : null;
+        $receiptSent = false;
+        if (!$order) {
+            try {
+                DB::transaction(function () use ($cart, $data, &$order) {
+                    $order = \App\Services\CourierService::orderFromCart($cart, 0, null);
+                    if (!$order) {
+                        throw new \RuntimeException('ما قدرناش نحسبو قيمة السلة');
+                    }
+                    $paid = min((float) ($data['paid'] ?? 0), (float) $order->total_price);
+                    if ($paid > 0) {
+                        \App\Services\OrderPaymentService::pay($order, $paid, (int) ($data['payment_id'] ?: \App\Services\AppSettings::cashPaymentId()), 'عربون · تأكيد حجز سلة #' . $cart->id);
+                    }
+                    $cart->portal_status = 'confirmed';
+                    $cart->pay_method = $cart->pay_method ?: 'office';
+                    $cart->ordered_at = $cart->ordered_at ?: now();
+                    $cart->confirmed_at = $cart->confirmed_at ?: now();
+                    $cart->courier_pay = $paid;
+                    $cart->paid_amount = $paid;
+                    $cart->paid_at = $paid > 0 ? now() : $cart->paid_at;
+                    $cart->order_id = $order->id;
+                    $cart->save();
+                });
+            } catch (\RuntimeException $e) {
+                return back()->with('error', $e->getMessage());
+            } catch (\Throwable $e) {
+                report($e);
+
+                return back()->with('error', 'ما قدرناش نعملو الإيصال: ' . mb_substr($e->getMessage(), 0, 150));
+            }
+            $receiptSent = $this->sendConfirmMsg($cart, $order);
+        } elseif ($cart->portal_status !== 'confirmed') {
+            $cart->portal_status = 'confirmed';
+            $cart->confirmed_at = $cart->confirmed_at ?: now();
+            $cart->save();
+        }
+        // 📤 قروب منتظرة: الرابط + PDF لو فيه تكرار + الكود
+        $grpMsg = '';
+        $g = collect((array) \App\Services\AppSettings::get('wa_groups_recent', []))->filter(fn ($x) => !empty($x['tag']) && !empty($x['id']))->first();
+        if ($g) {
+            $req2 = Request::create('', 'POST', ['to_phone' => $g['id'], 'wa' => 1]);
+            $req2->setUserResolver($request->getUserResolver());
+            try {
+                $this->bookNow($req2, $cart->fresh(), $pdf);
+                $grpMsg = session()->has('error') ? ' · ⚠ ما وصلش للقروب' : ' · 📤 انبعتت لقروب منتظرة';
+                session()->forget(['error', 'success']);
+            } catch (\Throwable $e) {
+                report($e);
+                $grpMsg = ' · ⚠ ما وصلش للقروب';
+            }
+        } else {
+            $grpMsg = ' · ⚠ قروب منتظرة مش مسجل (من الإعدادات)';
+        }
+        // 📋 تنزل في «تحجزت»
+        if (\App\Support\Fast::hasColumn('cart_quotes', 'booked_done_at')) {
+            $cart = $cart->fresh();
+            $cart->booked_done_at = $cart->booked_done_at ?: now();
+            $cart->booked_by = $cart->booked_by ?: auth()->id();
+            $cart->save();
+        }
+        foreach (['sg.badge.pcart', 'sg.badge.bqueue', 'sg.badge.courier'] as $k) {
+            \Illuminate\Support\Facades\Cache::forget($k);
+        }
+        Log::create(['user_id' => auth()->id(), 'type' => 'cart', 'title' => ' تأكيد حجز سلة #' . $cart->id, 'log' => ' إيصال ' . optional($order)->code . ' · عربون ' . (float) ($data['paid'] ?? 0)]);
+
+        return back()->with('success', '✓ تأكد حجز السلة #' . $cart->id . ' · إيصال ' . optional($order)->code . ($receiptSent ? ' · وصل العميل الإيصال' : '') . ($newAcc === true ? ' · 🎉 انفتحله حساب (كود ' . $c->code . ')' : '') . $grpMsg . ' · نزلت في «تحجزت»');
+    }
+
     /** 📤 من أوامر الإيصال: يبعث سلة الإيصال لقروب الحجز (منتظرة): الرابط + PDF لو فيه تكرار + الكود */
     public function orderToGroup(Request $request, \App\Models\Order $order, SheinQuotationPdf $pdf)
     {

@@ -9,6 +9,10 @@
 .sg-sug a i { font-style: normal; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: #eef0f4; color: var(--ink-2); }
 .sg-sug a i.t { background: #e8f0fb; color: #2a78d6; }
 .sg-sug a i.c { background: #fff1e6; color: #a8400a; }
+.sg-sug a i.k { background: #e6f4ee; color: #12805c; }
+.sg-sug a .who { flex: 1; min-width: 0; line-height: 1.35; }
+.sg-sug a .who .nm { display: block; font-family: Somar, sans-serif; font-weight: 800; font-size: 15px; direction: rtl; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sg-sug a .who .ph { display: block; font-family: InterNum, Somar, sans-serif; font-weight: 700; font-size: 14.5px; color: #111; direction: ltr; text-align: right; }
 .sg-sug .none { padding: 10px 12px; color: var(--ink-3); font-size: 13.5px; }
 </style>
 <script>
@@ -21,7 +25,7 @@
     const hide = () => { box.hidden = true; idx = -1; };
     const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const draw = () => {
-      box.innerHTML = items.length ? items.map((x, i) => `<a href="${esc(x.url)}" class="${i === idx ? 'on' : ''}"><i class="${x.kind === 'trip' ? 't' : (x.kind === 'cust' ? 'c' : '')}">${x.kind === 'trip' ? 'رحلة' : (x.kind === 'cust' ? 'زبون' : 'إيصال')}</i><b>${esc(x.code)}</b><small>${esc(x.sub)}</small></a>`).join('') : '<div class="none">ما فيش نتائج قريبة</div>';
+      box.innerHTML = items.length ? items.map((x, i) => `<a href="${esc(x.url)}" class="${i === idx ? 'on' : ''}"><i class="${({ trip: 't', cust: 'c', cart: 'k' })[x.kind] || ''}">${({ trip: 'رحلة', cust: 'زبون', cart: 'سلة' })[x.kind] || 'إيصال'}</i><b>${esc(x.code)}</b>${(x.name || x.phone) ? `<span class="who"><span class="nm">${esc(x.name || '—')}</span>${x.phone ? `<span class="ph">${esc(x.phone)}</span>` : ''}</span>` : ''}<small>${esc(x.sub)}</small></a>`).join('') : '<div class="none">ما فيش نتائج قريبة</div>';
       place(); box.hidden = false;
     };
     inp.addEventListener('input', () => {

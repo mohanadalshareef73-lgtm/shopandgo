@@ -233,7 +233,7 @@ class FinanceReport
         $from = self::surplusFrom();
         $all = self::period($from, null);
         $drawn = self::byCurrency(
-            PartnerTransaction::where(fn ($q) => $q->whereIn('type', ['distribution'])->orWhere(fn ($w) => $w->where('type', 'settle')->where('via', 'distribution'))) // السحب اليومي صار دين يتخصم من النصيب (ما ينقصش الفائض مرتين)
+            PartnerTransaction::where(fn ($q) => $q->whereIn('type', ['distribution'])->orWhere(fn ($w) => $w->where('type', 'settle')->where('via', 'distribution'))) // السحب اليومي صار دين ينخصم من النصيب (ما ينقصش الفائض مرتين)
                 ->when($from, fn ($q) => $q->whereDate('date', '>=', $from))
                 ->selectRaw('currency, SUM(amount) as total')->groupBy('currency')->get()
         );
