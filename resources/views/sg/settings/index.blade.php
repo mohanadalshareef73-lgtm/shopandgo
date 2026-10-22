@@ -19,6 +19,8 @@
         <div class="grid g2 f"><div><label class="l">اسم المحل</label><input name="shop_name" class="inp" value="{{ $s['shop_name'] }}"></div><div><label class="l">هاتف المحل</label><input name="shop_phone" class="inp numr" value="{{ $s['shop_phone'] }}"></div></div>
         <div class="grid g2 f"><div><label class="l">العنوان</label><input name="shop_address" class="inp" value="{{ $s['shop_address'] }}"></div><div><label class="l">أوقات الدوام</label><input name="shop_hours" class="inp" value="{{ $s['shop_hours'] }}"></div></div>
         <div class="f"><label class="l">أرقام الإدارة (التقارير، التنبيهات، تقفيل الورديات) — افصل بفاصلة</label><input name="report_phones" class="inp numr" value="{{ $list($s['report_phones']) }}" placeholder="0912345678، 0923456789"></div>
+        <div class="f"><label class="l">🚨 رقمك للتنبيهات العاجلة (أخطاء المنظومة، مشاكل ردود السلات، الواتساب واقف، رصيد السلات) — توصل حتى لو الإشعارات موقفة</label><input name="urgent_phones" class="inp numr" value="{{ $list($s['urgent_phones'] ?? []) }}" placeholder="فاضي = أرقام الإدارة اللي فوق"></div>
+        <div class="f"><label class="l">💳 نبهني لما رصيد السلات يوصل ($)</label><input name="cart_wallet_alert" class="inp numr" value="{{ $s['cart_wallet_alert'] ?? 50 }}" inputmode="decimal"></div>
         {!! $tg('monthly_report_enabled', 'أرسل التقرير الشهري أوتوماتيك أول يوم في الشهر', 'يمشي على أرقام الإدارة') !!}
         @php $s['biweekly_report_enabled'] = $s['biweekly_report_enabled'] ?? true; @endphp
         {!! $tg('biweekly_report_enabled', 'أرسل تقرير كل 14 يوم', 'الأرقام + أهم العملاء + اللي يحتاج انتباه، على أرقام الإدارة الساعة 9:15 الصبح') !!}

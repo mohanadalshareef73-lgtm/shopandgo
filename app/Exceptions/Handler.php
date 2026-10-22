@@ -58,7 +58,7 @@ class Handler extends ExceptionHandler
         }
         static::$alerting = true;
         try {
-            $phones = \App\Services\AppSettings::phonesFor('errors');
+            $phones = class_exists(\App\Services\UrgentAlert::class) ? \App\Services\UrgentAlert::phones() : \App\Services\AppSettings::phonesFor('errors'); // 🚨 الأخطاء توصل طول حتى لو الإشعارات موقفة
             if (!$phones || !class_exists(\App\Services\MessageService::class)) {
                 return;
             }
@@ -77,7 +77,7 @@ class Handler extends ExceptionHandler
                 $hint = "\n💡 غالباً ملف ناقص من باتش — عاود Extract وامسح الكاش";
             }
             $user = auth('web')->user() ?? auth('customer')->user();
-            $text = "⚠️ خطأ في المنظومة\n"
+            $text = "🚨 ⚠️ خطأ في المنظومة\n"
                 . (app()->runningInConsole() ? 'مهمة تلقائية' : 'الصفحة: ' . request()->method() . ' ' . request()->path()) . "\n"
                 . ($user ? 'المستخدم: ' . $user->name . "\n" : '')
                 . 'الخطأ: ' . $msg . "\n"

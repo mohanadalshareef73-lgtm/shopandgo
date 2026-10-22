@@ -29,6 +29,15 @@ class OpsAlerts extends Command
                 route('finance.trips.create'), 'warn', true);
         }
 
+        // 💳 رصيد محفظة تسعير السلات (حتى لو ما فيش سلات توا)
+        try {
+            if (config('services.cart_quotes.base_url')) {
+                \App\Services\UrgentAlert::checkCartWallet(app(\App\Services\CartQuoteClient::class)->wallet());
+            }
+        } catch (\Throwable $e) {
+            \App\Services\UrgentAlert::send('cart-wallet-unavailable', '⛔ ما قدرناش نوصلو لمحفظة تسعير السلات (مشكلة تقنية في خدمة التسعير)', 60);
+        }
+
         // تنبيهات تأخير قديمة لرحلات قبل رحلة البداية (B-0392) تتعلّم مقروءة وما تزعجش
         try {
             $okIds = TripPurchase::alertable()->pluck('id');

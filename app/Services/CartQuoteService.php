@@ -276,6 +276,9 @@ class CartQuoteService
                 }
             });
         } catch (CartWalletPausedException $e) {
+            if ($e->getMessage() === CartWalletPausedException::INSUFFICIENT) {
+                UrgentAlert::send('cart-wallet-insufficient', '⛔ خدمة التسعير تقول الرصيد ما يكفيش — ردود أسعار السلات واقفة لين تشحن', 30);
+            }
             DB::transaction(function () use ($id, $e) {
                 $quote = CartQuote::lockForUpdate()->find($id);
                 if ($quote && ! $quote->notified_at) {
@@ -283,6 +286,8 @@ class CartQuoteService
                 }
             });
         } catch (\Throwable $e) {
+            // 🚨 مشكلة تقنية في الرد على سلة (مش رابط قطعة بدل سلة — هذاك ما يجيش عليه تنبيه)
+            UrgentAlert::send('cart-reply-' . get_class($e), '⚠ مشكلة في الرد على سلة واتساب #' . $id . "\n" . ($e instanceof CartQuoteException ? $e->getMessage() : 'خطأ في التجهيز أو الإرسال') . "\nالمنظومة حتعاود وحدها، لكن لو تكررت شوف خدمة التسعير والواتساب", 30);
             // Persist only our own credential-free errors, never HTTP exception text.
             DB::transaction(function () use ($id, $e) {
                 $quote = CartQuote::lockForUpdate()->find($id);
@@ -364,6 +369,9 @@ class CartQuoteService
         }
         $quote->fill(['status' => 'failed', 'payload' => $payload, 'last_error' => $code,
             'next_attempt_at' => now()])->save();
+        if (in_array($code, ['ACCOUNT_PROBLEM', 'INSUFFICIENT_FUNDS', 'IDEMPOTENCY_KEY_REQUIRED', 'IDEMPOTENCY_CONFLICT', 'CAPACITY_UNAVAILABLE'], true)) {
+            UrgentAlert::send('cart-code-' . $code, '⚠ سلة ' . $quote->retailer_name . ' #' . $quote->id . ' ما انحسبتش: ' . $code . ($code === 'INSUFFICIENT_FUNDS' ? ' (الرصيد ما يكفيش)' : ' (مشكلة في خدمة التسعير)'), 30);
+        }
         if (in_array($code, ['ACCOUNT_PROBLEM', 'INSUFFICIENT_FUNDS', 'IDEMPOTENCY_KEY_REQUIRED', 'IDEMPOTENCY_CONFLICT'], true)) {
             $notificationId = DB::table('notifications')->insertGetId([
                 'typeOf' => 'some', 'title' => $quote->retailer_name.' quotation needs staff attention',

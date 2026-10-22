@@ -262,6 +262,18 @@ class MessageService
 
     protected static function log($type, $phone, $text, $status, $error, $customer, $order): void
     {
+        // 🚨 الواتساب ما يبعثش: 3 رسائل فشلت خلال 10 دقايق → تنبيه للمدير
+        if ($status === 'failed' && $type !== 'alert' && $phone) {
+            try {
+                $c = app('cache');
+                $n = (int) $c->get('wa-fail-count', 0) + 1;
+                $c->put('wa-fail-count', $n, now()->addMinutes(10));
+                if ($n >= 3) {
+                    UrgentAlert::send('wa-failing', '📵 الواتساب ما يبعثش للزبائن: ' . $n . ' رسائل فشلت خلال 10 دقايق' . ($error ? "\nآخر خطأ: " . mb_substr((string) $error, 0, 160) : '') . "\nتأكد إن جلسة واتسي مربوطة", 30);
+                }
+            } catch (\Throwable $e) {
+            }
+        }
         try {
             WhatsappOutbox::create([
                 'type' => $type, 'phone' => $phone, 'body' => $text, 'status' => $status, 'error' => $error,

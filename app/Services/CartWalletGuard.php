@@ -25,9 +25,12 @@ class CartWalletGuard
         try {
             $wallet = $this->client->wallet();
         } catch (CartQuoteException | ConnectionException $e) {
+            UrgentAlert::send('cart-wallet-unavailable', '⛔ ردود أسعار السلات واقفة: ما قدرناش نوصلو لمحفظة التسعير (مشكلة تقنية في خدمة التسعير)', 30);
             throw new CartWalletPausedException(CartWalletPausedException::UNAVAILABLE);
         }
+        UrgentAlert::checkCartWallet($wallet);
         if (! self::hasCredit($wallet)) {
+            UrgentAlert::send('cart-wallet-empty', '⛔ رصيد السلات خلص! ردود الأسعار على الواتساب واقفة لين تشحن المحفظة', 30);
             throw new CartWalletPausedException(CartWalletPausedException::EMPTY);
         }
     }
