@@ -1,6 +1,8 @@
 <IfModule lsapi_module>
     php_value upload_max_filesize 5M
     php_value post_max_size 16M
+    # 🔒 حماية مؤقتة من ثغرة PHP2Shell (CVE-2026-109619) لين تتحدث نسخة PHP
+    php_flag session.upload_progress.enabled off
 </IfModule>
 
 <IfModule mod_rewrite.c>
