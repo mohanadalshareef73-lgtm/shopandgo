@@ -8,8 +8,16 @@
 @endphp
 @section('content')
 <div class="crumb"><a href="{{ route('sg.trips.index') }}">الرحلات</a> › {{ $trip->trip_code }}</div>
+@php
+    // ⇄ التنقل بين الرحلات بالترتيب حسب رقم الرحلة
+    $prevTrip = \App\Models\TripPurchase::where('trip_code', '<', $trip->trip_code)->orderByDesc('trip_code')->first(['id', 'trip_code']);
+    $nextTrip = \App\Models\TripPurchase::where('trip_code', '>', $trip->trip_code)->orderBy('trip_code')->first(['id', 'trip_code']);
+@endphp
 <div class="top">
-    <div style="display:flex;align-items:center;gap:12px"><h1 class="code">{{ $trip->trip_code }}</h1><span class="chip n" style="font-size:13.5px">{{ $s['status'] ?: '—' }}</span>@if ($trip->coupon_used)<span class="chip u">كوبون</span>@endif</div>
+    <div style="display:flex;align-items:center;gap:12px">
+        @if ($prevTrip)<a class="btn ghost" href="{{ route('finance.trips.show', $prevTrip->id) }}" title="الرحلة السابقة">→ <span class="num">{{ $prevTrip->trip_code }}</span></a>@else<span class="btn ghost" style="opacity:.4;cursor:default">→ السابقة</span>@endif
+        <h1 class="code">{{ $trip->trip_code }}</h1>
+        @if ($nextTrip)<a class="btn ghost" href="{{ route('finance.trips.show', $nextTrip->id) }}" title="الرحلة التالية"><span class="num">{{ $nextTrip->trip_code }}</span> ←</a>@else<span class="btn ghost" style="opacity:.4;cursor:default">التالية ←</span>@endif<span class="chip n" style="font-size:13.5px">{{ $s['status'] ?: '—' }}</span>@if ($trip->coupon_used)<span class="chip u">كوبون</span>@endif</div>
     <div class="acts">
         @can('trip-purchase-create')<a class="btn" href="{{ route('finance.trips.create') }}">+ إضافة رحلة أخرى</a>@endcan
         @can('order-receive')<a class="btn green" href="{{ route('sg.trips.receive', $trip->id) }}">📦 استلام البضاعة</a>@endcan
