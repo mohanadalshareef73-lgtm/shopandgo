@@ -133,7 +133,7 @@
                 @if (in_array($cart->last_error, [\App\Services\CartWalletPausedException::EMPTY, \App\Services\CartWalletPausedException::INSUFFICIENT], true))<span class="qs wait">⏸ تستنى شحن المحفظة</span>@endif
             </div>
             <div style="display:flex;gap:6px;justify-content:flex-end">
-                @if ($cart->status === 'succeeded' && !($cart->booked_done_at ?? null))@can('cart-list')<button type="button" class="btn green sm" onclick="openCB({{ json_encode(['id' => $cart->id, 'url' => route('sg.carts.confirmbook', $cart), 'name' => $name, 'phone' => $cart->contact_phone ? preg_replace('/^218/', '0', $cart->contact_phone) : '', 'total' => data_get($viewTotals, $cart->id . '.amount') ?? data_get($cart->payload, 'result.total.amount'), 'has' => (bool) $cart->order_id]) }})">✓ تأكيد الحجز</button>@endcan @elseif ($cart->booked_done_at ?? null)<span class="chip u">✓ تحجزت</span>@endif
+                @if ($cart->status === 'succeeded' && !($cart->booked_done_at ?? null))@can('cart-list')<button type="button" class="btn green sm" onclick="openCB({{ json_encode(['id' => $cart->id, 'url' => route('sg.carts.confirmbook', $cart), 'name' => $name, 'phone' => $cart->contact_phone ? preg_replace('/^218/', '0', $cart->contact_phone) : '', 'total' => data_get($viewTotals, $cart->id . '.amount') ?? data_get($cart->payload, 'result.total.amount'), 'has' => (bool) $cart->order_id, 'guest' => !$cart->customer_id]) }})">✓ تأكيد الحجز</button>@endcan @elseif ($cart->booked_done_at ?? null)<span class="chip u">✓ تحجزت</span>@endif
                 @if ($cart->whatsapp_url)<a class="btn ghost sm" href="{{ $cart->whatsapp_url }}" target="_blank" rel="noopener" title="واتساب" style="color:var(--wa)">💬</a>@endif
                 <a class="btn ghost sm" href="{{ route('carts.show', $cart) }}">فتح ←</a>
             </div>
@@ -149,6 +149,18 @@
     <div class="who" style="margin-bottom:10px"><span class="av" id="cbAv">؟</span><div><b id="cbN"></b><div class="num" id="cbP" style="font-weight:700;color:#111;direction:ltr;text-align:right"></div></div></div>
     <div class="ln"><span>إجمالي السلة</span><b class="num" id="cbTot">—</b></div>
     <form method="post" id="cbF" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='⏳ يتأكد ويتبعت…'">@csrf
+        <details id="cbAcc" class="mt" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px">
+            <summary style="cursor:pointer;font-weight:800">👤 افتحله حساب عادي <span class="note">(اختياري — لو ما عبّيتش، ينفتح حساب برقم الواتساب وحده)</span></summary>
+            <div class="grid g2 mt">
+                <div class="f"><label class="l">الاسم</label><input name="acc_name" id="cbAN" class="inp"></div>
+                <div class="f"><label class="l">رقم الهاتف</label><input name="acc_phone" id="cbAP" class="inp numr" inputmode="tel"></div>
+                <div class="f"><label class="l">المدينة</label><input name="acc_city" class="inp" list="lyCities" value="بنغازي"></div>
+                <div class="f"><label class="l">المنطقة</label><input name="acc_area" class="inp" placeholder="الكيش، الهواري…"></div>
+                <div class="f" style="grid-column:1/-1"><label class="l">كود العميل <span class="note">(اختياري — فاضي = تلقائي من رقمه)</span></label><input name="acc_code" class="inp numr" autocomplete="off"></div>
+            </div>
+            <div class="note">لو الرقم عنده حساب من قبل، نربطوه بيه ونكملو المدينة والمنطقة لو ناقصين.</div>
+        </details>
+        @include('sg.partials.cities')
         <div id="cbPay">
             <div class="f mt"><label class="l">العربون المدفوع <span class="note">(اختياري — لو ما دفعش خليه 0)</span></label><input name="paid" class="inp big" inputmode="decimal" placeholder="0"></div>
             <div class="f"><label class="l">الدفع</label><select name="payment_id" class="inp">@foreach (\App\Models\PaymentMethod::where('status', true)->orderBy('id')->get() as $pm)<option value="{{ $pm->id }}" @selected($pm->id == \App\Services\AppSettings::cashPaymentId())>{{ $pm->name }}</option>@endforeach</select></div>
@@ -159,13 +171,17 @@
 </div></div>
 <script>
 window.openCB = function (d) {
+  document.getElementById('cbF').reset();
   document.getElementById('cbT').textContent = '✓ تأكيد الحجز · سلة #' + d.id;
   document.getElementById('cbN').textContent = d.name || '—';
   document.getElementById('cbAv').textContent = (d.name || '؟').trim().charAt(0);
   document.getElementById('cbP').textContent = d.phone || '';
   document.getElementById('cbTot').textContent = d.total ? d.total + ' د.ل' : '—';
   document.getElementById('cbPay').hidden = !!d.has;
-  const f = document.getElementById('cbF'); f.action = d.url; f.reset();
+  const acc = document.getElementById('cbAcc'); acc.hidden = !d.guest; acc.open = false;
+  document.getElementById('cbAN').value = d.guest ? (d.name && d.name !== 'غير محدد' ? d.name : '') : '';
+  document.getElementById('cbAP').value = d.guest ? (d.phone || '') : '';
+  const f = document.getElementById('cbF'); f.action = d.url;
   const b = f.querySelector('button'); b.disabled = false; b.textContent = '✓ تأكيد الحجز';
   document.getElementById('mCB').classList.add('open');
 };

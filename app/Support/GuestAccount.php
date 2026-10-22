@@ -13,8 +13,14 @@ use App\Models\Customer;
 class GuestAccount
 {
     /** @return array{0: ?Customer, 1: bool} [العميل، جديد؟] */
-    public static function resolve(?string $name, ?string $phone, ?string $address = null): array
+    public static function resolve(?string $name, ?string $phone, ?string $address = null, array $extra = []): array
     {
+        // 👤 «افتحله حساب عادي»: الموظف كتب الاسم/الرقم/الكود/المدينة/المنطقة بيده
+        $name = trim((string) ($extra['name'] ?? '')) ?: $name;
+        $phone = trim((string) ($extra['phone'] ?? '')) ?: $phone;
+        $hasCity = \App\Support\Fast::hasColumn('customers', 'city');
+        $city = trim((string) ($extra['city'] ?? ''));
+        $area = trim((string) ($extra['area'] ?? ''));
         $norm = SignupController::normalizePhone((string) $phone);
         $tail = substr($norm, -9);
         if (strlen($tail) < 9) {
@@ -31,6 +37,11 @@ class GuestAccount
                 $c->address = mb_substr(trim($address), 0, 190);
                 $c->save();
             }
+            if ($hasCity && ($city !== '' || $area !== '')) {
+                $c->city = $c->city ?: ($city ?: null);
+                $c->area = $c->area ?: ($area ?: null);
+                $c->save();
+            }
 
             return [$c, false];
         }
@@ -38,7 +49,15 @@ class GuestAccount
         $c->name = mb_substr(trim((string) $name) ?: 'عميل', 0, 120);
         $c->phone_1 = $norm;
         $c->address = $address ? mb_substr(trim($address), 0, 190) : null;
-        $c->code = ClientsController::codeFor($norm);
+        $want = trim((string) ($extra['code'] ?? ''));
+        if ($want !== '' && Customer::withoutGlobalScope('approved')->where('code', $want)->exists()) {
+            throw new \RuntimeException('الكود ' . $want . ' مستعمل — جرب: ' . implode('، ', ClientsController::codeSuggestions($want, $norm)));
+        }
+        $c->code = $want !== '' ? $want : ClientsController::codeFor($norm);
+        if ($hasCity) {
+            $c->city = $city ?: null;
+            $c->area = $area ?: null;
+        }
         $c->password = null; // أول دخول: رقم الهاتف + رمز واتساب
         $c->save();
         try {

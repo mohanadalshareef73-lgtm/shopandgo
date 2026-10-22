@@ -151,6 +151,16 @@ class PortalCartsController extends Controller
         return back()->with('success', '🛵 الحجز #' . $cart->id . ' مشى لطلبيات دليفري');
     }
 
+    /** 👤 بيانات «افتحله حساب عادي» من فورم التأكيد */
+    protected function accExtra(Request $request): array
+    {
+        return array_filter([
+            'name' => mb_substr(trim((string) $request->input('acc_name')), 0, 120), 'phone' => trim((string) $request->input('acc_phone')),
+            'code' => mb_substr(trim((string) $request->input('acc_code')), 0, 20), 'city' => mb_substr(trim((string) $request->input('acc_city')), 0, 80),
+            'area' => mb_substr(trim((string) $request->input('acc_area')), 0, 120),
+        ], fn ($v) => $v !== '');
+    }
+
     public function decide(Request $request, CartQuote $cart, SheinQuotationPdf $pdf)
     {
         $data = $request->validate(['do' => 'required|in:confirm,reject,ignore', 'send_whatsapp' => 'nullable|boolean', 'to' => 'nullable|array', 'to.*' => 'string|max:60']);
@@ -183,7 +193,11 @@ class PortalCartsController extends Controller
                 $waPh = strlen($waPh) > 13 ? '' : $waPh;
             }
             $waNm = optional($cart->incomingMessage)->name;
-            [$gc, $isNew] = \App\Support\GuestAccount::resolve($cart->guest_name ?? optional($gd)->recipient_name ?? $waNm, $cart->guest_phone ?? optional($gd)->recipient_phone ?? ($waPh ?: null), $cart->guest_address ?? optional($gd)->address);
+            try {
+                [$gc, $isNew] = \App\Support\GuestAccount::resolve($cart->guest_name ?? optional($gd)->recipient_name ?? $waNm, $cart->guest_phone ?? optional($gd)->recipient_phone ?? ($waPh ?: null), $cart->guest_address ?? optional($gd)->address, $this->accExtra($request));
+            } catch (\RuntimeException $e) {
+                return back()->withInput()->with('error', $e->getMessage());
+            }
             if (!$gc) {
                 return back()->with('error', 'رقم العميل مش واضح — ما قدرناش نفتحوله حساب. اعمله إيصال يدوي');
             }
@@ -497,7 +511,11 @@ class PortalCartsController extends Controller
                 $waPh = preg_replace('/^218/', '0', preg_replace('/\D/', '', (string) ($im->contact_phone ?: $im->phone)));
                 $waPh = strlen($waPh) > 13 ? '' : $waPh;
             }
-            [$gc, $isNew] = \App\Support\GuestAccount::resolve($cart->guest_name ?? optional($cart->incomingMessage)->name, $cart->guest_phone ?? ($waPh ?: null), $cart->guest_address ?? null);
+            try {
+                [$gc, $isNew] = \App\Support\GuestAccount::resolve($cart->guest_name ?? optional($cart->incomingMessage)->name, $cart->guest_phone ?? ($waPh ?: null), $cart->guest_address ?? null, $this->accExtra($request));
+            } catch (\RuntimeException $e) {
+                return back()->with('error', $e->getMessage());
+            }
             if (!$gc) {
                 return back()->with('error', 'رقم العميل في السلة #' . $cart->id . ' مش واضح — ما قدرناش نربطوه بحساب. اعمله إيصال يدوي');
             }

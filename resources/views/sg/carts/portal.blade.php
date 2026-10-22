@@ -92,6 +92,14 @@
             </form>
             <form method="post" action="{{ route('sg.pcarts.decide', $ct) }}" style="display:flex;gap:4px;flex-wrap:wrap" onsubmit="return this.submitted==='ignore' || confirm('نأكدو الحجز؟ ينعمل الإيصال ويوصل العميل (ولو ما عندهش حساب ينفتحله برقم الواتساب)')">@csrf
                 <input type="hidden" name="send_whatsapp" value="1">
+                @if (!$ct->customer_id)<details style="width:100%;border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin-bottom:4px"><summary style="cursor:pointer;font-weight:700;font-size:13.5px">👤 افتحله حساب عادي <span class="note">(اختياري)</span></summary>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+                        <input name="acc_name" class="inp" placeholder="الاسم" value="{{ $ct->guest_name ?? '' }}" style="height:36px">
+                        <input name="acc_phone" class="inp numr" placeholder="رقم الهاتف" value="{{ $ct->guest_phone ?? '' }}" inputmode="tel" style="height:36px">
+                        <input name="acc_city" class="inp" placeholder="المدينة" list="lyCities" value="بنغازي" style="height:36px">
+                        <input name="acc_area" class="inp" placeholder="المنطقة" style="height:36px">
+                        <input name="acc_code" class="inp numr" placeholder="كود العميل (اختياري)" style="height:36px;grid-column:1/-1">
+                    </div></details>@endif
                 <button name="do" value="confirm" class="btn green sm" onclick="this.form.submitted='confirm'">✓ تأكيد الحجز</button>
                 <button name="do" value="ignore" class="btn ghost sm" onclick="this.form.submitted='ignore'" title="تختفي من القائمة بس">✕ تجاهل</button>
             </form>
@@ -118,4 +126,5 @@
 // 🔍 كل ما تكتب يفلتر: نرجعو المؤشر لآخر الخانة بعد ما تتحدث الصفحة
 (function () { try { if (sessionStorage.getItem('pcQf')) { sessionStorage.removeItem('pcQf'); const q = document.getElementById('pcQ'); if (q) { q.focus(); const v = q.value; q.value = ''; q.value = v; } } } catch (e) {} })();
 </script>
+@include('sg.partials.cities')
 @endsection
