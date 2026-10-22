@@ -294,9 +294,9 @@
                             @if ($is->note)<div style="font-size:13px">{{ $is->note }}</div>@endif
                             <div class="note" style="font-size:12px">{{ optional($is->creator)->name }} · {{ $is->created_at->format('Y-m-d g:i a') }}@if ($is->resolution) · ✓ {{ $is->resolution }} ({{ optional($is->resolver)->name }})@endif</div></div>
                         @if ($is->status === 'open')@can('order-edit')
-                            <details style="width:100%"><summary class="note" style="cursor:pointer">حل المشكلة…</summary>
+                            @php $dd = (int) request('deduct') === $is->id; @endphp<details style="width:100%" @if ($dd) open @endif><summary class="note" style="cursor:pointer">حل المشكلة…</summary>
                                 <form method="post" action="{{ route('sg.issues.resolve', $is) }}" class="mt">@csrf
-                                    <div class="grid g2"><input name="value" class="inp numr" placeholder="قيمة (اختياري)"><select name="action" class="inp">@foreach (\App\Models\OrderIssue::ACTIONS as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select></div>
+                                    <div class="grid g2"><input name="value" class="inp numr" placeholder="قيمة (اختياري)" value="{{ $dd && $is->value ? $is->value : '' }}" @if ($dd) autofocus @endif><select name="action" class="inp">@foreach (\App\Models\OrderIssue::ACTIONS as $k => $v)<option value="{{ $k }}" @selected($dd && $k === 'deduct')>{{ $v }}</option>@endforeach</select></div>
                                     <select name="payment_id" class="inp mt">@foreach ($payments as $pm)<option value="{{ $pm->id }}" @selected($pm->id == \App\Services\AppSettings::cashPaymentId())>للإرجاع النقدي: {{ $pm->name }}</option>@endforeach</select>
                                     <input name="resolution" class="inp mt" placeholder="كيف حُلّت؟ (مثلاً: وصلت مع الرحلة التالية)">
                                     <label class="ck mt"><input type="checkbox" name="send_whatsapp" value="1" checked> إبلاغ العميل</label>

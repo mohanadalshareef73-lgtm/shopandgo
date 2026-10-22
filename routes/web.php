@@ -398,6 +398,7 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::get('issues', [$C . 'IssuesController', 'index'])->name('issues');
         Route::post('orders/{order}/issues', [$C . 'IssuesController', 'store'])->name('issues.store');
         Route::post('issues/{issue}/resolve', [$C . 'IssuesController', 'resolve'])->name('issues.resolve');
+        Route::post('issues-bulk', [$C . 'IssuesController', 'bulk'])->name('issues.bulk');
         Route::get('soldouts', [$C . 'SoldoutsController', 'index'])->name('soldouts');
         Route::get('soldouts/find', [$C . 'SoldoutsController', 'find'])->name('soldouts.find');
         Route::post('orders/{order}/soldouts', [$C . 'SoldoutsController', 'store'])->name('soldouts.store');

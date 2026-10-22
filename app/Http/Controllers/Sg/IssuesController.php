@@ -15,7 +15,7 @@ class IssuesController extends Controller
     public function __construct()
     {
         $this->middleware('permission:order-list', ['only' => ['index']]);
-        $this->middleware('permission:order-edit', ['only' => ['store', 'resolve']]);
+        $this->middleware('permission:order-edit', ['only' => ['store', 'resolve', 'bulk']]);
     }
 
     public function index(Request $request)
@@ -96,5 +96,33 @@ class IssuesController extends Controller
         IssueService::notify($issue->fresh(), $request->boolean('send_whatsapp'), true);
 
         return back()->with('success', 'حُلّت المشكلة · ' . $issue->fresh()->resolution);
+    }
+
+    /** ✓ تم الحل بدون أي رسالة للعميل، أو 🗑 حذف — لوحدة أو لمجموعة */
+    public function bulk(Request $request)
+    {
+        $data = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'integer', 'do' => 'required|in:resolve,delete'], ['ids.required' => 'اختار مشكلة وحدة على الأقل']);
+        $rows = OrderIssue::with('order')->whereIn('id', $data['ids'])->get();
+        $n = 0;
+        foreach ($rows as $r) {
+            $code = optional($r->order)->code;
+            if ($data['do'] === 'resolve') {
+                if ($r->status !== 'open') {
+                    continue;
+                }
+                $r->status = 'resolved';
+                $r->resolution = $r->resolution ?: 'تم الحل';
+                $r->resolved_by = auth()->id();
+                $r->resolved_at = now();
+                $r->save();
+                \App\Models\Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' حل مشكلة (' . $code . ')', 'log' => ' ' . $r->typeLabel() . ' · تم الحل بدون رسالة']);
+            } else {
+                \App\Models\Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' حذف مشكلة (' . $code . ')', 'log' => ' ' . $r->typeLabel() . ($r->note ? ' · ' . $r->note : '')]);
+                $r->delete();
+            }
+            $n++;
+        }
+
+        return back()->with('success', ($data['do'] === 'resolve' ? '✓ تعلّمت محلولة: ' : '🗑 انحذفت: ') . $n . ' مشكلة' . ($data['do'] === 'resolve' ? ' · بدون رسالة للعميل' : ''));
     }
 }
