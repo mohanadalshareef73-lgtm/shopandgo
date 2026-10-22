@@ -32,7 +32,7 @@ class SettingsController extends Controller
             'shop_name' => 'nullable|string|max:80', 'shop_phone' => 'nullable|string|max:40', 'shop_address' => 'nullable|string|max:200', 'shop_hours' => 'nullable|string|max:120',
             'ship_price_per_kg' => 'nullable|numeric|min:0', 'ship_min' => 'nullable|numeric|min:0', 'cash_payment_id' => 'nullable|exists:payment_methods,id',
             'package_types' => 'nullable|string|max:500', 'shelf_rows' => 'nullable|string|max:200', 'shelf_per_row' => 'nullable|integer|min:1|max:200', 'shelf_reminder_days' => 'nullable|integer|min:1|max:90',
-            'report_phones' => 'nullable|string|max:300', 'urgent_phones' => 'nullable|string|max:200', 'urgent_shop_phones' => 'nullable|string|max:200', 'cart_wallet_alert' => 'nullable|numeric|min:0|max:100000',
+            'report_phones' => 'nullable|string|max:300', 'urgent_phones' => 'nullable|string|max:200', 'shop_phones_extra' => 'nullable|array|max:10', 'shop_phones_extra.*' => 'nullable|string|max:40', 'cart_wallet_alert' => 'nullable|numeric|min:0|max:100000',
             'points_per_order' => 'nullable|integer|min:0', 'points_per_100' => 'nullable|numeric|min:0', 'point_value' => 'nullable|numeric|min:0', 'points_min_redeem' => 'nullable|integer|min:0',
             'courier_default_fee' => 'nullable|numeric|min:0', 'bank_accounts_text' => 'nullable|string|max:1000',
             'shelf_remind_every' => 'nullable|integer|min:1|max:60', 'shelf_remind_max' => 'nullable|integer|min:0|max:50', 'shelf_remind_time' => ['nullable', 'regex:/^\d{1,2}:\d{2}$/'],
@@ -46,10 +46,14 @@ class SettingsController extends Controller
         ]);
         $split = fn ($v) => array_values(array_filter(array_map('trim', preg_split('/[,،\n]+/u', (string) $v))));
         $out = collect($data)->filter(fn ($v) => $v !== null)->all();
-        foreach (['package_types', 'shelf_rows', 'report_phones', 'booking_phones', 'urgent_phones', 'urgent_shop_phones'] as $k) {
+        foreach (['package_types', 'shelf_rows', 'report_phones', 'booking_phones', 'urgent_phones'] as $k) {
             if ($request->has($k)) {
                 $out[$k] = $split($request->input($k));
             }
+        }
+        // 🏪 أرقام المحل الزايدة (علامة +): نشيلو الفاضي
+        if ($request->has('shop_phone')) {
+            $out['shop_phones_extra'] = array_values(array_unique(array_filter(array_map('trim', (array) $request->input('shop_phones_extra', [])))));
         }
         // أرقام الحجز بس (ما فيش قروبات) — ونفس القائمة اللي تطلع في ⚡ احجز
         if ($request->has('booking_phones')) {

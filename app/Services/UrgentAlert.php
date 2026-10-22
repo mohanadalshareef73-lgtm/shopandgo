@@ -21,8 +21,8 @@ class UrgentAlert
             return array_values(array_filter(array_map('trim', (array) $v)));
         };
         $mine = $split(AppSettings::get('urgent_phones', [])) ?: AppSettings::reportPhones();
-        // 🏪 رقم المحل كمان يوصله نفس التنبيه
-        $shop = $split(AppSettings::get('urgent_shop_phones', []));
+        // 🏪 هاتف المحل + الأرقام الزايدة (علامة +) يوصلهم نفس التنبيه
+        $shop = array_merge($split((string) AppSettings::get('shop_phone', '')), $split(AppSettings::get('shop_phones_extra', [])));
 
         return array_values(array_unique(array_merge($mine, $shop)));
     }
