@@ -45,6 +45,9 @@
     .sg-main .t .btn { font-size: 13px !important; padding: 5px 11px !important; min-height: 0; border-radius: 10px; }
     .sg-main .t .inp { height: 34px !important; font-size: 14px !important; }
     </style>
+    {{-- 🎨 الشكل الجديد: يتفعّل تلقائياً، وزر «الشكل القديم» في القائمة يرجّعه --}}
+    <script>try { if (localStorage.getItem('sgUI') !== 'old') document.documentElement.classList.add('nui'); } catch (e) { document.documentElement.classList.add('nui'); }</script>
+    <link rel="stylesheet" href="{{ asset('assets/sg/theme.css') }}?v=1">
 </head>
 <body class="@yield('bodyClass', 'soft'){{ request('embed') ? ' embed' : '' }}">
 @if (request('embed'))<style>/* 🪟 داخل نافذة: بدون القائمة والأعلى */ .embed .sg-side, .embed .bell-wrap, .embed .sg-burger, .embed .sg-back, .embed .no-embed { display: none !important; } .embed .sg-app { display: block; } .embed .sg-main { margin: 0 !important; padding: 14px !important; max-width: none !important; }</style>@endif
@@ -155,6 +158,9 @@
                 </a>
             @endif
         @endforeach
+
+        <button type="button" class="ui-toggle no-print" onclick="try{localStorage.setItem('sgUI', document.documentElement.classList.contains('nui') ? 'old' : 'new')}catch(e){} location.reload()">🎨 <span class="nui-on">الشكل القديم</span><span class="nui-off">الشكل الجديد</span></button>
+        <style>.nui-off{display:none} html:not(.nui) .nui-on{display:none} html:not(.nui) .nui-off{display:inline}</style>
 
         @if ($u)
             <div class="me">

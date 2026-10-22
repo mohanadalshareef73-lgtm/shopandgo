@@ -1,0 +1,84 @@
+/* Shop & Go — الشكل الجديد (مريح للعين)
+   كل القواعد تحت html.nui، فلو تبي ترجع للشكل القديم: زر «الشكل القديم» في القائمة، أو امسح هذا الملف. */
+
+html.nui {
+  --bg: #f5f6f9; --surface: #fff; --line: #e6e8ee; --line-soft: #eff1f5;
+  --ink: #14182a; --ink-2: #3f4559; --ink-3: #6b7185;
+  --brand: #262c4a; --accent: #e8590c; --accent-bg: #fdeadf; --accent-ink: #a8400a;
+  --soft: #f7f8fa; --nav-on: #eceff7;
+}
+html.nui body { background: var(--bg); }
+html.nui .sg-main { color: var(--ink); padding: 26px 34px 48px; line-height: 1.7; }
+
+/* القائمة الجانبية: خلفية بيضاء، العنصر المختار لون هادي بدل الكحلي الغامق */
+html.nui .sg-side { padding: 22px 14px; border-left: 1px solid var(--line); }
+html.nui .sg-side a.it { min-height: 44px; padding: 0 14px; border-radius: 11px; color: var(--ink-2); font-weight: 700; margin-bottom: 3px; }
+html.nui .sg-side a.it svg { width: 20px; height: 20px; color: var(--ink-3); }
+html.nui .sg-side a.it:hover { background: var(--soft); color: var(--ink); }
+html.nui .sg-side a.it.on { background: var(--nav-on); color: var(--brand); font-weight: 800; }
+html.nui .sg-side a.it.on svg { color: var(--accent); }
+html.nui .sg-side a.it .bd, html.nui .sg-side a.it.on .bd { background: var(--accent-bg); color: var(--accent-ink); font-size: 12.5px; min-width: 24px; text-align: center; padding: 2px 8px; }
+html.nui .sg-side .cap { color: var(--ink-3); font-weight: 700; margin: 18px 14px 8px; }
+html.nui .ui-toggle { display: block; width: 100%; margin-top: 10px; border: 1px dashed var(--line); background: transparent; border-radius: 10px; padding: 9px; font: inherit; font-size: 13.5px; font-weight: 700; color: var(--ink-3); cursor: pointer; }
+.ui-toggle { display: block; width: 100%; margin-top: 10px; border: 1px dashed #d5d9e4; background: transparent; border-radius: 10px; padding: 9px; font: inherit; font-size: 13.5px; cursor: pointer; }
+
+/* رأس الصفحة */
+html.nui .sg-main .top { margin-bottom: 20px; }
+html.nui .sg-main .top h1 { font-size: 28px; font-weight: 800; color: var(--ink); }
+html.nui .sg-main .top .sub { color: var(--ink-3); font-size: 15px; }
+
+/* الكروت: أهدى، حد رفيع وظل خفيف بدل الظل الكبير */
+html.nui .sg-main .card { border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(20, 24, 42, .04); }
+html.nui .sg-main .card.dark, html.nui .sg-main .kpi.accent { border-color: var(--brand); box-shadow: none; }
+html.nui .sg-main .card h3 { font-size: 18px; font-weight: 800; }
+html.nui .sg-main .grid, html.nui .sg-main .kpis { gap: 16px; }
+html.nui .sg-main .kpi .lbl, html.nui .sg-main .tile .t-lbl { font-size: 15px; color: var(--ink-3); font-weight: 700; }
+html.nui .sg-main .kpi.accent .lbl, html.nui .sg-main .kpi.accent .s { color: #c9cde0; }
+html.nui .sg-main .kpi .v, html.nui .sg-main .tile .t-val { font-size: 30px; }
+
+/* الأزرار: أكبر وأسهل للضغط */
+html.nui .sg-main .btn { min-height: 42px; border-radius: 12px; font-weight: 700; }
+html.nui .sg-main .btn.sm { min-height: 34px; border-radius: 10px; }
+html.nui .sg-main .btn.ghost { background: #fff; border: 1px solid var(--line); box-shadow: none; color: var(--ink); font-weight: 700; }
+html.nui .sg-main .btn.ghost:hover { background: var(--soft); filter: none; }
+html.nui .sg-main .btn.red { font-weight: 700; background: #fdecec; border: 1px solid #f6d3d3; color: #b42323; }
+html.nui .sg-main .btn.primary, html.nui .sg-main .btn.accent { background: var(--accent); color: #fff; }
+
+/* شريط البحث والفرز */
+html.nui .sg-main .tw > .tw-h, html.nui .sg-main .tw > form > .tw-h, html.nui .sg-main form.tw-h { border-radius: 16px; border: 1px solid var(--line); box-shadow: none; padding: 10px 12px; }
+html.nui .sg-main .sx input { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; height: 44px; }
+html.nui .sg-main .seg { background: var(--soft); border-color: var(--line); }
+html.nui .sg-main .seg a.on, html.nui .sg-main .seg button.on { background: #fff; color: var(--ink); font-weight: 800; box-shadow: 0 1px 3px rgba(20, 24, 42, .1); }
+html.nui .sg-main .pill { height: 40px; border-radius: 999px; padding: 0 16px; background: #fff; border: 1px solid var(--line); color: var(--ink) !important; font-weight: 700; }
+html.nui .sg-main .pill.on { background: var(--brand); border-color: var(--brand); color: #fff !important; }
+html.nui .sg-main .stages { box-shadow: none; border: 1px solid var(--line); }
+html.nui .sg-main .tabs a.on { border-color: var(--accent); }
+html.nui .sg-main .tw-f { box-shadow: none; border: 1px solid var(--line) !important; border-radius: 16px; }
+
+/* الجداول: جدول واحد في كرت أبيض بخطوط خفيفة بدل صفوف طايرة */
+html.nui .sg-main table.t { background: #fff; border: 1px solid var(--line); border-radius: 16px; border-collapse: separate; border-spacing: 0; margin-top: 0; overflow: hidden; }
+html.nui .sg-main table.t th { background: var(--soft); color: var(--ink-3) !important; font-weight: 700; font-size: 14px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+html.nui .sg-main table.t td { background: #fff; padding: 13px 14px; border-bottom: 1px solid var(--line-soft); border-radius: 0 !important; }
+html.nui .sg-main table.t tr:last-child td { border-bottom: 0; }
+html.nui .sg-main table.t tbody tr { box-shadow: none; transform: none !important; }
+html.nui .sg-main table.t tbody tr:hover { box-shadow: none; }
+html.nui .sg-main table.t tbody tr:hover td { background: #f8f9fc; }
+html.nui .sg-main table.t tr.on td, html.nui .sg-main table.t tr.picked td { background: #fff6f0; }
+html.nui .sg-main .card table.t { border: 0; border-radius: 0; }
+
+/* الحالات */
+html.nui .sg-main .st, html.nui .sg-main .chip { font-size: 13.5px; padding: 4px 12px; }
+
+/* الخانات */
+html.nui .sg-main .inp { border-color: var(--line); border-radius: 12px; background: #fff; }
+html.nui .sg-main .inp:focus, html.nui .sg-main .sx input:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(38, 44, 74, .12); background: #fff; }
+html.nui .sg-main .opts input:checked + span { border-color: var(--brand); background: var(--nav-on); }
+html.nui .sg-main input[type=checkbox] { accent-color: var(--accent); width: 18px; height: 18px; }
+
+/* التنبيهات والنوافذ */
+html.nui .flash { border-radius: 14px; font-weight: 700; }
+html.nui .hint { background: var(--soft); }
+html.nui .modal { border-radius: 18px; }
+
+@media (max-width: 980px) { html.nui .sg-main { padding: 16px; } }
+@media print { html.nui body, html.nui .sg-main { background: #fff; } }
