@@ -173,9 +173,10 @@
     <main class="sg-main">
         {{-- أي موظف: بلّغ الإدارة على كود --}}
         <button type="button" class="no-print" data-modal="mFlag" title="بلّغ الإدارة" style="position:fixed;bottom:18px;left:18px;z-index:40;border:0;cursor:pointer;border-radius:99px;padding:12px 16px;font:inherit;font-weight:700;font-size:13.5px;background:#262c4a;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.18)">⚑ بلّغ الإدارة</button>
+        <script>window.sgFlag = function (code) { const m = document.getElementById('mFlag'); if (!m) return; m.querySelector('input[name=code]').value = code || ''; const r = m.querySelector('input[name=type][value=review]'); if (r) r.checked = true; setTimeout(() => { const t = m.querySelector('textarea[name=note]'); if (t) t.focus(); }, 60); };</script>
         <div class="modal-bg" id="mFlag"><div class="modal" style="max-width:440px">
             <h3>⚑ بلّغ الإدارة</h3>
-            <div class="note mb">زبون اشتكى من نواقص أو أي حاجة؟ اكتب الكود والإدارة يوصلها تنبيه، ويتسجل في «المشاكل».</div>
+            <div class="note mb">زبون اشتكى أو الطلب يحتاج مراجعة؟ اكتب الكود والإدارة يوصلها تنبيه، ويتسجل في «المشاكل». <b>بلاغ داخلي — الزبون ما يشوفهش.</b></div>
             <form method="post" action="{{ route('sg.flag') }}">@csrf
                 <div class="f"><label class="l">رقم الإيصال أو كود العميل</label><input name="code" class="inp numr" required></div>
                 <div class="f"><div class="opts" style="flex-wrap:wrap">@foreach (\App\Models\OrderIssue::TYPES as $k => [$t, $ic])<label><input type="radio" name="type" value="{{ $k }}" @checked($loop->first)><span>{{ $ic }} {{ $t }}</span></label>@endforeach</div></div>

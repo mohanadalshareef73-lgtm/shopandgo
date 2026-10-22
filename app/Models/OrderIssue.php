@@ -15,6 +15,7 @@ class OrderIssue extends Model
         'missing' => ['نواقص', '📉'],
         'not_arrived' => ['لم يصل', '📭'],
         'damaged' => ['تالف / فيه عيب', '💔'],
+        'review' => ['مراجعة الطلب', '🔎'],
         'other' => ['مشكلة أخرى', '⚠'],
     ];
 
