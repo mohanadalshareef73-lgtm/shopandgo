@@ -30,14 +30,14 @@
     };
     inp.addEventListener('input', () => {
       clearTimeout(t); const v = inp.value.trim();
-      if (!v) { hide(); return; }
+      if (v.length < 2) { hide(); return; }
       t = setTimeout(async () => {
         try {
           if (ctl) ctl.abort(); ctl = new AbortController();
           const r = await (await fetch(url + '?type=' + encodeURIComponent(inp.dataset.suggest) + '&t=' + encodeURIComponent(v), { signal: ctl.signal, headers: { Accept: 'application/json' } })).json();
           items = r.items || []; idx = -1; if (inp.value.trim() === v) draw();
         } catch (e) {}
-      }, 200);
+      }, 300);
     });
     inp.addEventListener('keydown', e => {
       if (box.hidden || !items.length) return;

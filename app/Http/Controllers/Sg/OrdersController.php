@@ -39,7 +39,8 @@ class OrdersController extends Controller
 
     public static function applyStage(Builder $q, ?string $stage): Builder
     {
-        $prep = Status::where('stage', 'prep')->pluck('name')->all();
+        static $prepCache = null; // ⚡ مرة وحدة في الطلب بدل 8
+        $prep = $prepCache ??= Status::where('stage', 'prep')->pluck('name')->all();
         $open = fn ($q) => $q->where('status', '!=', 'canceld')->where('delivered', false);
 
         return match ($stage) {
@@ -61,7 +62,7 @@ class OrdersController extends Controller
     {
         $t = trim((string) $request->input('t', ''));
         $type = $request->input('type', 'all');
-        if ($t === '' || mb_strlen($t) > 40) {
+        if (mb_strlen($t) < 2 || mb_strlen($t) > 40) { // ⚡ حرف واحد يجيب آلاف النتائج
             return response()->json(['items' => []]);
         }
         $rank = fn ($col) => "CASE WHEN $col = ? THEN 0 WHEN $col LIKE ? THEN 1 WHEN $col LIKE ? THEN 2 WHEN $col LIKE ? THEN 3 ELSE 4 END";
@@ -73,9 +74,12 @@ class OrdersController extends Controller
             $custs = Customer::where('code', 'like', '%' . $t . '%')
                 ->orderByRaw('CASE WHEN code = ? THEN 0 WHEN code LIKE ? THEN 1 ELSE 2 END', [$t, $t . '%'])->orderByRaw('LENGTH(code)')->orderBy('code')
                 ->limit(6)->get(['id', 'code', 'name', 'phone_1']);
+            // ⚡ العدادات في استعلام واحد بدل استعلام لكل زبون
+            $ordN = $custs->isEmpty() ? collect() : Order::whereIn('customer_id', $custs->pluck('id'))->selectRaw('customer_id, COUNT(*) n')->groupBy('customer_id')->pluck('n', 'customer_id');
+            $cartN = $custs->isEmpty() ? collect() : \App\Models\CartQuote::whereIn('customer_id', $custs->pluck('id'))->selectRaw('customer_id, COUNT(*) n')->groupBy('customer_id')->pluck('n', 'customer_id');
             foreach ($custs as $c) {
-                $n = Order::where('customer_id', $c->id)->count();
-                $nc = \App\Models\CartQuote::where('customer_id', $c->id)->count();
+                $n = (int) ($ordN[$c->id] ?? 0);
+                $nc = (int) ($cartN[$c->id] ?? 0);
                 $items[] = ['kind' => 'cust', 'code' => $c->code, 'name' => trim((string) $c->name, ' .'), 'phone' => $c->phone_1,
                     'sub' => $clean([$n . ' إيصال', $nc ? $nc . ' سلة' : '']),
                     'url' => $type === 'cart' ? route('sg.carts', ['search' => $c->code]) : route('sg.orders.index', ['q' => $c->code])];
@@ -139,10 +143,15 @@ class OrdersController extends Controller
             [$y, $m] = explode('-', trim($request->month)) + [null, null];
             $base->whereYear('created_at', (int) $y)->whereMonth('created_at', (int) $m);
         }
-        $counts = [];
-        foreach (['all', 'none', 'prep', 'way', 'ready', 'debt', 'done', 'cx'] as $s) {
-            $counts[$s] = self::applyStage(clone $base, $s === 'all' ? null : $s)->count();
-        }
+        // ⚡ عدادات المراحل: تتحسب مرة كل دقيقة بدل كل فتحة صفحة
+        $counts = \Illuminate\Support\Facades\Cache::remember('sg.orders.counts.' . md5((string) $request->month), 60, function () use ($base) {
+            $c = [];
+            foreach (['all', 'none', 'prep', 'way', 'ready', 'debt', 'done', 'cx'] as $s) {
+                $c[$s] = self::applyStage(clone $base, $s === 'all' ? null : $s)->count();
+            }
+
+            return $c;
+        });
 
         $q = self::applyStage(clone $base, $request->stage)->with(['customer', 'platform']);
         if ($request->filled('q')) {
