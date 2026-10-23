@@ -217,6 +217,7 @@
         <div class="grid g2 f"><div><label class="l">الهاتف</label><input name="phone_1" class="inp numr" value="{{ $sel->phone_1 }}" required></div><div><label class="l">هاتف آخر</label><input name="phone_2" class="inp numr" value="{{ $sel->phone_2 }}"></div></div>
         <div class="grid g2"><div class="f"><label class="l">المدينة <b style="color:var(--down)">*</b></label><input name="city" class="inp" list="lyCities" value="{{ old('city', $sel->city ?? '') }}" required></div><div class="f"><label class="l">المنطقة <b style="color:var(--down)">*</b></label><input name="area" class="inp" value="{{ old('area', $sel->area ?? '') }}" required></div></div>
         <div class="f"><label class="l">العنوان بالتفصيل</label><input name="address" class="inp" value="{{ $sel->address }}"></div>
+        <div class="f"><label class="l">كود العميل</label><input name="code" class="inp numr" value="{{ old('code', $sel->code) }}" required maxlength="20" data-code-check data-except="{{ $sel->id }}" autocomplete="off"></div>
         <div style="display:flex;gap:8px"><button class="btn">حفظ</button><button type="button" class="btn ghost" data-close>إلغاء</button></div>
     </form>
 </div></div>

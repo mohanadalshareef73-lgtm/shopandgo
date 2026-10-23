@@ -142,8 +142,16 @@ class ClientsController extends Controller
             'phone_2' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:190',
             'city' => 'required|string|max:80', 'area' => 'required|string|max:120',
-        ], ['city.required' => 'اكتب المدينة', 'area.required' => 'اكتب المنطقة']);
-        $customer->update($data);
+            'code' => 'required|string|max:20|unique:customers,code,' . $customer->id,
+        ], ['city.required' => 'اكتب المدينة', 'area.required' => 'اكتب المنطقة', 'code.required' => 'اكتب كود العميل', 'code.unique' => 'هذا الكود مستخدم — جرب: ' . implode('، ', self::codeSuggestions(trim((string) $request->input('code')), preg_replace('/\D/', '', (string) $request->input('phone_1'))))]);
+        $data['code'] = trim($data['code']);
+        $old = $customer->code;
+        $customer->code = $data['code'];
+        unset($data['code']);
+        $customer->fill($data)->save();
+        if ($old !== $customer->code) {
+            Log::create(['user_id' => auth()->id(), 'type' => 'customer', 'title' => ' كود عميل (' . $customer->name . ')', 'log' => ' تغيير الكود من ' . $old . ' إلى ' . $customer->code]);
+        }
 
         return back()->with('success', 'تم حفظ بيانات العميل');
     }
