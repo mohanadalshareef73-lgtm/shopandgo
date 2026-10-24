@@ -151,7 +151,7 @@ class SettingsController extends Controller
         }
         AppSettings::put(['wa_groups_list' => collect($list)->keyBy('id')->all(), 'wa_groups_at' => now()->toDateTimeString()]);
 
-        return back()->with('success', '👥 لقينا ' . count($list) . ' قروب — اختار قروب الحجز واحفظ');
+        return back()->with('success', '👥 لقينا ' . count($list) . ' قروب — اختار القروب من القائمة واحفظ');
     }
 
     /** ✉️ رسالة تجربة لقروب */

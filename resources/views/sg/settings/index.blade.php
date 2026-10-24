@@ -146,6 +146,7 @@
         <input name="manual" class="inp numr" style="width:240px" placeholder="أو ID القروب (‎…@g.us)">
         <button class="btn">حفظ</button>
     </form>
+    <form method="post" action="{{ route('sg.settings.groups.fetch') }}" style="margin-top:8px">@csrf<button class="btn ghost sm">🔄 جيب قروباتي من الواتساب</button> <span class="note">{{ !empty($s['wa_groups_at']) ? 'آخر مرة: ' . $s['wa_groups_at'] : 'بعدها القروبات تطلع في القائمة فوق' }}</span></form>
 </div>
 <div class="card" style="max-width:820px;margin-top:12px">
     <h3 style="margin:0 0 6px">🧪 تجربة قروب الحجز (منتظرة)</h3>
