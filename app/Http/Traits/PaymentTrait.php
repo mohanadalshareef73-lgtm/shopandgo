@@ -9,15 +9,15 @@ trait PaymentTrait {
         $mobile_number = substr($mobile_number, 1);
         $data = [
             "PhoneNumber" => '00218'.$mobile_number.'',
-            "CompanyName" => env('COMPANY_NAME'),
+            "CompanyName" => config('system.company_name'),
             "serviceNo" => 10,
             "productNo" => $products[0]['classification_id'],
             "Value" => $total_price,
             "RequestID" => $requestID,
-            "Token" => env('ALMADAR_TOKEN'),
+            "Token" => config('system.almadar_token'),
             "Date" => now()->format("Y-m-d")
         ];
-        $response = Http::asMultipart()->post(''.env('ALMADAR_API').'/path/pay', $data);
+        $response = Http::asMultipart()->post(''.config('system.almadar_api').'/path/pay', $data);
         $responseCode = $response->status();
         return $response;
     }

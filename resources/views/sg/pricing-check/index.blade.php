@@ -1,5 +1,5 @@
 @extends('sg.layout')
-@section('title', 'فحص التسعير')
+@section('title', 'فحص التسعير والسرعة')
 @section('bodyClass', 'soft')
 @php
     $age = $hb ? now()->timestamp - (int) $hb : null;
@@ -11,10 +11,11 @@
 @endphp
 @section('content')
 <div class="top">
-    <div><h1>🩺 فحص التسعير</h1><div class="sub">ليش السلات ما تنحسبش أو الرابط ما يوصلش في الواتساب</div></div>
+    <div><h1>🩺 فحص التسعير والسرعة</h1><div class="sub">ليش السلات ما تنحسبش، وشن الصفحات اللي ثقيلة</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
         <form method="post" action="{{ route('sg.pricing.unlock') }}">@csrf<button class="btn ghost">🔓 فك القفل العالق</button></form>
         <form method="post" action="{{ route('sg.pricing.run') }}">@csrf<button class="btn">▶ شغّل التسعير توا</button></form>
+        <form method="post" action="{{ route('sg.pricing.optimize') }}">@csrf<button class="btn primary">⚡ سرّع المنظومة</button></form>
         <a href="{{ route('sg.pricing.check') }}" class="btn ghost">↻ تحديث</a>
     </div>
 </div>
@@ -37,6 +38,32 @@
         <tr><td>🛒 سلات تستنى الرد (آخر يومين)</td><td>{!! $ok($waiting < 5) !!}</td><td class="note">{{ $waiting }} سلة · فشلت اليوم {{ $failedToday }} · آخر سلة جت {{ $lastIn ? $lastIn->diffForHumans() : '—' }}</td></tr>
         <tr><td>🐞 وضع الديبق APP_DEBUG</td><td>{!! $ok(!$debug) !!}</td><td class="note">{{ $debug ? 'شغال — خليه false في .env (يثقل المنظومة)' : 'مقفول' }}</td></tr>
     </table>
+</div>
+
+<div class="card mb">
+    <h3>⚡ السرعة</h3>
+    <table class="t">
+        <tr><td>الإعدادات محفوظة جاهزة (config cache)</td><td>{!! $ok($speed['config']) !!}</td><td class="note">{{ $speed['config'] ? 'تمام' : 'اضغط «سرّع المنظومة»' }}</td></tr>
+        <tr><td>الروابط محفوظة جاهزة (route cache)</td><td>{!! $ok($speed['routes']) !!}</td><td class="note">{{ $speed['routes'] ? 'تمام' : 'اضغط «سرّع المنظومة»' }}</td></tr>
+        <tr><td>OPcache (ذاكرة PHP)</td><td>{!! $ok($speed['opcache']) !!}</td><td class="note">{{ $speed['opcache'] ? 'شغال' : 'مقفول — فعّله من cPanel ← Select PHP Version ← Extensions ← opcache' }}</td></tr>
+        <tr><td>PHP</td><td></td><td class="note num">{{ $speed['php'] }} · cache: {{ $speed['cache'] }} · session: {{ $speed['session'] }}</td></tr>
+    </table>
+    <div class="hint mt">بعد أي رفع ملفات افتح «مسح الكاش» (clearCacheAndCookies) — يمسح ويرجع يسرّع وحده.</div>
+</div>
+
+<div class="card tw mb">
+    <div class="tw-h" style="display:flex;justify-content:space-between;align-items:center"><b>🐢 الصفحات اللي أخذت أكثر من ثانية (آخر 3 أيام)</b>
+        @if ($slow->count())<form method="post" action="{{ route('sg.pricing.clearslow') }}">@csrf<button class="btn ghost sm">مسح السجل</button></form>@endif</div>
+    @if ($slowBy->isEmpty())
+        <div class="note" style="padding:14px 18px">ما فيش صفحات بطيئة مسجلة لين توا (السجل يبدا من بعد الرفع). خلي الموظفين يشتغلو ساعة وارجع شوف.</div>
+    @else
+    <table class="t">
+        <thead><tr><th>الصفحة</th><th>كم مرة</th><th>المتوسط</th><th>الأبطأ</th><th>الداتابيز</th><th>استعلامات</th><th>ذاكرة</th></tr></thead>
+        @foreach ($slowBy->take(25) as $r)
+        <tr><td style="direction:ltr;text-align:right">{{ $r['route'] }}</td><td class="num">{{ $r['n'] }}</td><td class="num">{{ number_format($r['avg'] / 1000, 1) }} ث</td><td class="num">{{ number_format($r['max'] / 1000, 1) }} ث</td><td class="num">{{ number_format($r['db'] / 1000, 1) }} ث</td><td class="num">{{ $r['q'] }}</td><td class="num">{{ $r['mem'] }}MB</td></tr>
+        @endforeach
+    </table>
+    @endif
 </div>
 
 <div class="card tw mb">

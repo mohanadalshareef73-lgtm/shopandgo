@@ -40,13 +40,13 @@ Route::get('reviews', [App\Http\Controllers\Portal\ReviewController::class, 'ind
 Route::get('stats.json', [App\Http\Controllers\Portal\ReviewController::class, 'stats'])->name('stats.public');
 Route::post('/login', [CustomerAuthController::class, 'login'])->middleware('throttle:login')->name('customer.login.submit');
 // تسجيل عميل جديد + رمز التحقق عبر واتساب
-Route::get('/register', [App\Http\Controllers\Portal\SignupController::class, 'form'])->name('customer.register');
-Route::post('/register', [App\Http\Controllers\Portal\SignupController::class, 'store'])->middleware('throttle:signup')->name('customer.register.store');
-Route::get('/verify', [App\Http\Controllers\Portal\SignupController::class, 'verifyForm'])->name('customer.verify');
+Route::get('/register', [App\Http\Controllers\Portal\SignupController::class, 'form']); // الاسم في /customers/... تحت (اسم مكرر يمنع تسريع الروابط)
+Route::post('/register', [App\Http\Controllers\Portal\SignupController::class, 'store'])->middleware('throttle:signup'); // الاسم في /customers/... تحت (اسم مكرر يمنع تسريع الروابط)
+Route::get('/verify', [App\Http\Controllers\Portal\SignupController::class, 'verifyForm']); // الاسم في /customers/... تحت (اسم مكرر يمنع تسريع الروابط)
 Route::get('/forgot', [App\Http\Controllers\Portal\SignupController::class, 'forgotForm'])->name('customer.forgot');
 Route::post('/forgot', [App\Http\Controllers\Portal\SignupController::class, 'forgot'])->middleware('throttle:otp')->name('customer.forgot.send');
-Route::post('/verify', [App\Http\Controllers\Portal\SignupController::class, 'verify'])->middleware('throttle:otp')->name('customer.verify.submit');
-Route::post('/verify/resend', [App\Http\Controllers\Portal\SignupController::class, 'resend'])->middleware('throttle:otp')->name('customer.verify.resend');
+Route::post('/verify', [App\Http\Controllers\Portal\SignupController::class, 'verify'])->middleware('throttle:otp'); // الاسم في /customers/... تحت (اسم مكرر يمنع تسريع الروابط)
+Route::post('/verify/resend', [App\Http\Controllers\Portal\SignupController::class, 'resend'])->middleware('throttle:otp'); // الاسم في /customers/... تحت (اسم مكرر يمنع تسريع الروابط)
 Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 Route::get('/sw.js', [App\Http\Controllers\Portal\PushController::class, 'sw'])->name('portal.sw');
 Route::get('/push/latest', [App\Http\Controllers\Portal\PushController::class, 'latestAny'])->name('push.latest');
@@ -59,7 +59,7 @@ Route::get('system-update/backup/{file}', [App\Http\Controllers\SystemUpdateCont
 // Admin login (/admin/login)
 Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/login', [App\Http\Controllers\Auth\AdminLoginController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [App\Http\Controllers\Auth\AdminLoginController::class, 'login'])->middleware('throttle:login')->name('login');
+    Route::post('/login', [App\Http\Controllers\Auth\AdminLoginController::class, 'login'])->middleware('throttle:login'); // نفس رابط admin.login
     Route::post('/logout', [App\Http\Controllers\Auth\AdminLoginController::class, 'logout'])->name('logout');
 });
 
@@ -409,6 +409,8 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::get('pricing-check', [$C . 'PricingCheckController', 'index'])->name('pricing.check');
         Route::post('pricing-check/unlock', [$C . 'PricingCheckController', 'unlock'])->name('pricing.unlock');
         Route::post('pricing-check/run', [$C . 'PricingCheckController', 'run'])->name('pricing.run');
+        Route::post('pricing-check/optimize', [$C . 'PricingCheckController', 'optimize'])->name('pricing.optimize');
+        Route::post('pricing-check/clear-slow', [$C . 'PricingCheckController', 'clearSlow'])->name('pricing.clearslow');
         Route::post('orders/{order}/issues', [$C . 'IssuesController', 'store'])->name('issues.store');
         Route::post('issues/{issue}/resolve', [$C . 'IssuesController', 'resolve'])->name('issues.resolve');
         Route::post('issues-bulk', [$C . 'IssuesController', 'bulk'])->name('issues.bulk');

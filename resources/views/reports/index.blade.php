@@ -156,7 +156,7 @@
                         <div class="print-header-inner">
                             <img src="{{ asset('assets/images/logo.png') }}" width="200">
                             <div class="print-title">
-                                <h2>{{ env('COMPANY_NAME') }}</h2>
+                                <h2>{{ config('system.company_name') }}</h2>
                                 <div class="print-sub">
                                     تقرير عام يوم {{ $fromDate }}
                                     @if (isset($toDate))
@@ -781,7 +781,7 @@
 
 
                 <div class="print-footer">
-                    {{ env('COMPANY_NAME') }}
+                    {{ config('system.company_name') }}
                 </div>
 
             </div>

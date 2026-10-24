@@ -45,7 +45,11 @@ class PricingCheckController extends Controller
         } catch (\Throwable $e) {
         }
 
-        return view('sg.pricing-check.index', compact('hb', 'hbq', 'wallet', 'walletErr', 'quotes', 'waiting', 'failedToday', 'lastIn', 'wa', 'waFail', 'token', 'debug', 'testMode', 'lastWaIn'));
+        $speed = \App\Support\Optimizer::status();
+        $slow = collect(Cache::get('sg.slow', []));
+        $slowBy = $slow->groupBy('route')->map(fn ($g, $r) => ['route' => $r, 'n' => $g->count(), 'avg' => (int) $g->avg('ms'), 'max' => (int) $g->max('ms'), 'q' => (int) $g->avg('q'), 'db' => (int) $g->avg('db'), 'mem' => (int) $g->max('mem')])->sortByDesc('n')->values();
+
+        return view('sg.pricing-check.index', compact('speed', 'slow', 'slowBy', 'hb', 'hbq', 'wallet', 'walletErr', 'quotes', 'waiting', 'failedToday', 'lastIn', 'wa', 'waFail', 'token', 'debug', 'testMode', 'lastWaIn'));
     }
 
     /** يفك القفل العالق (لو الأمر طاح في نصه، Laravel يقعد يعتبره شغال لمدة 24 ساعة) */
@@ -56,6 +60,23 @@ class PricingCheckController extends Controller
         Cache::flush();
 
         return back()->with('success', 'تم فك القفل — التسعير يرجع يشتغل خلال دقيقة');
+    }
+
+    /** ⚡ تسريع: حفظ الإعدادات والروابط جاهزة */
+    public function optimize()
+    {
+        $this->guard();
+        $r = \App\Support\Optimizer::run();
+
+        return back()->with(($r['config'] && $r['routes']) ? 'success' : 'error', 'التسريع: الإعدادات ' . ($r['config'] ? '✓' : '✗ ' . ($r['config_err'] ?? '')) . ' · الروابط ' . ($r['routes'] ? '✓' : '✗ ' . ($r['routes_err'] ?? '')));
+    }
+
+    public function clearSlow()
+    {
+        $this->guard();
+        Cache::forget('sg.slow');
+
+        return back()->with('success', 'تم مسح سجل الصفحات البطيئة');
     }
 
     /** يشغّل التسعير توا من غير ما يستنى الـ cron */

@@ -188,7 +188,7 @@
                                                     method="post" class="d-none">
                                                     @csrf
                                                 </form>
-                                                @if (env('SYSTEM_ACTIVE'))
+                                                @if (config('system.active'))
                                                 <input class="form-check-input f-18" onclick="event.preventDefault(); document.getElementById('logout-form22').submit();" type="checkbox" checked role="switch" />
                                             @else
                                                 <input class="form-check-input f-18" onclick="event.preventDefault(); document.getElementById('logout-form22').submit();" type="checkbox" role="switch" />

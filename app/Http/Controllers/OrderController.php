@@ -1553,7 +1553,7 @@ class OrderController extends Controller
                                     $order1->currency_sign,
                                     $order1->code,
                                     $order1->trip_details,
-                                    env('APP_URL')
+                                    config('app.url')
                                 ],
                                 $messageReady1->message
                             );
@@ -1574,7 +1574,7 @@ class OrderController extends Controller
                                     $order1->trip_status,
                                     $order1->code,
                                     $order1->trip_details,
-                                    env('APP_URL')
+                                    config('app.url')
                                 ],
                                 $messageChange1->message
                             );

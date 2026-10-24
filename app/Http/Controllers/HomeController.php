@@ -102,7 +102,7 @@ public function index()
         $test = file_get_contents($path);
 
         if (file_exists($path)) {
-            if (env('SYSTEM_ACTIVE')) {
+            if (config('system.active')) {
                 file_put_contents($path, str_replace('SYSTEM_ACTIVE=true', 'SYSTEM_ACTIVE=false', $test));
             } else {
                 file_put_contents($path, str_replace('SYSTEM_ACTIVE=false', 'SYSTEM_ACTIVE=true', $test));
@@ -111,7 +111,7 @@ public function index()
             return redirect()->back()->with('error', 'حدث خطأ ما الرجاء إعادة المحاولة...');
         }
 
-        if (env('SYSTEM_ACTIVE')) {
+        if (config('system.active')) {
             Log::create([
                 'title' => 'إيقاف النظام',
                 'log' => 'تم إلغاء تفعيل النظام بنجاح',

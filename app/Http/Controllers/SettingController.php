@@ -233,12 +233,13 @@ class SettingController extends Controller
         Artisan::call('config:clear');
         Artisan::call('route:clear');
         Artisan::call('view:clear');
+        $fast = \App\Support\Optimizer::run(); // ⚡ نرجعو نسرّعوها بعد المسح
         // Clear session and cookies
         // Assuming you want to delete all cookies
         foreach ($request->cookies as $name => $value) {
             Cookie::queue(Cookie::forget($name));
         }
         // Optional: Set a response message
-        return redirect()->route('home')->with(['success' => 'Cache and cookies have been cleared.']);
+        return redirect()->route('home')->with(['success' => 'تم مسح الكاش' . ((!empty($fast['config']) && !empty($fast['routes'])) ? ' ⚡ والمنظومة متسرّعة' : ' (التسريع: ' . (!empty($fast['config']) ? 'الإعدادات ✓' : 'الإعدادات ✗') . ' · ' . (!empty($fast['routes']) ? 'الروابط ✓' : 'الروابط ✗') . ')')]);
     }
 }

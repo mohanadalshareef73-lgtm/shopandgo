@@ -169,7 +169,7 @@ class TripController extends Controller
                                 $order->currency_sign,
                                 $order->code,
                                 $order->trip_details,
-                                env('APP_URL')
+                                config('app.url')
                             ],
                             $messageReady1->message
                         );
@@ -190,7 +190,7 @@ class TripController extends Controller
                                 $order->trip_status,
                                 $order->code,
                                 $order->trip_details,
-                                env('APP_URL')
+                                config('app.url')
                             ],
                             $messageChange1->message
                         );

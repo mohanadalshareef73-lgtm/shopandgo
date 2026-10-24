@@ -25,7 +25,7 @@ class UserMiddleware
             Auth::logout();
             return redirect()->route('login')->with('error', 'تم إلغاء تفعيل حسابك الرجاء التواصل مع المسؤولين');
         }
-        if(!env('SYSTEM_ACTIVE')){
+        if(!config('system.active')){
             Auth::logout();
             return redirect()->route('login')->with('error', 'عذرآ النظام في حالة صيانة الرجاء الدخول في وقت لاحق');
         }
