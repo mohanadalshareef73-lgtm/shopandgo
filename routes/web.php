@@ -406,6 +406,9 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::get('reviews-admin', [$C . 'ReviewsController', 'index'])->name('reviews');
         Route::post('reviews-admin/{review}', [$C . 'ReviewsController', 'act'])->name('reviews.act');
         Route::get('kpi', [$C . 'KpiController', 'index'])->name('kpi');
+        Route::get('pricing-check', [$C . 'PricingCheckController', 'index'])->name('pricing.check');
+        Route::post('pricing-check/unlock', [$C . 'PricingCheckController', 'unlock'])->name('pricing.unlock');
+        Route::post('pricing-check/run', [$C . 'PricingCheckController', 'run'])->name('pricing.run');
         Route::post('orders/{order}/issues', [$C . 'IssuesController', 'store'])->name('issues.store');
         Route::post('issues/{issue}/resolve', [$C . 'IssuesController', 'resolve'])->name('issues.resolve');
         Route::post('issues-bulk', [$C . 'IssuesController', 'bulk'])->name('issues.bulk');

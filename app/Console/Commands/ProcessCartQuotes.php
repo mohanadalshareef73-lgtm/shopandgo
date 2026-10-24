@@ -14,6 +14,7 @@ class ProcessCartQuotes extends Command
 
     public function handle(CartQuoteService $quotes): int
     {
+        \Illuminate\Support\Facades\Cache::put('hb.cart-quotes', now()->timestamp, now()->addDays(3)); // 💓 لصفحة فحص التسعير
         $quotes->processNotifications();
         $processed = 0;
         CartQuote::whereNull('notified_at')->where(function ($query) {

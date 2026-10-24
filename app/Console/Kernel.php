@@ -15,11 +15,14 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        $schedule->command('cart-quotes:process')->everyMinute()->withoutOverlapping();
+        // 💓 نبضة: نعرفو من صفحة «فحص التسعير» إن الـ cron شغال
+        $schedule->call(fn () => \Illuminate\Support\Facades\Cache::put('hb.cron', now()->timestamp, now()->addDays(3)))->everyMinute()->name('sg-heartbeat');
+        // القفل يتفك وحده بعد 10 دقايق لو الأمر طاح (بدل 24 ساعة)
+        $schedule->command('cart-quotes:process')->everyMinute()->withoutOverlapping(10);
         $schedule->command('sg:campaigns')->everyMinute()->withoutOverlapping(); // حملات واتساب على دفعات
         $schedule->command('sg:cleanup')->dailyAt('04:30')->timezone('Africa/Tripoli')->withoutOverlapping(); // تنظيف الملفات والسجلات القديمة
-        $schedule->command('cart-quotes:process-replies')->everyMinute()->withoutOverlapping();
-        $schedule->command('whatsapp:resolve-cart-contacts')->everyMinute()->withoutOverlapping();
+        $schedule->command('cart-quotes:process-replies')->everyMinute()->withoutOverlapping(10);
+        $schedule->command('whatsapp:resolve-cart-contacts')->everyMinute()->withoutOverlapping(10);
         // التقرير الشهري للشركاء: أول يوم في الشهر الساعة 9 الصبح (توقيت ليبيا)
         $schedule->command('sg:monthly-report')->monthlyOn(1, '09:00')->timezone('Africa/Tripoli');
         // تذكير الرف الأوتوماتيكي + تجهيز تذكير الديون (بتأكيد) + التقرير اليومي + النسخة الاحتياطية الأسبوعية
