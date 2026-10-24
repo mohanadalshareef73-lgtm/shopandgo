@@ -52,7 +52,7 @@
         <a href="?tab=account"><small>نقاطك</small><b style="color:var(--s7)">{{ $pts }}</b><i>{{ $pointsOn ? '= ' . $f($pts * $pointValue) . ' د.ل' : '' }}</i></a>
     </div>
     <div class="qa">
-        <a href="?tab=delivery"><span style="background:var(--up-bg);color:var(--up)">🚚</span>طلب توصيل</a>
+        @if (\App\Support\DeliveryLink::enabled())<a href="?tab=delivery"><span style="background:var(--up-bg);color:var(--up)">🚚</span>طلب توصيل</a>@endif
         <a href="?tab=problem"><span style="background:var(--down-bg);color:var(--down)">⚠</span>لدي مشكلة</a>
         <a href="?tab=addresses"><span style="background:var(--s1-bg)">📍</span>عناويننا</a>
         <a href="?tab=prices"><span style="background:var(--warn-bg)">💲</span>الأسعار</a>
@@ -65,7 +65,7 @@
         </div>
     @endforeach
     @if ($ready->count())
-        <a class="alert" href="?tab=delivery" style="background:var(--up-bg);color:var(--up)"><svg width="22" height="22"><use href="#i-check"/></svg><div class="tx"><b>وصلت بضاعتك 🎉</b>{{ $ready->pluck('code')->implode('، ') }} في الرف · يمكنك طلب التوصيل</div><svg width="18" height="18"><use href="#i-chev"/></svg></a>
+        <a class="alert" href="{{ \App\Support\DeliveryLink::enabled() ? '?tab=delivery' : '?tab=orders' }}" style="background:var(--up-bg);color:var(--up)"><svg width="22" height="22"><use href="#i-check"/></svg><div class="tx"><b>وصلت بضاعتك 🎉</b>{{ $ready->pluck('code')->implode('، ') }} في الرف{{ \App\Support\DeliveryLink::enabled() ? ' · يمكنك طلب التوصيل' : ' · جاهزة للاستلام من المقر' }}</div><svg width="18" height="18"><use href="#i-chev"/></svg></a>
     @endif
     @foreach ($feed->take(2) as $m)
         <div class="note-c" style="background:var(--s1-bg);color:#1d4f8f">💬 {{ $m->body }} @if ($m->code)<b class="num">· {{ $m->code }}</b>@endif<div style="font-size:11.5px;opacity:.8;margin-top:2px">{{ $m->t->diffForHumans() }}</div></div>
@@ -184,7 +184,7 @@
             @if ($d->status === 'requested')<form method="post" action="{{ route('portal.delivery.cancel', $d->id) }}" onsubmit="return confirm('إلغاء طلب التوصيل؟')" style="margin-top:8px">@csrf<button class="btn ghost sm" style="width:100%">إلغاء الطلب</button></form>@endif
         </div>
     @endforeach
-    @if (!($settings['portal_delivery_enabled'] ?? true))
+    @if (!\App\Support\DeliveryLink::enabled())
         <div class="empty2"><span>🚫</span>طلب التوصيل من الحساب غير متاح حالياً، تواصل معنا</div>
     @elseif (!$ready->count())
         <div class="empty2"><span>📦</span>لا توجد طلبيات جاهزة في الرف حالياً<br>عند وصول بضاعتك يمكنك طلب توصيلها من هنا</div>

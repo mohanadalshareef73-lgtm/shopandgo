@@ -85,7 +85,7 @@ class MessageService
             '{رابط_الموقع}' => config('app.url'),
             '{رابط_الحساب}' => rtrim((string) config('app.url'), '/') . '/login',
             // 🛵 رابط طلب مندوب (من غير دخول) — يطلع بس لو الطلبية ما تسلمتش
-            '{رابط_التوصيل}' => $order->id && !$order->delivered ? \App\Support\DeliveryLink::url($order) : '',
+            '{رابط_التوصيل}' => $order->id && !$order->delivered && \App\Support\DeliveryLink::enabled() ? \App\Support\DeliveryLink::url($order) : '',
             '{دخول_الحساب}' => $c ? static::loginText($c) : '',
             // القديمة
             '{{$customer->name}}' => optional($c)->name,
@@ -142,7 +142,37 @@ class MessageService
 
     public static function render(string $text, array $vars): string
     {
+        if (!\App\Support\DeliveryLink::enabled()) {
+            $text = static::stripDeliveryLink($text);
+        }
+
         return strtr($text, array_map(fn ($v) => (string) ($v ?? ''), $vars));
+    }
+
+    /** 🚫 طلب التوصيل موقوف: نشيلو سطر الرابط والسطر اللي قبله («اطلب مندوب من هني 👇») */
+    public static function stripDeliveryLink(string $text): string
+    {
+        if (!str_contains($text, '{رابط_التوصيل}')) {
+            return $text;
+        }
+        $lines = preg_split('/\R/u', $text);
+        $out = [];
+        foreach ($lines as $l) {
+            if (str_contains($l, '{رابط_التوصيل}')) {
+                $rest = trim(str_replace('{رابط_التوصيل}', '', $l));
+                $prev = end($out);
+                if ($prev !== false && (str_contains($prev, 'مندوب') || str_contains($prev, 'نوصل') || str_contains($prev, '🛵'))) {
+                    array_pop($out);
+                }
+                if ($rest !== '' && !str_contains($rest, 'مندوب') && !str_contains($rest, '🛵')) {
+                    $out[] = $rest;
+                }
+                continue;
+            }
+            $out[] = $l;
+        }
+
+        return trim(preg_replace("/\n{3,}/u", "\n\n", implode("\n", $out)));
     }
 
     /** يبعث قالب لزبون. يرجع true إذا أُرسلت. */

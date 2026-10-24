@@ -18,6 +18,10 @@ class DeliveryRequestController extends Controller
     protected function load(int $order, string $t): Order
     {
         abort_unless(DeliveryLink::check($order, $t), 404);
+        if (!DeliveryLink::enabled()) {
+            // 🚫 طلب التوصيل عبر المنظومة موقوف
+            abort(response()->view('portal.delivery-off', [], 200));
+        }
 
         return Order::with('customer')->findOrFail($order);
     }

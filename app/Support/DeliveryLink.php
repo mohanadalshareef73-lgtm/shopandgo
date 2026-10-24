@@ -7,6 +7,16 @@ use App\Models\Order;
 /** 🛵 رابط «اطلب مندوب» للعميل من رسالة الواتساب (من غير دخول) — رابط قصير بتوقيع سري */
 class DeliveryLink
 {
+    /** طلب التوصيل من الزبون (الرابط + حسابه) — يتقفل من الإعدادات */
+    public static function enabled(): bool
+    {
+        try {
+            return (bool) \App\Services\AppSettings::get('portal_delivery_enabled', false);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     public static function token(int $orderId): string
     {
         return substr(hash_hmac('sha256', 'deliv|' . $orderId, (string) config('app.key')), 0, 16);

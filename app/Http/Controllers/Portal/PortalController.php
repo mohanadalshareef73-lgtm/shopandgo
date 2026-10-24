@@ -189,7 +189,7 @@ class PortalController extends Controller
     /** العميل يطلب توصيل */
     public function requestDelivery(Request $request)
     {
-        abort_unless(AppSettings::get('portal_delivery_enabled', true), 403);
+        abort_unless(\App\Support\DeliveryLink::enabled(), 403);
         $c = $this->me();
         $data = $request->validate([
             'order_ids' => 'required|array|min:1', 'order_ids.*' => 'integer',
