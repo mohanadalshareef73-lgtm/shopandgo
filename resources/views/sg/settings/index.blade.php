@@ -132,6 +132,21 @@
     $gAll = collect($gSeen)->merge($gRecent)->filter(fn ($g) => !empty($g['id']))->keyBy('id');
     $gTest = (array) ($s['wa_group_test'] ?? []);
 @endphp
+@php
+    $dGrp = \App\Services\DeliveryGroup::group();
+    $gPick = collect((array) ($s['wa_groups_list'] ?? []))->merge($gAll)->filter(fn ($g) => is_array($g) && !empty($g['id']))->keyBy('id');
+@endphp
+<div class="card" style="max-width:820px;margin-top:12px">
+    <h3 style="margin:0 0 6px">🛵 قروب الدليفري</h3>
+    <div class="note" style="margin-bottom:10px">أي طلب توصيل (طلبية ولا عربون) تمشي بياناته لهذا القروب، وصورة إيصال المصرف لو دزها العميل. أسهل طريقة: حد ثاني يكتب <b>#دليفري</b> في القروب ويتسجل وحده.</div>
+    <div class="ln"><span>القروب الحالي: <b>{{ $dGrp['name'] ?? ($dGrp ? $dGrp['id'] : '— مش مسجل') }}</b> @if ($dGrp)<small class="note">{{ $dGrp['id'] }}</small>@endif</span>
+        @if ($dGrp)<form method="post" action="{{ route('sg.settings.group.test') }}" style="margin:0">@csrf<input type="hidden" name="id" value="{{ $dGrp['id'] }}"><button class="btn sm">🧪 جرب</button></form>@endif</div>
+    <form method="post" action="{{ route('sg.settings.dgroup') }}" style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">@csrf
+        <select name="id" class="inp" style="flex:1;min-width:220px"><option value="">— اختار القروب —</option>@foreach ($gPick as $id => $g)<option value="{{ $id }}" @selected(($dGrp['id'] ?? '') === $id)>{{ $g['name'] ?? $id }}</option>@endforeach</select>
+        <input name="manual" class="inp numr" style="width:240px" placeholder="أو ID القروب (‎…@g.us)">
+        <button class="btn">حفظ</button>
+    </form>
+</div>
 <div class="card" style="max-width:820px;margin-top:12px">
     <h3 style="margin:0 0 6px">🧪 تجربة قروب الحجز (منتظرة)</h3>
     <div class="note" style="margin-bottom:10px">1) خلّي <b>حد ثاني</b> (مش الرقم المربوط بواتسي) يكتب <b>#حجز</b> في قروب منتظرة · 2) حدّث الصفحة هذي · 3) لو طلع القروب تحت اضغط 🧪 جرب</div>

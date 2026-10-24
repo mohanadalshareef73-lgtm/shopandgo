@@ -169,6 +169,26 @@ class SettingsController extends Controller
     }
 
     /** شيل قروب واتساب من الحجز (من القائمة ومن أرقام الحجز) */
+    /** 🛵 قروب الدليفري (تمشيله طلبات التوصيل) */
+    public function deliveryGroup(Request $request)
+    {
+        abort_unless(auth()->user()->hasRole('Admin'), 403);
+        $id = trim((string) ($request->input('manual') ?: $request->input('id')));
+        if ($id === '') {
+            AppSettings::put(['delivery_group' => null]);
+
+            return back()->with('success', 'انشال قروب الدليفري');
+        }
+        if (!str_ends_with($id, '@g.us')) {
+            return back()->with('error', 'ID القروب لازم ينتهي بـ @g.us');
+        }
+        $known = (array) AppSettings::get('wa_groups_list', []) + (array) AppSettings::get('wa_groups_seen', []) + (array) AppSettings::get('wa_groups_recent', []);
+        $g = collect($known)->first(fn ($x) => is_array($x) && ($x['id'] ?? null) === $id) ?: [];
+        AppSettings::put(['delivery_group' => ['id' => $id, 'name' => $g['name'] ?? 'دليفري', 'session' => $g['session'] ?? null, 'at' => now()->toDateTimeString()]]);
+
+        return back()->with('success', '🛵 قروب الدليفري: ' . ($g['name'] ?? $id));
+    }
+
     public function groupRemove(Request $request)
     {
         $id = (string) $request->input('id');

@@ -145,9 +145,23 @@ class CartsController extends Controller
     public function courierSend(Request $request, int $id, string $t)
     {
         abort_unless(hash_equals(static::publicToken($id), $t), 404);
-        $data = $request->validate(['name' => 'required|string|max:120', 'phone' => 'required|string|max:20', 'address' => 'required|string|max:200',
-            'location_url' => 'nullable|string|max:500', 'note' => 'nullable|string|max:200'],
-            ['name.required' => 'اكتب اسمك', 'phone.required' => 'اكتب رقمك', 'address.required' => 'اكتب عنوانك']);
+        $data = $request->validate(['name' => 'required|string|max:120', 'phone' => 'required|string|max:20',
+            'city' => 'required|string|max:80', 'area' => 'required|string|max:120', 'address' => 'nullable|string|max:200',
+            'location_url' => 'nullable|string|max:500', 'note' => 'nullable|string|max:200',
+            'pay_type' => 'required|in:cash,bank', 'receipt' => 'nullable|required_if:pay_type,bank|file|mimes:jpg,jpeg,png,webp,pdf|max:6144'],
+            ['name.required' => 'اكتب اسمك', 'phone.required' => 'اكتب رقمك', 'city.required' => 'اكتب المدينة', 'area.required' => 'اكتب المنطقة',
+                'pay_type.required' => 'اختار طريقة الدفع', 'receipt.required_if' => 'ارفع صورة إيصال التحويل', 'receipt.mimes' => 'الإيصال لازم صورة أو PDF', 'receipt.max' => 'صورة الإيصال كبيرة (أقصى 6 ميقا)']);
+        $data['address'] = \App\Services\CourierService::withArea($data['area'], trim((string) ($data['address'] ?? '')));
+        $receipt = null;
+        if ($request->hasFile('receipt')) {
+            try {
+                $receipt = \App\Support\ImageShrink::store($request->file('receipt'), 'receipts', 'public');
+            } catch (\Throwable $e) {
+                report($e);
+
+                return back()->withInput()->with('error', 'ما قدرناش نحفظو صورة الإيصال، جرب صورة ثانية');
+            }
+        }
         $cart = CartQuote::findOrFail($id);
         abort_unless($cart->status === 'succeeded', 404);
         if (\App\Models\Delivery::where('cart_id', $cart->id)->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->exists()) {
@@ -197,6 +211,29 @@ class CartsController extends Controller
                 \App\Services\CourierService::cartCollectGuest($cart, $deposit, ['name' => trim($data['name']), 'phone' => $phone, 'address' => trim($data['address']),
                     'location_url' => $data['location_url'] ?? null, 'note' => $data['note'] ?? null]);
             }
+            // 🛵 بيانات التوصيل كاملة على الطلب (المدينة · المنطقة · الدفع · الإيصال) — تمشي لقروب الدليفري
+            $dlx = \App\Models\Delivery::where('cart_id', $cart->id)->whereIn('status', ['requested', 'assigned', 'out', 'problem'])->latest('id')->first();
+            if ($dlx) {
+                $dlx->city = $data['city'];
+                if (\App\Support\Fast::hasColumn('deliveries', 'area')) {
+                    $dlx->area = $data['area'];
+                }
+                $dlx->address = $data['address'];
+                $dlx->recipient_name = $dlx->recipient_name ?: trim($data['name']);
+                $dlx->recipient_phone = $phone;
+                $dlx->pay_type = $data['pay_type'];
+                $dlx->bank_receipt = $receipt ?: $dlx->bank_receipt;
+                if (\App\Support\Fast::hasColumn('deliveries', 'kind')) {
+                    $dlx->kind = 'deposit';
+                }
+                if (\App\Support\Fast::hasColumn('deliveries', 'zone') && \App\Services\CourierService::outsideBenghazi($data['city'], $data['address'])) {
+                    $dlx->zone = 'out';
+                }
+                $dlx->save();
+            }
+            if ($c) {
+                \App\Services\CourierService::rememberCity($c, $data['city'], $data['area']);
+            }
             \App\Models\Log::create(['user_id' => null, 'type' => 'cart', 'title' => ' يبي مندوب يستلم العربون (سلة #' . $cart->id . ')', 'log' => ' ' . $data['name'] . ' · ' . $data['phone'] . ' · عربون ' . $deposit]);
         } catch (\Throwable $e) {
             report($e);
@@ -204,7 +241,7 @@ class CartsController extends Controller
             return back()->withInput()->with('error', 'صار مشكل، جرب مرة ثانية ولا كلمنا على الواتساب');
         }
 
-        return redirect()->route('portal.cart.courier', ['id' => $id, 't' => $t])->with('success', '✅ وصلنا طلبك');
+        return redirect()->route('portal.cart.courier', ['id' => $id, 't' => $t])->with('success', \App\Http\Controllers\Portal\DeliveryRequestController::DONE_MSG);
     }
 
     /** رقم الإيصال بالأرقام والحروف بس (بدون فراغات وشرطات) */

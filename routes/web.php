@@ -126,7 +126,7 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
 
     Route::get('paid-print/{id}', [App\Http\Controllers\CustomerController::class, 'paidPrint'])->name('customer.paid.print');
 
-    Route::resource('trip', App\Http\Controllers\TripController::class);
+    Route::resource('trip', App\Http\Controllers\TripController::class)->names(['update' => 'trip.resource.update']); // الاسم trip.update لـ trip-update تحت (زي ما كان)
     Route::get('trip-onway/', [App\Http\Controllers\TripController::class, 'onway'])->name('trip.onway.index');
     Route::get('trip-delay/', [App\Http\Controllers\TripController::class, 'delay'])->name('trip.delay.index');
     Route::get('trip-arrived/', [App\Http\Controllers\TripController::class, 'arrived'])->name('trip.arrived.index');
@@ -507,6 +507,7 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::post('settings/group-remove', [$C . 'SettingsController', 'groupRemove'])->name('settings.group.remove');
         Route::post('settings/groups-fetch', [$C . 'SettingsController', 'groupsFetch'])->name('settings.groups.fetch');
         Route::post('settings/group-test', [$C . 'SettingsController', 'groupTest'])->name('settings.group.test');
+        Route::post('settings/delivery-group', [$C . 'SettingsController', 'deliveryGroup'])->name('settings.dgroup');
         Route::post('settings/payments', [$C . 'SettingsController', 'payment'])->name('settings.payment');
         Route::post('settings/payments/{payment}/toggle', [$C . 'SettingsController', 'paymentToggle'])->name('settings.payment.toggle');
         Route::post('settings/statuses', [$C . 'SettingsController', 'statuses'])->name('settings.statuses');

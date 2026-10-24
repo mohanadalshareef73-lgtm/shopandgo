@@ -53,10 +53,12 @@ class DeliveryRequestController extends Controller
         $o = $this->load($order, $t);
         $data = $request->validate([
             'name' => 'required|string|max:120', 'phone' => 'required|string|max:30', 'city' => 'required|string|max:80', 'area' => 'required|string|max:120',
-            'address' => 'required|string|max:250', 'location_url' => 'nullable|string|max:500', 'note' => 'nullable|string|max:500',
+            'address' => 'nullable|string|max:250', 'location_url' => 'nullable|string|max:500', 'note' => 'nullable|string|max:500',
+            'pay_type' => 'required|in:cash,bank', 'receipt' => 'nullable|required_if:pay_type,bank|file|mimes:jpg,jpeg,png,webp,pdf|max:6144',
             'ids' => 'nullable|array', 'ids.*' => 'integer',
-        ], ['name.required' => 'اكتب اسمك', 'phone.required' => 'اكتب رقم هاتفك', 'address.required' => 'اكتب العنوان', 'city.required' => 'اكتب المدينة', 'area.required' => 'اكتب المنطقة']);
-        $data['address'] = CourierService::withArea($data['area'], $data['address']);
+        ], ['name.required' => 'اكتب اسمك', 'phone.required' => 'اكتب رقم هاتفك', 'city.required' => 'اكتب المدينة', 'area.required' => 'اكتب المنطقة',
+            'pay_type.required' => 'اختار طريقة الدفع', 'receipt.required_if' => 'ارفع صورة إيصال التحويل', 'receipt.mimes' => 'الإيصال لازم صورة أو PDF', 'receipt.max' => 'صورة الإيصال كبيرة (أقصى 6 ميقا)']);
+        $data['address'] = CourierService::withArea($data['area'], $data['address'] ?? '');
         $c = $o->customer;
         abort_unless($c, 404);
         $ids = array_map('intval', $data['ids'] ?? [$o->id]);
@@ -64,16 +66,28 @@ class DeliveryRequestController extends Controller
         if ($orders->isEmpty()) {
             return back()->withInput()->with('error', 'الطلبية هذي مسجلة توصيلها قبل، أو تسلمت ✓');
         }
+        $receipt = null;
+        if ($request->hasFile('receipt')) {
+            try {
+                $receipt = \App\Support\ImageShrink::store($request->file('receipt'), 'receipts', 'public');
+            } catch (\Throwable $e) {
+                report($e);
+
+                return back()->withInput()->with('error', 'ما قدرناش نحفظو صورة الإيصال، جرب صورة ثانية');
+            }
+        }
         DB::beginTransaction();
         try {
-            // 🚚 خارج بنغازي: ما تمشيش للمندوب — تقعد في واجهة المندوبين «طلبيات خارج بنغازي» والإدارة تتصرف
-            $outside = CourierService::outsideBenghazi($data['city'] ?? null, $data['address'] ?? null);
-            $courier = $outside ? null : CourierService::autoPick($data['city'] ?? null); // أقرب مندوب متاح (لو فيه) — وإلا الإدارة تعيّنه
+            // 🛵 بدون مناديب: الطلب يقعد في «طلبيات دليفري» وبياناته تمشي لقروب الدليفري
             $dl = CourierService::assign($c, $orders, [
-                'recipient_name' => $data['name'], 'recipient_phone' => $data['phone'], 'city' => $data['city'] ?? null,
+                'recipient_name' => $data['name'], 'recipient_phone' => $data['phone'], 'city' => $data['city'], 'area' => $data['area'],
                 'address' => $data['address'], 'location_url' => $data['location_url'] ?? null,
-                'fee' => AppSettings::get('courier_default_fee', 0), 'pay_type' => 'cash', 'note' => $data['note'] ?? null,
-            ], $courier, 'customer');
+                'fee' => 0, 'pay_type' => $data['pay_type'], 'bank_receipt' => $receipt, 'note' => $data['note'] ?? null,
+            ], null, 'customer');
+            if (\App\Support\Fast::hasColumn('deliveries', 'kind')) {
+                $dl->kind = 'order';
+                $dl->saveQuietly();
+            }
             CourierService::rememberCity($c, $data['city'], $data['area']);
             if (!$c->address) {
                 $c->address = $data['address'];
@@ -90,7 +104,7 @@ class DeliveryRequestController extends Controller
             return back()->withInput()->with('error', 'صار خطأ، عاود جرب بعد شوية');
         }
         try {
-            \App\Services\AlertService::push('delivery_request', ($outside ? '🚚 طلب توصيل خارج بنغازي (' . $data['city'] . ') · ' : '🛵 طلب توصيل من الواتساب · ') . $dl->code, $c->name . ' · ' . $data['phone'] . ' · ' . $data['address'], route('sg.couriers', ['d' => $dl->id]), 'info', true);
+            \App\Services\AlertService::push('delivery_request', '🛵 طلب توصيل من الرابط · ' . $dl->code, $c->name . ' · ' . $data['phone'] . ' · ' . $data['city'] . ' - ' . $data['area'] . ($receipt ? ' · 🏦 دافع تحويل' : ''), route('sg.dispatch'), 'info');
         } catch (\Throwable $e) {
         }
         try {
@@ -98,6 +112,8 @@ class DeliveryRequestController extends Controller
         } catch (\Throwable $e) {
         }
 
-        return redirect()->route('deliv.req', ['order' => $o->id, 't' => $t])->with('success', '✅ وصلنا طلبك! المندوب بيتواصل معاك قريب');
+        return redirect()->route('deliv.req', ['order' => $o->id, 't' => $t])->with('success', self::DONE_MSG);
     }
+
+    public const DONE_MSG = '✅ تم تسجيل طلبك في قائمة التوصيل، سنتواصل معك قريباً';
 }

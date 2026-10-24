@@ -149,6 +149,12 @@ class WhatsAppWebhookController extends Controller
                     uasort($recent, fn ($x, $y) => strcmp($y['at'] ?? '', $x['at'] ?? ''));
                     \App\Services\AppSettings::put(['wa_groups_recent' => array_slice($recent, 0, 10, true)]);
                 }
+                // 🛵 قروب الدليفري: اللي ينكتب فيه #دليفري تمشيله طلبات التوصيل
+                if ($gid && (str_contains($text, '#دليفري') || str_contains(mb_strtolower($text), '#delivery'))) {
+                    $dname = $message['chat_name'] ?? $message['group_name'] ?? $message['group']['name'] ?? ($value['group']['subject'] ?? null);
+                    \App\Services\AppSettings::put(['delivery_group' => ['id' => $gid, 'name' => is_string($dname) ? mb_substr($dname, 0, 60) : 'دليفري', 'session' => $sessionUuid, 'at' => now()->toDateTimeString()]]);
+                    \App\Services\AlertService::push('backup', '🛵 تسجل قروب الدليفري', ($dname ?: $gid) . ' — طلبات التوصيل تمشيله من توا', route('sg.settings'));
+                }
                 if ($gid && (str_contains($text, '#حجز') || str_contains(mb_strtolower($text), '#booking'))) {
                     $seen = (array) \App\Services\AppSettings::get('wa_groups_seen', []);
                     $name = $message['chat_name'] ?? $message['group_name'] ?? $message['group']['name'] ?? ($value['group']['subject'] ?? null);

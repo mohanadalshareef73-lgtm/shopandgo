@@ -58,6 +58,10 @@ class CourierService
             'assigned_at' => $courier ? now() : null,
             'created_id' => auth('web')->id(),
         ]);
+        if (!empty($d['area']) && \App\Support\Fast::hasColumn('deliveries', 'area')) {
+            $dl->area = mb_substr((string) $d['area'], 0, 120);
+            $dl->saveQuietly();
+        }
         // 🚚 المدينة مش بنغازي (أو العنوان في مدينة ثانية) → تنزل في طلبيات خارج بنغازي
         if (\App\Support\Fast::hasColumn('deliveries', 'zone') && static::outsideBenghazi($dl->city, $dl->address)) {
             $dl->zone = 'out';
@@ -163,6 +167,9 @@ class CourierService
     /** نختارو مندوب أوتوماتيك: متاح، ومنطقته نفس المدينة لو فيه، والأقل شغل توا */
     public static function autoPick(?string $city = null): ?User
     {
+        if (!AppSettings::get('couriers_enabled', false)) {
+            return null; // 🚫 المناديب موقوفين — الطلب يقعد في واجهة الدليفري
+        }
         $q = User::where('type_id', 4)->where('status', true);
         if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'courier_available')) {
             $q->where('courier_available', true);
@@ -227,7 +234,7 @@ class CourierService
                 report($e);
             }
         }
-        AlertService::push('request', '🛵 تحصيل حجز سلة #' . $cart->id, $c->name . ' · ' . TreasuryService::fmt($dl->toCollect()) . ' د.ل (السلة ' . TreasuryService::fmt($amount) . ' + توصيل ' . TreasuryService::fmt($dl->customerFee()) . ')' . ($courier ? ' · مع ' . $courier->name : ' · ⚠ ما فيش مندوب متاح، عيّن واحد'), route('sg.couriers', $courier ? ['id' => $courier->id] : []), $courier ? 'info' : 'warn');
+        AlertService::push('request', '🛵 تحصيل حجز سلة #' . $cart->id, $c->name . ' · ' . TreasuryService::fmt($dl->toCollect()) . ' د.ل (السلة ' . TreasuryService::fmt($amount) . ' + توصيل ' . TreasuryService::fmt($dl->customerFee()) . ')' . ($courier ? ' · مع ' . $courier->name : ' · ⚠ ما فيش مندوب متاح، عيّن واحد'), route('sg.dispatch', $courier ? ['id' => $courier->id] : []), $courier ? 'info' : 'warn');
 
         return $dl;
     }
@@ -337,7 +344,7 @@ class CourierService
         }
         AlertService::push('request', '🛵 طلب مندوب لحجز سلة (عميل بدون حساب)',
             $d['name'] . ' · ' . $d['phone'] . ' · ' . ($d['address'] ?? '') . ' · سلة #' . $cart->id . ' · عربون ' . TreasuryService::fmt($amount) . ' د.ل' . ($courier ? ' · مع ' . $courier->name : ' · ⚠ ما فيش مندوب متاح، عيّن واحد'),
-            route('sg.couriers', $courier ? ['id' => $courier->id] : []), 'warn', true);
+            route('sg.dispatch', $courier ? ['id' => $courier->id] : []), 'warn', true);
 
         return $dl;
     }
@@ -631,7 +638,7 @@ class CourierService
             return;
         }
         $left = $dl->orders->sum(fn ($o) => max(0, $o->fresh()->remaining()));
-        AlertService::push('delivered', '✅ ' . optional($courier)->name . ' سلّم ' . $dl->code, $dl->recipient_name . ' · قبض ' . TreasuryService::fmt($cash + $bank) . ' د.ل' . ($left > 0.009 ? ' · باقي ' . TreasuryService::fmt($left) : '') . ($note ? ' · ' . $note : ''), route('sg.couriers', ['id' => $dl->courier_id]), 'ok');
+        AlertService::push('delivered', '✅ ' . optional($courier)->name . ' سلّم ' . $dl->code, $dl->recipient_name . ' · قبض ' . TreasuryService::fmt($cash + $bank) . ' د.ل' . ($left > 0.009 ? ' · باقي ' . TreasuryService::fmt($left) : '') . ($note ? ' · ' . $note : ''), route('sg.dispatch', ['id' => $dl->courier_id]), 'ok');
         static::notifyCustomer($dl->fresh(['orders', 'courier', 'customer']), 'courier_delivered');
     }
 
@@ -641,7 +648,7 @@ class CourierService
         $dl->problem = $text;
         $dl->save();
         $dl->log('problem', $text);
-        AlertService::push('problem', '⚠ مشكلة في توصيل ' . $dl->code, optional($dl->courier)->name . ': ' . $text . ' · ' . $dl->recipient_name . ' ' . $dl->recipient_phone, route('sg.couriers', ['id' => $dl->courier_id]), 'warn', true);
+        AlertService::push('problem', '⚠ مشكلة في توصيل ' . $dl->code, optional($dl->courier)->name . ': ' . $text . ' · ' . $dl->recipient_name . ' ' . $dl->recipient_phone, route('sg.dispatch', ['id' => $dl->courier_id]), 'warn', true);
     }
 
     /** عادت الطلبية للمحل: الإيصالات ترجع للرف */

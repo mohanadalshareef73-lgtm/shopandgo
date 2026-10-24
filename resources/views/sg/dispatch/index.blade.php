@@ -31,12 +31,12 @@ table.t td.w { white-space: normal; min-width: 110px; }
 @section('content')
 <div class="dp">
 <div class="top">
-    <div><h1>🛵 طلبيات دليفري</h1><div class="sub">اختار الزبائن الجاهزين ← اعطيهم لمندوب (بحساب ولا بالاسم) ← اطبع الكشف PDF</div></div>
-    <div class="acts"><a class="btn ghost" href="{{ route('sg.couriers') }}">المندوبين</a><button class="sg-burger">☰</button></div>
+    <div><h1>🛵 طلبيات دليفري</h1><div class="sub">طلبات العملاء من الرابط تنزل هني وتمشي لقروب الدليفري ← ✅ تم التسليم (طلبية) · ✓ تأكيد (عربون)</div></div>
+    <div class="acts"><button class="sg-burger">☰</button></div>
 </div>
 
 <div class="dtabs">
-    <a href="?tab=in" class="{{ $tab === 'in' ? 'on' : '' }}">🛵 مع المناديب ({{ (int) ($counts['in'] ?? 0) }})</a>
+    <a href="?tab=in" class="{{ $tab === 'in' ? 'on' : '' }}">🛵 بنغازي ({{ (int) ($counts['in'] ?? 0) }})</a>
     <a href="?tab=out" class="{{ $tab === 'out' ? 'on' : '' }}">🚚 خارج بنغازي ({{ (int) ($counts['out'] ?? 0) }})</a>
 </div>
 
@@ -60,40 +60,28 @@ table.t td.w { white-space: normal; min-width: 110px; }
 {{-- الطابور: منو مستلمها · علّم ← كشف / ترحيل / تعيين / رجوع --}}
 <form method="post" action="{{ route('sg.dispatch.bulk') }}" id="bk" class="card tw mb">
     @csrf <input type="hidden" name="a" id="bkA">
-    <div class="tw-h"><h3>{{ $tab === 'out' ? '🚚 طابور خارج بنغازي' : '🛵 طلبيات مع المناديب' }} <span class="h-note">{{ $queue->count() }} زبون · {{ $f($queue->sum('amount')) }} د.ل + توصيل {{ $f($queue->sum('fee')) }}</span></h3>
-        @foreach ($batches as $bt)<a class="btn ghost sm" target="_blank" href="{{ route('sg.dispatch.pdf', ['batch' => $bt]) }}">📄 {{ $bt }}</a>@endforeach
-    </div>
-    <div class="qbar" style="background:#fff">
-        @foreach (['wait' => '⏳ مازال ما استلمهاش مندوب', 'taken' => '🛵 استلمها مندوب', 'all' => 'الكل'] as $k => $lb)
-            <a class="btn sm {{ $fl === $k ? '' : 'ghost' }}" href="?tab={{ $tab }}&f={{ $k }}">{{ $lb }} <b class="num">({{ $fc[$k] }})</b></a>
-        @endforeach
+    <div class="tw-h"><h3>{{ $tab === 'out' ? '🚚 خارج بنغازي' : '🛵 قائمة الدليفري' }} <span class="h-note">{{ $queue->count() }} طلب · {{ $f($queue->sum('amount')) }} د.ل</span></h3>
+        @php $dGrp = \App\Services\DeliveryGroup::group(); @endphp
+        <span class="note" style="margin-inline-start:auto">{!! $dGrp ? '📤 قروب الدليفري: <b>' . e($dGrp['name'] ?? $dGrp['id']) . '</b>' : '<span style="color:var(--down)">⚠ قروب الدليفري مش مسجل — من الإعدادات</span>' !!}</span>
     </div>
     @if ($tab === 'out')
     <div class="qbar" style="background:#fff4e5">
         <input type="search" class="inp" style="width:220px" placeholder="🔍 كود شركة التوصيل / كود العميل" value="{{ $xq }}" onkeydown="if(event.key==='Enter'){event.preventDefault();location='?tab=out&xq='+encodeURIComponent(this.value)}">
         @if ($xq !== '')<a class="btn ghost sm" href="?tab=out">✕ مسح</a>@endif
-        <span class="sep"></span>
-        <label class="note">التحصيل في</label><select name="payment_id" id="payOut" class="inp">@foreach ($payments as $pm)<option value="{{ $pm->id }}" @selected($pm->id == $cashId)>{{ $pm->name }}</option>@endforeach</select>
-        <button type="button" class="btn sm" style="background:#e8590c;color:#fff" onclick="if(confirm('نحصّلو المختارين بقيمتهم كاملة؟ (بدون رسالة للعميل)'))bk('settle')">💰 تحصيل المختار</button>
     </div>
     @endif
     @if ($queue->count())
     <div class="qbar">
         <b>المختار: <span id="nq" class="num">0</span></b>
         <button type="button" class="btn sm" onclick="pdfSel()">📄 كشف PDF للمختار</button>
-        <button type="button" class="btn green sm" onclick="if(confirm('المختارين مستلمين بدون رسالة؟ الباقي يتسجل مقبوض كاش'))bk('silent')">✅ مستلمة (بدون رسالة)</button>
-        <button type="button" class="btn ghost sm" onclick="bk('{{ $tab === 'out' ? 'move_in' : 'move_out' }}')">{{ $tab === 'out' ? '🛵 ترحيل للمندوب' : '🚚 ترحيل خارج بنغازي' }}</button>
+        <button type="button" class="btn ghost sm" onclick="bk('{{ $tab === 'out' ? 'move_in' : 'move_out' }}')">{{ $tab === 'out' ? '🛵 ترحيل لبنغازي' : '🚚 ترحيل خارج بنغازي' }}</button>
         <span class="sep"></span>
-        <select name="courier_id" class="inp"><option value="">— مندوب —</option>@foreach ($couriers as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach</select>
-        <input name="courier_name" class="inp" style="width:150px" placeholder="✍ اسم المندوب">
-        <button type="button" class="btn sm" style="background:#262c4a;color:#fff" onclick="bk('courier')">🛵 استلمها المندوب</button>
         <button type="button" class="btn ghost sm" style="color:var(--down)" onclick="if(confirm('نرجعو المختارين للمحل والرف؟'))bk('back')">↩ للرف</button>
     </div>
     @endif
-    <div class="scroll-x"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.qk').forEach(x=>x.checked=this.checked);cq()"></th><th>إجراء</th><th>مع</th><th>الزبون</th><th>العنوان</th><th>الإيصالات · التخزين</th><th class="n">الباقي</th></tr></thead><tbody>
+    <div class="scroll-x"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.qk').forEach(x=>x.checked=this.checked);cq()"></th><th>إجراء</th><th>الدفع</th><th>الزبون</th><th>العنوان</th><th>الإيصالات · التخزين</th><th class="n">الباقي</th></tr></thead><tbody>
     @forelse ($queue as $d)
-        @php $who = $d->courier_name ?: optional($d->courier)->name; @endphp
-        <tr>
+            <tr>
             <td><input type="checkbox" class="qk" name="ids[]" value="{{ $d->id }}" onchange="cq()"></td>
             <td><div class="qa">
                 @php $ct = $d->cart_id ? ($carts[$d->cart_id] ?? null) : null; $done = $d->status === 'delivered'; @endphp
@@ -110,23 +98,26 @@ table.t td.w { white-space: normal; min-width: 110px; }
                     @if ($d->customer)<button type="button" class="btn ghost sm" data-copy="{{ $d->customer->code }}" onclick="cp(this)">⧉ كود العميل {{ $d->customer->code }}</button>@endif
                     <button type="button" class="btn green sm" title="إخفاء ← حجوزات متأكدة" onclick="ra({{ $d->id }}, 'hide')">✓</button>
                 @else
+                @php $isDep = $d->kind === 'deposit' || $d->cart_id || $d->deposit_order_id;
+                    $dj = ['id' => $d->id, 'code' => $d->code, 'name' => $d->recipient_name ?: optional($d->customer)->name, 'ccode' => optional($d->customer)->code, 'phone' => $ph($d->recipient_phone), 'city' => $d->city, 'area' => $d->area ?? null, 'address' => $d->address, 'note' => $d->note, 'amount' => round((float) $d->amount, 2), 'kind' => $isDep ? 'deposit' : 'order', 'pay_type' => $d->pay_type, 'cart' => $d->cart_id, 'what' => $d->cart_id ? 'سلة #' . $d->cart_id : $d->orders->pluck('code')->implode('، ')]; @endphp
+                @if ($isDep)<button type="button" class="btn sm" style="background:#0f8a5f;color:#fff" onclick='openDl("confirm", @json($dj))'>✓ تأكيد</button>
+                @else<button type="button" class="btn green sm" onclick='openDl("deliver", @json($dj))'>✅ تم التسليم</button>@endif
+                <button type="button" class="btn ghost sm" onclick='openEd(@json($dj))'>✏ تعديل</button>
                 <button type="button" class="btn ghost sm" onclick="const t=prompt('📝 الملاحظة اللي تبي تبعتها للعميل على الواتساب:');if(t&&t.trim())postTo(RA+{{ $d->id }},{a:'note',text:t})">📝 ملاحظة</button>
+                <button type="button" class="btn ghost sm" title="{{ !empty($d->group_sent_at) ? 'انبعت للقروب ' . \Carbon\Carbon::parse($d->group_sent_at)->format('m-d g:i a') : 'ما انبعتش للقروب' }}" onclick="postTo(RA+{{ $d->id }},{a:'resend'},'نبعتوه لقروب الدليفري{{ !empty($d->group_sent_at) ? ' مرة ثانية' : '' }}؟')">📤{{ !empty($d->group_sent_at) ? '✓' : '' }}</button>
                 @if ($tab === 'out')
                 <input class="inp" style="width:120px;height:28px;font-size:12.5px" placeholder="كود الشركة" value="{{ $d->ext_code }}" data-id="{{ $d->id }}" onchange="ext(this)">
-                <button type="button" class="btn sm" style="background:#e8590c;color:#fff" onclick="settle({{ $d->id }}, {{ (float) $d->amount + 0 }})">💰 تحصيل</button>
                 @endif
-                @if ($d->cart_id)<button type="button" class="btn sm" style="background:#0f8a5f;color:#fff" onclick="collect({{ $d->id }}, {{ (float) $d->amount + 0 }})">✓ تأكيد</button>
-                @else<button type="button" class="btn green sm" onclick="silentAmt({{ $d->id }}, {{ (float) $d->amount + 0 }}, {{ $d->kind === 'deposit' ? 1 : 0 }})">{{ $d->kind === 'deposit' ? '✅ قبض العربون' : '✅ مستلمة' }}</button>@endif
-                <button type="button" class="btn ghost sm" onclick="ra({{ $d->id }}, 'done', 'نفتحو صفحة التسليم باش تدير الدفع بنفسك؟')">💵 بالكاشير</button>
+                @if (!$isDep)<button type="button" class="btn ghost sm" onclick="ra({{ $d->id }}, 'done', 'نفتحو صفحة التسليم باش تدير الدفع بنفسك؟')">💵 بالكاشير</button>@endif
                 @if (!empty($probs[$d->id]))<button type="button" class="btn sm" style="background:#fde8e8;color:#c62828;font-weight:800" data-p="{{ implode("\n", $probs[$d->id]) }}" onclick="alert('⚠ المشكلة:\n\n'+this.dataset.p)">⚠ مشكلة ({{ count($probs[$d->id]) }})</button>@endif
-                @if ($d->kind === 'deposit')<a class="btn ghost sm" target="_blank" href="{{ route('sg.dispatch.receipt', $d) }}">🧾 إيصال</a>@endif
-                <button type="button" class="kd {{ $d->kind === 'deposit' ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $d->kind === 'deposit' ? '💵 عربون' : '📦 طلبية' }}</button>
+                @if ($isDep)<a class="btn ghost sm" target="_blank" href="{{ route('sg.dispatch.receipt', $d) }}">🧾 إيصال</a>@endif
+                <button type="button" class="kd {{ $isDep ? 'deposit' : 'order' }}" title="اضغط للتبديل" onclick="ra({{ $d->id }}, 'kind')">{{ $isDep ? '💵 عربون' : '📦 طلبية' }}</button>
                 @endif
                 <button type="button" class="btn ghost sm" style="color:#c62828" title="حذف" onclick="ra({{ $d->id }}, 'delete', 'نحذفوه نهائي؟ ما يرجعش{{ $d->orders->count() ? ' (الإيصالات ترجع للرف)' : '' }}')">🗑</button>
             </div></td>
-            <td><b>{{ $who ?: '— ما تعيّنش' }}</b>@if (!$d->courier_id && $d->courier_name)<small class="note" style="display:block">بدون حساب</small>@endif</td>
-            <td class="w"><b class="num">{{ optional($d->customer)->code }}</b> {{ optional($d->customer)->name ?: $d->recipient_name }}<small class="note num" style="display:block">{{ $ph($d->recipient_phone) }}</small>@if ($d->bank_receipt)<a class="chip u" target="_blank" href="{{ asset('storage/' . $d->bank_receipt) }}">📎 دافع تحويل</a>@endif</td>
-            <td class="w">{{ $d->address ?: '—' }}@if ($d->note)<small class="note" style="display:block">{{ \Illuminate\Support\Str::limit($d->note, 90) }}</small>@endif</td>
+            <td><b>{{ ['cash' => '💵 كاش', 'bank' => '🏦 مصرف', 'mixed' => '💵+🏦', 'paid' => '✅ مدفوعة'][$d->pay_type] ?? '—' }}</b>@if ($d->bank_receipt)<a class="chip u" style="display:inline-block;margin-top:3px" target="_blank" href="{{ asset('storage/' . $d->bank_receipt) }}">📎 الإيصال</a>@endif</td>
+            <td class="w"><b class="num">{{ optional($d->customer)->code }}</b> {{ optional($d->customer)->name ?: $d->recipient_name }}<small class="note num" style="display:block">{{ $ph($d->recipient_phone) }}</small></td>
+            <td class="w"><b>{{ trim(($d->city ?: '') . (($d->area ?? null) ? ' · ' . $d->area : '')) ?: '' }}</b>@if ($d->address)<small class="note" style="display:block">{{ $d->address }}</small>@endif @if ($d->note)<small class="note" style="display:block">{{ \Illuminate\Support\Str::limit($d->note, 90) }}</small>@endif</td>
             <td class="w num">@if ($d->cart_id)<b>🛒 حجز سلة #{{ $d->cart_id }}</b>@else{{ $d->orders->pluck('code')->implode('، ') ?: '—' }}@endif
                 @if ($d->kind !== 'deposit' && !$d->cart_id && $d->orders->count())<small style="display:block;color:#000;font-size:12px">🛍 أكياس: <b>{{ $d->orders->sum(fn ($o) => (int) $o->bags_num) ?: $d->parcels }}</b> · 🗄 الرف: <b>{{ $d->orders->pluck('storage_num')->filter()->unique()->implode('، ') ?: '—' }}</b></small>@endif
                 @foreach ($probs[$d->id] ?? [] as $pr)<small style="display:block;color:#c62828;font-weight:700">{{ $pr }}</small>@endforeach</td>
@@ -138,6 +129,41 @@ table.t td.w { white-space: normal; min-width: 110px; }
     </tbody></table></div>
 </form>
 <form method="post" id="rowAct" style="display:none">@csrf<input type="hidden" name="a" id="raA"></form>
+
+<div class="modal-bg" id="mDl"><div class="modal" style="max-width:460px">
+    <h3 id="dlT">✅ تم التسليم</h3>
+    <div class="hint mb" id="dlI"></div>
+    <form method="post" id="dlF">@csrf<input type="hidden" name="a" id="dlA">
+        <div class="grid g2">
+            <div class="f"><label class="l" id="dlAL">دفع كم؟ (د.ل)</label><input name="amount" id="dlAm" class="inp numr" inputmode="decimal" required></div>
+            <div class="f"><label class="l">نوع الدفع</label><select name="payment_id" id="dlP" class="inp">@foreach ($payments as $pm)<option value="{{ $pm->id }}" @selected($pm->id == $cashId)>{{ $pm->name }}</option>@endforeach</select></div>
+        </div>
+        <div class="f"><label class="l">ملاحظة (اختياري)</label><input name="note" class="inp" placeholder="مثلاً: سلّمها فلان · الباقي دين"></div>
+        <div class="note mb" id="dlH"></div>
+        <div style="display:flex;gap:8px"><button class="btn green" id="dlB">✅ تم التسليم</button><button type="button" class="btn ghost" data-close>إلغاء</button></div>
+    </form>
+</div></div>
+
+<div class="modal-bg" id="mEd"><div class="modal" style="max-width:560px">
+    <h3>✏ تعديل الدليفري <span class="num" id="edC"></span></h3>
+    <form method="post" id="edF">@csrf<input type="hidden" name="a" value="edit">
+        <div class="grid g2">
+            <div class="f"><label class="l">الاسم</label><input name="recipient_name" id="edN" class="inp"></div>
+            <div class="f"><label class="l">الهاتف</label><input name="recipient_phone" id="edPh" class="inp numr"></div>
+            <div class="f"><label class="l">المدينة</label><input name="city" id="edCt" class="inp" list="lyCities"></div>
+            <div class="f"><label class="l">المنطقة</label><input name="area" id="edAr" class="inp"></div>
+        </div>
+        <div class="f"><label class="l">العنوان</label><input name="address" id="edAd" class="inp"></div>
+        <div class="grid g2">
+            <div class="f"><label class="l" id="edAmL">القيمة (د.ل)</label><input name="amount" id="edAm" class="inp numr" inputmode="decimal"></div>
+            <div class="f"><label class="l">نوع الدفع</label><select name="pay_type" id="edPt" class="inp"><option value="cash">💵 كاش</option><option value="bank">🏦 مصرف</option><option value="mixed">💵+🏦</option><option value="paid">✅ مدفوعة</option></select></div>
+            <div class="f"><label class="l">نوع الطلب</label><select name="kind" id="edK" class="inp"><option value="order">📦 طلبية</option><option value="deposit">💵 عربون</option></select></div>
+        </div>
+        <div class="f"><label class="l">ملاحظة</label><input name="note" id="edNt" class="inp"></div>
+        <div style="display:flex;gap:8px"><button class="btn">حفظ</button><button type="button" class="btn ghost" data-close>إلغاء</button></div>
+    </form>
+</div></div>
+@include('sg.partials.cities')
 
 {{-- الجاهز في الرف --}}
 <form method="post" action="{{ route('sg.dispatch.assign') }}" id="asg" class="card tw">
@@ -163,12 +189,8 @@ table.t td.w { white-space: normal; min-width: 110px; }
     </tbody></table></div>
     <div class="abar">
         <b>المختار: <span id="nsel" class="num">0</span></b>
-        <select name="zone" class="inp"><option value="in" @selected($tab === 'in')>🛵 مع مندوب</option><option value="out" @selected($tab === 'out')>🚚 خارج بنغازي</option></select>
-        <select name="courier_id" class="inp"><option value="">— مندوب بحساب —</option>@foreach ($couriers as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach</select>
-        <span class="note">ولا</span>
-        <input name="courier_name" class="inp" style="width:160px" placeholder="اكتب اسم المندوب">
-        <label class="note">توصيل للكل <input name="fee" class="inp numr" style="width:70px" value="{{ $defFee + 0 }}" oninput="document.querySelectorAll('.fc').forEach(x=>x.value=this.value)"> د.ل</label>
-        <button class="btn green" style="margin-inline-start:auto">✓ تعيين وطباعة الكشف</button>
+        <select name="zone" class="inp"><option value="in" @selected($tab === 'in')>🛵 بنغازي</option><option value="out" @selected($tab === 'out')>🚚 خارج بنغازي</option></select>
+        <button class="btn green" style="margin-inline-start:auto">➕ أضف لقائمة الدليفري</button>
     </div>
 </form>
 </div>
@@ -191,5 +213,21 @@ function settle(id,amt){const v=prompt('كم سلمتلك شركة التوصي�
   const p=document.getElementById('payOut');postTo(RA+id,{a:'settle',amount:n,payment_id:p?p.value:''})}
 function cp(b){navigator.clipboard.writeText(b.dataset.copy||'');const t=b.textContent;b.textContent='✓ تنسخ';setTimeout(()=>b.textContent=t,1500)}
 function silentAmt(id,amt,dep){const v=prompt(dep?'كم قبض المندوب من العربون؟':'كم دفع العميل؟ (بدون رسالة للعميل — يطلعلك الإيصال)',amt);if(v===null)return;const n=parseFloat(v);if(isNaN(n)||n<0){alert('اكتب رقم صحيح');return}postTo(RA+id,{a:'silent',amount:n})}
-function cnt(){document.getElementById('nsel').textContent=document.querySelectorAll('.pk:checked').length}</script>
+function cnt(){document.getElementById('nsel').textContent=document.querySelectorAll('.pk:checked').length}
+const CASH = {{ (int) $cashId }};
+function openDl(a,d){const dep=a==='confirm';document.getElementById('dlF').action=RA+d.id;document.getElementById('dlA').value=a;
+  document.getElementById('dlT').textContent=dep?'✓ تأكيد العربون':'✅ تم التسليم';
+  document.getElementById('dlB').textContent=dep?'✓ تأكيد':'✅ تم التسليم';
+  document.getElementById('dlAL').textContent=dep?'العربون اللي دفعه (د.ل)':'دفع كم؟ (د.ل)';
+  document.getElementById('dlI').innerHTML='<b>'+(d.ccode||'')+'</b> '+(d.name||'')+' · '+(d.what||'')+'<br>'+(dep?'العربون':'الباقي')+': <b class="num">'+d.amount+'</b> د.ل';
+  document.getElementById('dlH').textContent=dep?(d.cart?'يتعمل الإيصال، تتحجز السلة في قروب منتظرة، ويطلعلك الإيصال للطباعة':'الدفعة تتسجل على الإيصال (البضاعة تقعد في الرف) ويطلعلك الإيصال'):'الإيصالات تصير مستلمة والمبلغ يدخل الخزينة · لو دفع أقل يقعد الباقي دين · يطلعلك إيصال التسليم';
+  document.getElementById('dlAm').value=d.amount;const p=document.getElementById('dlP');
+  if(d.pay_type==='bank'){const o=[...p.options].find(x=>+x.value!==CASH);if(o)p.value=o.value}else p.value=CASH;
+  document.getElementById('mDl').classList.add('open')}
+function openEd(d){document.getElementById('edF').action=RA+d.id;document.getElementById('edC').textContent=d.code;
+  const v={edN:d.name,edPh:d.phone,edCt:d.city,edAr:d.area,edAd:d.address,edAm:d.amount,edNt:d.note,edPt:d.pay_type||'cash',edK:d.kind};
+  for(const k in v){document.getElementById(k).value=v[k]??''}
+  document.getElementById('edAmL').textContent=d.kind==='deposit'?'العربون (د.ل)':'الباقي (د.ل)';
+  document.getElementById('mEd').classList.add('open')}
+</script>
 @endsection

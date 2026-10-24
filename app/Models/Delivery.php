@@ -14,6 +14,14 @@ class Delivery extends Model
 
     protected static function booted()
     {
+        // 🛵 أي طلب توصيل جديد (طلبية ولا عربون) يمشي لقروب «دليفري» بعد ما يكمل يتسجل
+        static::created(function (Delivery $d) {
+            try {
+                \App\Services\DeliveryGroup::later((int) $d->id);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        });
         // 🛵 أول ما توصيلة تتعين لمندوب (جديدة أو تبدل المندوب): تجيه رسالة واتساب طول
         static::saved(function (Delivery $d) {
             try {

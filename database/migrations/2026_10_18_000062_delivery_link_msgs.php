@@ -11,7 +11,7 @@ return new class extends Migration {
         if (!Schema::hasTable('whatsapp_messages') || !Schema::hasColumn('whatsapp_messages', 'type')) {
             return;
         }
-        $line = "🛵 تبي نوصلوهولك لباب بيتك؟ اطلب مندوب من هني 👇\n{رابط_التوصيل}";
+        $line = "🛵 تبي نوصلوهولك لباب بيتك؟ اطلب توصيل من هني 👇\n{رابط_التوصيل}";
         foreach (['ship_arrived', 'arrived'] as $type) {
             $row = DB::table('whatsapp_messages')->where('type', $type)->first();
             if (!$row || str_contains((string) $row->message, '{رابط_التوصيل}')) {

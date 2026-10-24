@@ -29,6 +29,9 @@ class CouriersController extends Controller
 
     public function index(Request $request)
     {
+        if (!\App\Services\AppSettings::get('couriers_enabled', false) && !$request->boolean('old')) {
+            return redirect()->route('sg.dispatch'); // 🚫 المناديب موقوفين: كل شي في «طلبيات دليفري»
+        }
         $couriers = CourierService::couriers();
         $bal = $couriers->mapWithKeys(fn ($c) => [$c->id => CourierService::balance($c)]);
         $requests = Delivery::with(['customer', 'orders'])->where('status', 'requested')->latest()->get();

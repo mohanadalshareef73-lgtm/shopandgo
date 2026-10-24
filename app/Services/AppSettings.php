@@ -46,7 +46,8 @@ class AppSettings
         // التوصيل والمندوبين
         'courier_default_fee' => 10,
         'courier_alert_whatsapp' => false, // ابعث تنبيه المشاكل لأرقام التقارير
-        'portal_delivery_enabled' => false, // الزبون يقدر يطلب توصيل من حسابه
+        'portal_delivery_enabled' => true,
+        'couriers_enabled' => false, // 🛵 المناديب موقوفين: ما فيش تعيين أوتوماتيك ولا واجهة مندوب // الزبون يقدر يطلب توصيل من حسابه
         'points_mode' => 'money',          // money · coupon · both
         'coupon_points' => 100,            // نقاط مقابل كوبون
         'coupon_percent' => 10,            // نسبة خصم الكوبون

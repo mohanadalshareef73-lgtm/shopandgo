@@ -159,7 +159,7 @@ class PortalController extends Controller
         $d->rated_at = now();
         $d->save();
         if ($data['rating'] <= 2) {
-            AlertService::push('low_rating', '🛵 تقييم منخفض للمندوب ' . optional($d->courier)->name, $d->code . ' · ' . $data['rating'] . '/5 · ' . ($data['note'] ?? ''), route('sg.couriers'), 'warning');
+            AlertService::push('low_rating', '🛵 تقييم منخفض للمندوب ' . optional($d->courier)->name, $d->code . ' · ' . $data['rating'] . '/5 · ' . ($data['note'] ?? ''), route('sg.dispatch'), 'warning');
         }
 
         return back()->with('success', 'شكراً على تقييمك 🙏');
@@ -232,7 +232,7 @@ class PortalController extends Controller
             $plan = (float) ($data['plan_cash'] ?? 0) + (float) ($data['plan_bank'] ?? 0);
             $dl = CourierService::assign($c, $orders, [
                 'recipient_name' => $data['recipient_name'], 'recipient_phone' => $data['recipient_phone'], 'recipient_phone2' => $data['recipient_phone2'] ?? null,
-                'city' => $data['city'] ?? null, 'address' => \App\Services\CourierService::withArea($data['area'] ?? null, $data['address']), 'location_url' => $data['location_url'] ?? null,
+                'city' => $data['city'] ?? null, 'area' => $data['area'] ?? null, 'address' => \App\Services\CourierService::withArea($data['area'] ?? null, $data['address']), 'location_url' => $data['location_url'] ?? null,
                 'plan_cash' => $data['plan_cash'] ?? 0, 'plan_bank' => $data['plan_bank'] ?? 0, 'bank_payment_id' => $data['bank_payment_id'] ?? null,
                 'pay_type' => ($data['plan_bank'] ?? 0) > 0 ? (($data['plan_cash'] ?? 0) > 0 ? 'mixed' : 'bank') : 'cash',
                 'fee' => AppSettings::get('courier_default_fee', 0), 'note' => $data['note'] ?? null,
@@ -266,10 +266,10 @@ class PortalController extends Controller
                 $auto = null;
             }
         }
-        AlertService::push('request', '🛵 طلب توصيل من ' . $c->name, $orders->pluck('code')->implode('، ') . ' · ' . $data['address'] . ' · نقداً ' . TreasuryService::fmt($data['plan_cash'] ?? 0) . ' / مصرف ' . TreasuryService::fmt($data['plan_bank'] ?? 0), route('sg.couriers'), 'info', true);
+        AlertService::push('request', '🛵 طلب توصيل من ' . $c->name, $orders->pluck('code')->implode('، ') . ' · ' . $data['address'] . ' · نقداً ' . TreasuryService::fmt($data['plan_cash'] ?? 0) . ' / مصرف ' . TreasuryService::fmt($data['plan_bank'] ?? 0), route('sg.dispatch'), 'info', true);
         MessageService::sendTemplate('delivery_request', $c, MessageService::orderVars($orders->first(), ['{رقم_الإيصال}' => $orders->pluck('code')->implode('، ')]), $orders->first());
 
-        return redirect()->route('customer.dashboard', ['tab' => 'delivery'])->with('success', 'تم استلام طلب التوصيل ' . $dl->code . ' ✅ ' . ($auto ? 'المندوب ' . $auto->name . ' بيتواصل معاك' : 'سيتم إسناده لمندوب والتواصل معك'));
+        return redirect()->route('customer.dashboard', ['tab' => 'delivery'])->with('success', \App\Http\Controllers\Portal\DeliveryRequestController::DONE_MSG);
     }
 
     public function cancelRequest(int $id)

@@ -23,6 +23,11 @@ class CourierMiddleware
         if ((int) $u->type_id !== 4) {
             return redirect()->route('admin.home');
         }
+        if (!\App\Services\AppSettings::get('couriers_enabled', false)) {
+            Auth::logout();
+
+            return redirect()->route('admin.login')->with('error', 'واجهة المندوب موقوفة');
+        }
 
         return $next($request);
     }

@@ -67,7 +67,7 @@ class DispatchController extends Controller
         // 🛵 فرز: استلمها مندوب · مازال
         $taken = fn ($d) => $d->courier_id || $d->courier_name;
         $fc = ['all' => $queue->count(), 'taken' => $queue->filter($taken)->count(), 'wait' => $queue->reject($taken)->count()];
-        $fl = in_array($request->f, ['taken', 'all', 'wait'], true) ? $request->f : (trim((string) $request->xq) !== '' ? 'all' : 'wait'); // الافتراضي: اللي مازال ما خذاهاش مندوب
+        $fl = 'all'; // 🛵 بدون مناديب: الكل يبان
         if ($fl !== 'all') {
             $queue = ($fl === 'taken' ? $queue->filter($taken) : $queue->reject($taken))->values();
         }
@@ -134,9 +134,6 @@ class DispatchController extends Controller
         ]);
         $courier = !empty($d['courier_id']) ? User::where('type_id', 4)->find($d['courier_id']) : null;
         $name = trim((string) ($d['courier_name'] ?? ''));
-        if (!$courier && $name === '' && $d['zone'] === 'in') {
-            return back()->with('error', 'اختار مندوب ولا اكتب اسمه');
-        }
         $batch = 'T-' . now()->format('md-Hi');
         $made = collect();
         DB::transaction(function () use ($d, $courier, $name, $batch, &$made) {
@@ -172,13 +169,15 @@ class DispatchController extends Controller
         Cache::forget('sg.badge.courier');
 
         return redirect()->route('sg.dispatch', ['tab' => $d['zone']])
-            ->with('success', '✓ ' . $made->count() . ' زبون مع ' . ($courier ? $courier->name : ($name ?: 'طابور خارج بنغازي')))
-            ->with('print_url', route('sg.dispatch.pdf', ['batch' => $batch]));
+            ->with('success', '✓ ' . $made->count() . ' زبون نزلو في قائمة الدليفري' . ($d['zone'] === 'out' ? ' (خارج بنغازي)' : '') . ' وانبعتو لقروب الدليفري');
     }
 
     /** إجراء على توصيل في الطابور: نوع · تحويل · تغيير المندوب · سلّم · رجّع */
     public function act(Request $request, Delivery $delivery)
     {
+        if (in_array($request->input('a'), ['deliver', 'confirm', 'edit', 'resend'], true)) {
+            return $this->act2($request, $delivery);
+        }
         $d = $request->validate(['a' => 'required|in:kind,move,courier,done,back,fee,silent,collect,ext,settle,note,hide,problem,delete,restore', 'text' => 'nullable|string|max:1000', 'amount' => 'nullable|numeric|min:0', 'ext_code' => 'nullable|string|max:60', 'payment_id' => 'nullable|integer', 'courier_id' => 'nullable|integer', 'courier_name' => 'nullable|string|max:100', 'fee' => 'nullable|numeric|min:0']);
         if ($d['a'] === 'delete') {
             if ($delivery->status === 'delivered') {
@@ -400,6 +399,219 @@ class DispatchController extends Controller
         }
 
         return back();
+    }
+
+    /**
+     * 🛵 الدليفري بدون مناديب:
+     *  deliver = ✅ تم التسليم (طلبية): نسجلو شن دفع ونوع الدفع ← الإيصالات مستلمة ← إيصال التسليم
+     *  confirm = ✓ تأكيد (عربون): الدفعة ← إيصال ← سلة؟ تنحجز في قروب منتظرة
+     *  edit    = ✏ تعديل البيانات والقيمة · resend = 📤 نبعتوه لقروب الدليفري مرة ثانية
+     */
+    protected function act2(Request $request, Delivery $delivery)
+    {
+        $d = $request->validate([
+            'a' => 'required|in:deliver,confirm,edit,resend', 'amount' => 'nullable|numeric|min:0', 'payment_id' => 'nullable|integer|exists:payment_methods,id',
+            'note' => 'nullable|string|max:500', 'recipient_name' => 'nullable|string|max:120', 'recipient_phone' => 'nullable|string|max:30',
+            'city' => 'nullable|string|max:80', 'area' => 'nullable|string|max:120', 'address' => 'nullable|string|max:250',
+            'kind' => 'nullable|in:order,deposit', 'pay_type' => 'nullable|in:cash,bank,mixed,paid',
+        ]);
+        if ($d['a'] === 'resend') {
+            $ok = \App\Services\DeliveryGroup::post($delivery->id, true);
+
+            return back()->with($ok ? 'success' : 'error', $ok ? '📤 انبعت لقروب الدليفري' : 'ما وصلش للقروب — شوف «قروب الدليفري» في الإعدادات');
+        }
+        if ($d['a'] === 'edit') {
+            $old = $delivery->only(['recipient_name', 'recipient_phone', 'city', 'area', 'address', 'note', 'amount', 'kind', 'pay_type']);
+            foreach (['recipient_name', 'recipient_phone', 'city', 'address', 'note', 'pay_type'] as $k) {
+                if ($request->has($k)) {
+                    $delivery->$k = $d[$k] ?? null;
+                }
+            }
+            if ($request->has('area') && \App\Support\Fast::hasColumn('deliveries', 'area')) {
+                $delivery->area = $d['area'] ?? null;
+            }
+            if ($request->filled('amount')) {
+                $delivery->amount = round((float) $d['amount'], 2);
+            }
+            if (!empty($d['kind'])) {
+                $delivery->kind = $d['kind'];
+            }
+            if (\App\Support\Fast::hasColumn('deliveries', 'zone')) {
+                $delivery->zone = static::outside($delivery->city, $delivery->address) ? 'out' : 'in';
+            }
+            $delivery->save();
+            $ch = collect($delivery->only(array_keys($old)))->filter(fn ($v, $k) => (string) $v !== (string) ($old[$k] ?? ''))->keys()->implode('، ');
+            $delivery->log($delivery->status, '✏ تعديل: ' . ($ch ?: 'بدون تغيير'));
+            Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' تعديل دليفري ' . $delivery->code, 'log' => ' ' . $ch]);
+
+            return back()->with('success', '✏ تحفظت بيانات ' . $delivery->code);
+        }
+        abort_unless($delivery->isOpen(), 422, 'التوصيل هذا مقفول');
+        $pid = (int) ($d['payment_id'] ?? AppSettings::cashPaymentId());
+        $amount = $request->filled('amount') ? round((float) $d['amount'], 2) : null;
+        $note = trim((string) ($d['note'] ?? ''));
+        $isDep = $delivery->kind === 'deposit' || $delivery->cart_id || $delivery->deposit_order_id;
+
+        if ($d['a'] === 'deliver') {
+            if ($isDep) {
+                return back()->with('error', 'هذا عربون — استعمل «✓ تأكيد»');
+            }
+            $oids = $delivery->orders->where('delivered', false)->pluck('id')->implode(',');
+            try {
+                $got = $this->payAndClose($delivery, $pid, $amount, $note, true);
+            } catch (\Throwable $e) {
+                report($e);
+
+                return back()->with('error', 'ما تمش: ' . $e->getMessage());
+            }
+
+            return back()->with('success', '✅ ' . (optional($delivery->customer)->name ?: $delivery->recipient_name) . ' تسلّم · دفع ' . TS::fmt($got) . ' د.ل')
+                ->with('print_url', $oids !== '' ? route('sg.delivery.slip', ['ids' => $oids, 'paid' => $got]) : null);
+        }
+
+        // ✓ تأكيد عربون
+        if ($delivery->cart_id) {
+            $cart = \App\Models\CartQuote::find($delivery->cart_id);
+            if (!$cart) {
+                return back()->with('error', 'السلة #' . $delivery->cart_id . ' مش موجودة');
+            }
+            $hadOrder = !empty($cart->order_id) && Order::find($cart->order_id);
+            $paid = $amount ?? round((float) $delivery->amount, 2);
+            session()->forget(['error', 'success']);
+            $req2 = Request::create('', 'POST', ['paid' => $paid, 'payment_id' => $pid]);
+            $req2->setUserResolver($request->getUserResolver());
+            try {
+                app(\App\Http\Controllers\Sg\PortalCartsController::class)->confirmBook($req2, $cart, app(\App\Services\SheinQuotationPdf::class));
+            } catch (\Throwable $e) {
+                report($e);
+
+                return back()->with('error', 'ما تأكدش: ' . mb_substr($e->getMessage(), 0, 200));
+            }
+            if ($err = session()->pull('error')) {
+                session()->forget('success');
+
+                return back()->with('error', $err);
+            }
+            $msg = (string) session()->pull('success');
+            $cart = $cart->fresh();
+            $o = $cart->order_id ? Order::find($cart->order_id) : null;
+            if ($hadOrder && $o && $paid > 0.009) {
+                \App\Services\OrderPaymentService::pay($o, $paid, $pid, 'عربون · دليفري ' . $delivery->code);
+                $cart->paid_amount = round((float) $cart->paid_amount + $paid, 2);
+                $cart->paid_at = now();
+                $cart->save();
+            }
+            $this->closeDelivery($delivery, $pid, $paid, '✓ تأكيد عربون حجز سلة #' . $cart->id . ($note ? ' · ' . $note : ''));
+            $r = back()->with('success', $msg ?: ('✓ تأكد حجز السلة #' . $cart->id));
+
+            return $o ? $r->with('print_url', route('order.invoice', $o->code)) : $r;
+        }
+        $o = $delivery->deposit_order_id ? Order::find($delivery->deposit_order_id) : $delivery->orders->first();
+        if (!$o) {
+            return back()->with('error', 'ما فيش إيصال مربوط بالعربون هذا');
+        }
+        try {
+            $got = $this->payAndClose($delivery, $pid, $amount ?? round((float) $delivery->amount, 2), $note, false);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->with('error', 'ما تمش: ' . $e->getMessage());
+        }
+        // 📤 الإيصال من سلة؟ تنحجز في قروب منتظرة
+        $grp = '';
+        $cart = \App\Models\CartQuote::where('order_id', $o->id)->whereNotNull('source_url')->latest('id')->first();
+        if ($cart && $cart->status === 'succeeded') {
+            session()->forget(['error', 'success']);
+            try {
+                app(\App\Http\Controllers\Sg\PortalCartsController::class)->orderToGroup($request->duplicate([], []), $o, app(\App\Services\SheinQuotationPdf::class));
+                $grp = session()->has('error') ? ' · ⚠ ما وصلش لقروب منتظرة' : ' · 📤 انبعت لقروب منتظرة';
+            } catch (\Throwable $e) {
+                report($e);
+                $grp = ' · ⚠ ما وصلش لقروب منتظرة';
+            }
+            session()->forget(['error', 'success']);
+        }
+
+        return back()->with('success', '✓ تأكد العربون ' . TS::fmt($got) . ' د.ل على الإيصال ' . $o->code . $grp)->with('print_url', route('order.invoice', $o->code));
+    }
+
+    /** الدفعة تدخل الخزينة (حسب نوع الدفع) · طلبية: الإيصالات تتسلم · عربون: دفعة بس والبضاعة تقعد */
+    protected function payAndClose(Delivery $dl, int $pid, ?float $amount, string $note, bool $deliver): float
+    {
+        $was = \App\Services\CustomerNotify::$enabled;
+        \App\Services\CustomerNotify::$enabled = false;
+        $got = 0;
+        try {
+            DB::transaction(function () use ($dl, $pid, $amount, $note, $deliver, &$got) {
+                $dl->loadMissing('orders');
+                $tag = 'دليفري ' . $dl->code . ($note ? ' · ' . $note : '');
+                $orders = $dl->deposit_order_id ? Order::whereKey($dl->deposit_order_id)->get() : $dl->orders->where('delivered', false)->values();
+                $left = $amount !== null ? $amount : ($deliver ? round($orders->sum(fn ($o) => max(0, $o->remaining())), 2) : round((float) $dl->amount, 2));
+                foreach ($orders as $o) {
+                    if ($left <= 0.009) {
+                        break;
+                    }
+                    $take = $deliver ? round(min($left, max(0, $o->remaining())), 2) : $left;
+                    if ($take > 0.009) {
+                        \App\Services\OrderPaymentService::pay($o, $take, $pid, $tag);
+                        $left -= $take;
+                        $got += $take;
+                    }
+                }
+                if ($deliver && $left > 0.009 && ($first = $orders->first())) {
+                    // دفع أكثر من الباقي: الزيادة على أول إيصال (تقعد رصيد له)
+                    \App\Services\OrderPaymentService::pay($first->fresh(), $left, $pid, $tag . ' · زيادة');
+                    $got += $left;
+                    $left = 0;
+                }
+                foreach ($dl->orders as $o) {
+                    if ($o->delivered) {
+                        continue;
+                    }
+                    if (!$deliver) {
+                        if ((int) $o->delivery_id === (int) $dl->id) {
+                            $o->delivery_id = null;
+                            $o->save();
+                        }
+                        continue;
+                    }
+                    $o = $o->fresh();
+                    $o->delivered = true;
+                    $o->delivered_at = now()->toDateString();
+                    $o->delivered_time = now();
+                    $o->delivered_by = auth()->id();
+                    $o->delivery_type = ($dl->zone ?? null) === 'out' ? 'توصيل عن طريق مكتب' : 'توصيل عن طريق مندوب'; // القيم المسموحة في الداتابيز
+                    $o->delivery_name = null;
+                    $o->delivery_id = $dl->id;
+                    $o->save();
+                }
+                $this->closeDelivery($dl, $pid, $got, ($deliver ? '✅ تم التسليم' : '✓ تأكيد عربون') . ' · ' . TS::fmt($got) . ' د.ل' . ($note ? ' · ' . $note : ''));
+            });
+        } finally {
+            \App\Services\CustomerNotify::$enabled = $was;
+        }
+        Cache::forget('sg.badge.ready');
+        Cache::forget('sg.badge.courier');
+
+        return round($got, 2);
+    }
+
+    protected function closeDelivery(Delivery $dl, int $pid, float $got, string $log): void
+    {
+        $cash = $pid === AppSettings::cashPaymentId();
+        $dl->collected_cash = $cash ? round($got, 2) : 0;
+        $dl->collected_bank = $cash ? 0 : round($got, 2);
+        $dl->status = 'delivered';
+        $dl->delivered_at = now();
+        $dl->problem = null;
+        if (\App\Support\Fast::hasColumn('deliveries', 'kept')) {
+            $dl->kept = false;
+        }
+        $dl->save();
+        $dl->log('delivered', $log);
+        Log::create(['user_id' => auth()->id(), 'type' => 'order', 'title' => ' دليفري ' . $dl->code . ' (' . ($dl->recipient_name ?: optional($dl->customer)->name) . ')', 'log' => ' ' . $log]);
+        Cache::forget('sg.badge.courier');
+        Cache::forget('sg.badge.pcart');
     }
 
     /** ☑ إجراء على المختارين: ترحيل · تعيين مندوب · رجوع للرف */
@@ -829,6 +1041,10 @@ class DispatchController extends Controller
             'parcels' => max(1, $orders->sum(fn ($o) => $o->bags_num ?: 1)), 'amount' => round($due, 2), 'fee' => $fee,
             'pay_type' => $due <= 0.009 ? 'paid' : 'cash', 'assigned_at' => $courier ? now() : null, 'created_id' => auth()->id(),
         ]);
+        if (!empty($cu->area) && \App\Support\Fast::hasColumn('deliveries', 'area')) {
+            $dl->area = $cu->area;
+            $dl->saveQuietly();
+        }
         foreach ($orders as $o) {
             $dl->orders()->attach($o->id, ['due' => max(0, $o->remaining())]);
             $o->delivery_id = $dl->id;
@@ -849,6 +1065,9 @@ class DispatchController extends Controller
     /** 💵 عربون: نبعتو للزبون الرابط والتفاصيل */
     protected function depositMsg(Delivery $dl): void
     {
+        if (!AppSettings::get('couriers_enabled', false)) {
+            return; // 🚫 بدون مناديب: ما فيش رسالة «المندوب جاي يقبض»
+        }
         $c = $dl->customer;
         if (!$c || !$c->phone_1) {
             return;
