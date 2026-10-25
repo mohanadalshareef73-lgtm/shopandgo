@@ -45,11 +45,21 @@ class PricingCheckController extends Controller
         } catch (\Throwable $e) {
         }
 
+        // 📱 جلسات واتسي: مربوطة ولا لا، والرقم اللي تبعت منه المنظومة
+        $waSessions = null;
+        $waErr = null;
+        try {
+            $waSessions = app(\App\Services\WhatsAppService::class)->sessions();
+        } catch (\Throwable $e) {
+            $waErr = $e->getMessage();
+        }
+        $waMain = optional(\App\Models\Setting::find(1))->whatsappMainSessionUuid() ?: config('services.whatsapp.main_session_uuid');
+        $waTest = Cache::get('sg.wa.test');
         $speed = \App\Support\Optimizer::status();
         $slow = collect(Cache::get('sg.slow', []));
         $slowBy = $slow->groupBy('route')->map(fn ($g, $r) => ['route' => $r, 'n' => $g->count(), 'avg' => (int) $g->avg('ms'), 'max' => (int) $g->max('ms'), 'q' => (int) $g->avg('q'), 'db' => (int) $g->avg('db'), 'mem' => (int) $g->max('mem')])->sortByDesc('n')->values();
 
-        return view('sg.pricing-check.index', compact('speed', 'slow', 'slowBy', 'hb', 'hbq', 'wallet', 'walletErr', 'quotes', 'waiting', 'failedToday', 'lastIn', 'wa', 'waFail', 'token', 'debug', 'testMode', 'lastWaIn'));
+        return view('sg.pricing-check.index', compact('waSessions', 'waErr', 'waMain', 'waTest', 'speed', 'slow', 'slowBy', 'hb', 'hbq', 'wallet', 'walletErr', 'quotes', 'waiting', 'failedToday', 'lastIn', 'wa', 'waFail', 'token', 'debug', 'testMode', 'lastWaIn'));
     }
 
     /** يفك القفل العالق (لو الأمر طاح في نصه، Laravel يقعد يعتبره شغال لمدة 24 ساعة) */
@@ -77,6 +87,27 @@ class PricingCheckController extends Controller
         Cache::forget('sg.slow');
 
         return back()->with('success', 'تم مسح سجل الصفحات البطيئة');
+    }
+
+    /** 🧪 رسالة تجربة لرقم المحل: نشوفو رد واتسي بالحرف (سبب الفشل) */
+    public function waTest()
+    {
+        $this->guard();
+        $to = \App\Services\MessageService::normalize((string) (\App\Services\AppSettings::get('shop_phone') ?: (\App\Services\AppSettings::reportPhones()[0] ?? '')));
+        if (!$to) {
+            return back()->with('error', 'ما فيش رقم محل في الإعدادات نجربو عليه');
+        }
+        try {
+            $r = app(\App\Services\WhatsAppService::class)->send(['phone' => [ltrim($to, '+')], 'message' => '🧪 تجربة من فحص التسعير · ' . now()->format('H:i')]);
+            $res = ['ok' => $r->successful(), 'status' => $r->status(), 'body' => mb_substr((string) $r->body(), 0, 400)];
+        } catch (\Throwable $e) {
+            $res = ['ok' => false, 'status' => 0, 'body' => mb_substr($e->getMessage(), 0, 400)];
+        }
+        $res['at'] = now()->format('Y-m-d H:i');
+        $res['to'] = $to;
+        Cache::put('sg.wa.test', $res, now()->addDay());
+
+        return back()->with($res['ok'] ? 'success' : 'error', $res['ok'] ? '✅ واتسي قبل الرسالة — شوف واتساب المحل' : '✕ واتسي رفض: ' . $res['status'] . ' · ' . $res['body']);
     }
 
     /** 🧹 تنظيف ملفات السلات القديمة توا (تتعمل من جديد وقت الحاجة) */

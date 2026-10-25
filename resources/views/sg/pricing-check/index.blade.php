@@ -35,6 +35,20 @@
         <tr><td>💳 محفظة التسعير</td><td>{!! $ok($wallet && (float) $avail > 0) !!}</td><td class="note">
             @if ($walletErr) ما قدرناش نوصلو للخدمة: {{ $walletErr }}
             @else المتاح <b class="num">{{ $avail }} {{ $wallet['available']['currency'] ?? '' }}</b> @endif</td></tr>
+        @php
+            $mainS = collect($waSessions ?? [])->firstWhere('uuid', $waMain);
+            $stOk = $mainS && in_array(strtolower((string) $mainS['status']), ['connected', 'open', 'active', 'ready', 'online', 'authenticated', 'working'], true);
+        @endphp
+        <tr><td>📱 جلسة واتسي اللي تبعت منها المنظومة</td><td>{!! $ok($stOk) !!}</td><td class="note">
+            @if ($waErr) ما قدرناش نوصلو لواتسي: {{ $waErr }}
+            @elseif (!$mainS) الرقم الرئيسي ({{ $waMain ?: 'مش محدد' }}) مش موجود في حسابك في واتسي — اختار الرقم الصح من إعدادات الواتساب
+            @else {{ $mainS['name'] }} · الحالة: <b style="direction:ltr;display:inline-block">{{ $mainS['status'] }}</b>{{ $stOk ? '' : ' — اربطها من جديد من لوحة واتسي (QR)' }} @endif
+            @if ($waSessions)<br><small>كل الجلسات: @foreach ($waSessions as $ss){{ $ss['name'] }} ({{ $ss['status'] }}){{ !$loop->last ? ' · ' : '' }}@endforeach</small>@endif
+        </td></tr>
+        <tr><td>🧪 آخر رسالة تجربة</td><td>@if ($waTest){!! $ok($waTest['ok']) !!}@endif</td><td class="note">
+            @if ($waTest){{ $waTest['at'] }} → {{ $waTest['to'] }} · <b class="num">{{ $waTest['status'] }}</b> <span style="direction:ltr;display:inline-block">{{ $waTest['body'] }}</span>@else ما جربناش لين توا @endif
+            <form method="post" action="{{ route('sg.pricing.watest') }}" style="display:inline">@csrf<button class="btn ghost sm">🧪 ابعت رسالة تجربة لرقم المحل</button></form>
+        </td></tr>
         <tr><td>📵 الواتساب (آخر 3 ساعات)</td><td>{!! $ok($waFail < 3) !!}</td><td class="note">{{ $waFail }} رسالة فشلت{{ $waFail >= 3 ? ' — تأكد إن جلسة الواتساب مربوطة' : '' }}</td></tr>
         <tr><td>🛒 سلات تستنى الرد (آخر يومين)</td><td>{!! $ok($waiting < 5) !!}</td><td class="note">{{ $waiting }} سلة · فشلت اليوم {{ $failedToday }} · آخر سلة جت {{ $lastIn ? $lastIn->diffForHumans() : '—' }}</td></tr>
         <tr><td>🐞 وضع الديبق APP_DEBUG</td><td>{!! $ok(!$debug) !!}</td><td class="note">{{ $debug ? 'شغال — خليه false في .env (يثقل المنظومة)' : 'مقفول' }}</td></tr>
