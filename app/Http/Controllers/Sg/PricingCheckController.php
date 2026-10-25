@@ -79,6 +79,20 @@ class PricingCheckController extends Controller
         return back()->with('success', 'تم مسح سجل الصفحات البطيئة');
     }
 
+    /** 🧹 تنظيف ملفات السلات القديمة توا (تتعمل من جديد وقت الحاجة) */
+    public function cleanup()
+    {
+        $this->guard();
+        @set_time_limit(170);
+        try {
+            Artisan::call('sg:cleanup');
+
+            return back()->with('success', '🧹 ' . trim(Artisan::output()));
+        } catch (\Throwable $e) {
+            return back()->with('error', 'التنظيف طاح: ' . mb_substr($e->getMessage(), 0, 250));
+        }
+    }
+
     /** يشغّل التسعير توا من غير ما يستنى الـ cron */
     public function run()
     {

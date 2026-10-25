@@ -409,6 +409,7 @@ Route::group(['middleware' => ['auth', 'isAdmin']], function () {
         Route::get('pricing-check', [$C . 'PricingCheckController', 'index'])->name('pricing.check');
         Route::post('pricing-check/unlock', [$C . 'PricingCheckController', 'unlock'])->name('pricing.unlock');
         Route::post('pricing-check/run', [$C . 'PricingCheckController', 'run'])->name('pricing.run');
+        Route::post('pricing-check/cleanup', [$C . 'PricingCheckController', 'cleanup'])->name('pricing.cleanup');
         Route::post('pricing-check/optimize', [$C . 'PricingCheckController', 'optimize'])->name('pricing.optimize');
         Route::post('pricing-check/clear-slow', [$C . 'PricingCheckController', 'clearSlow'])->name('pricing.clearslow');
         Route::post('orders/{order}/issues', [$C . 'IssuesController', 'store'])->name('issues.store');

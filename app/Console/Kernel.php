@@ -20,7 +20,7 @@ class Kernel extends ConsoleKernel
         // القفل يتفك وحده بعد 10 دقايق لو الأمر طاح (بدل 24 ساعة)
         $schedule->command('cart-quotes:process')->everyMinute()->withoutOverlapping(10);
         $schedule->command('sg:campaigns')->everyMinute()->withoutOverlapping(); // حملات واتساب على دفعات
-        $schedule->command('sg:cleanup')->dailyAt('04:30')->timezone('Africa/Tripoli')->withoutOverlapping(); // تنظيف الملفات والسجلات القديمة
+        $schedule->command('sg:cleanup')->twiceDaily(4, 15)->timezone('Africa/Tripoli')->withoutOverlapping(30); // 🧹 تنظيف ملفات السلات والسجلات القديمة (مرتين في اليوم)
         $schedule->command('cart-quotes:process-replies')->everyMinute()->withoutOverlapping(10);
         $schedule->command('whatsapp:resolve-cart-contacts')->everyMinute()->withoutOverlapping(10);
         // التقرير الشهري للشركاء: أول يوم في الشهر الساعة 9 الصبح (توقيت ليبيا)

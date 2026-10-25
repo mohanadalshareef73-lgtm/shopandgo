@@ -15,6 +15,7 @@
     <div style="display:flex;gap:8px;flex-wrap:wrap">
         <form method="post" action="{{ route('sg.pricing.unlock') }}">@csrf<button class="btn ghost">🔓 فك القفل العالق</button></form>
         <form method="post" action="{{ route('sg.pricing.run') }}">@csrf<button class="btn">▶ شغّل التسعير توا</button></form>
+        <form method="post" action="{{ route('sg.pricing.cleanup') }}" onsubmit="return confirm('نمسحو ملفات PDF وصور السلات القديمة (أقدم من 5 أيام)؟ تتعمل من جديد وحدها وقت ما تحتاجها')">@csrf<button class="btn ghost">🧹 فضّي ملفات السلات القديمة</button></form>
         <form method="post" action="{{ route('sg.pricing.optimize') }}">@csrf<button class="btn primary">⚡ سرّع المنظومة</button></form>
         <a href="{{ route('sg.pricing.check') }}" class="btn ghost">↻ تحديث</a>
     </div>

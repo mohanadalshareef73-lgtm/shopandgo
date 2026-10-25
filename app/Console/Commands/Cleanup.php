@@ -18,26 +18,29 @@ class Cleanup extends Command
         $freed = 0;
         $disk = Storage::disk('local');
         $keep = CartQuote::whereNotNull('pdf_path')->pluck('pdf_path')->flip();
-        $booked = CartQuote::whereIn('portal_status', ['ordered', 'confirmed'])->pluck('pdf_path')->filter()->flip();
+        // سلات لسه ما انبعتلهاش السعر: ملفها ما يتمسحش (يحتاجه الإرسال)
+        $pending = CartQuote::whereNotNull('pdf_path')->whereNull('notified_at')->pluck('pdf_path')->flip();
+        $days = max(2, (int) \App\Services\AppSettings::get('pdf_keep_days', 5));
         foreach (['shein', 'amazon', 'iherb'] as $r) {
             $dir = $r . '-quotations';
             if (!$disk->exists($dir)) {
                 continue;
             }
-            // ملفات PDF: اللي ما عادش مربوطة بسلة (أقدم من يومين)، أو سلات ما تحجزتش (أقدم من 45 يوم)
+            // ملفات PDF: اللي ما عادش مربوطة بسلة (أقدم من يوم)، وأي سلة انبعت سعرها (أقدم من 5 أيام)
+            // 🔁 آمن: أي ملف ينمسح يتعمل من جديد وحده وقت ما حد يفتحه ولا يبعته (prepare)
             foreach ($disk->files($dir) as $f) {
                 $age = now()->timestamp - $disk->lastModified($f);
-                $orphan = !isset($keep[$f]) && $age > 2 * 86400;
-                $stale = isset($keep[$f]) && !isset($booked[$f]) && $age > 45 * 86400;
+                $orphan = !isset($keep[$f]) && $age > 86400;
+                $stale = isset($keep[$f]) && !isset($pending[$f]) && $age > $days * 86400;
                 if ($orphan || $stale) {
                     $freed += $disk->size($f);
                     $disk->delete($f);
                 }
             }
-            // صور المنتجات المؤقتة (تنزل من جديد وقت الحاجة) أقدم من 30 يوم
+            // صور المنتجات المؤقتة (تنزل من جديد وقت الحاجة) أقدم من 5 أيام
             if ($disk->exists($dir . '/images')) {
-                foreach ($disk->files($dir . '/images') as $f) {
-                    if (now()->timestamp - $disk->lastModified($f) > 30 * 86400) {
+                foreach ($disk->allFiles($dir . '/images') as $f) {
+                    if (now()->timestamp - $disk->lastModified($f) > $days * 86400) {
                         $freed += $disk->size($f);
                         $disk->delete($f);
                     }
